@@ -2,48 +2,48 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>MDI • Éditeur Client</title>
+  <title>MDI • Mon Catalogue</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root { --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --accent: #3b82f6; --danger: #ef4444; }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
     .container { max-width: 800px; margin: 0 auto; display: none; }
-    .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box; }
+    .login-box { max-width: 400px; margin: 80px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box; font-family: inherit; }
     label { display: block; font-weight: 600; font-size: 13px; color: #64748b; margin-bottom: 5px; text-align: left; }
-    button { background: var(--accent); color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    button:hover { opacity: 0.9; }
-    .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .q-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    button { background: var(--accent); color: white; border: none; padding: 14px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    button:hover { filter: brightness(1.1); }
+    .card { background: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+    .q-item { padding: 15px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .q-item:last-child { border-bottom: none; }
+    .tag { background:#e2e8f0; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; color:#475569; }
   </style>
 </head>
 <body>
 
 <div id="login" class="login-box">
-  <h2>👋 Connexion Catalogue</h2>
-  <div id="loginError" style="color:red; font-size:13px; margin-bottom:10px; display:none"></div>
-  <label>Room ID</label><input id="roomId" placeholder="Ex: DEMO_CLIENT">
-  <label>Clé Secrète</label><input id="roomKey" type="password">
-  <button onclick="login()">Se connecter</button>
+  <h2>👋 Mon Catalogue MDI</h2>
+  <div id="loginError" style="color:var(--danger); font-size:13px; margin-bottom:15px; display:none"></div>
+  <label>ID Client</label><input id="roomId" placeholder="Ex: CLIENT_DEMO">
+  <label>Clé Secrète</label><input id="roomKey" type="password" placeholder="••••••••">
+  <button onclick="login()">Accéder à mes questions</button>
 </div>
 
 <div id="app" class="container">
-  <div style="display:flex; justify-content:space-between; margin-bottom:20px">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px">
     <h2>Mes Questions</h2>
-    <button onclick="logout()" style="width:auto; background:#94a3b8">Déconnexion</button>
+    <button onclick="logout()" style="width:auto; background:#64748b; padding:8px 15px">Déconnexion</button>
   </div>
 
   <div class="card">
-    <h3>Ajouter une question</h3>
+    <h3>➕ Nouvelle Question</h3>
     <form id="formQ">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-        <div><label>Code (ex: Q1, Q2...)</label><input id="q_key" required placeholder="Identifiant unique"></div>
+        <div><label>Code (ex: Q01)</label><input id="q_key" required></div>
         <div><label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select></div>
       </div>
-      
-      <label>Question</label><textarea id="q_prompt" required placeholder="Votre question ici..."></textarea>
-      
+      <label>Question</label><textarea id="q_prompt" required rows="2"></textarea>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
         <div><label>Réponse A</label><input id="q_a" required></div>
         <div><label>Réponse B</label><input id="q_b" required></div>
@@ -54,13 +54,12 @@
       </div>
       <label>Bonne Réponse (Quiz uniquement)</label>
       <select id="q_correct"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
-      
-      <button type="submit">💾 Enregistrer</button>
+      <button type="submit">💾 Enregistrer dans mon catalogue</button>
     </form>
   </div>
 
   <div class="card">
-    <h3>Liste des questions</h3>
+    <h3>📚 Liste des questions</h3>
     <div id="list">Chargement...</div>
   </div>
 </div>
@@ -68,7 +67,6 @@
 <script>
 const API = "https://magic-digital-impact-live.onrender.com/api/client";
 
-// Auto-Login
 const storedId = localStorage.getItem("mdi_id");
 const storedKey = localStorage.getItem("mdi_key");
 if(storedId && storedKey) {
@@ -80,14 +78,11 @@ if(storedId && storedKey) {
 async function login() {
   const id = document.getElementById("roomId").value.trim();
   const key = document.getElementById("roomKey").value.trim();
-  const errEl = document.getElementById("loginError");
-  
-  if(!id || !key) return alert("Remplissez tout !");
+  if(!id || !key) return;
 
   try {
     const res = await fetch(API + "/questions", { headers: { "x-room-id": id, "x-room-key": key } });
     const json = await res.json();
-
     if(json.ok) {
       localStorage.setItem("mdi_id", id);
       localStorage.setItem("mdi_key", key);
@@ -95,11 +90,11 @@ async function login() {
       document.getElementById("app").style.display = "block";
       renderList(json.questions);
     } else {
-      errEl.style.display = "block";
-      errEl.textContent = "Erreur : " + (json.error || "Identifiants incorrects");
+      document.getElementById("loginError").style.display = "block";
+      document.getElementById("loginError").textContent = "Identifiants invalides.";
       localStorage.clear();
     }
-  } catch(e) { alert("Erreur connexion: " + e.message); }
+  } catch(e) { console.error(e); }
 }
 
 function logout() { localStorage.clear(); location.reload(); }
@@ -108,12 +103,10 @@ document.getElementById("formQ").onsubmit = async (e) => {
   e.preventDefault();
   const id = localStorage.getItem("mdi_id");
   const key = localStorage.getItem("mdi_key");
-  
-  // On utilise Date.now() pour l'ordre, pour que les dernières créées soient à la fin
   const body = {
     question_key: document.getElementById("q_key").value,
     type: document.getElementById("q_type").value,
-    order_index: Date.now(), 
+    order_index: Date.now(),
     prompt: document.getElementById("q_prompt").value,
     option_a: document.getElementById("q_a").value,
     option_b: document.getElementById("q_b").value,
@@ -122,38 +115,25 @@ document.getElementById("formQ").onsubmit = async (e) => {
     correct_option: document.getElementById("q_correct").value,
     enabled: true
   };
-
-  try {
-    const res = await fetch(API + "/save-question", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-room-id": id, "x-room-key": key },
-      body: JSON.stringify(body)
-    });
-    const json = await res.json();
-    
-    if(json.ok) {
-      alert("✅ Question enregistrée avec succès !");
-      login(); // Rafraîchir la liste
-      // Reset partiel du form
-      document.getElementById("q_key").value = "";
-      document.getElementById("q_prompt").value = "";
-    } else {
-      alert("❌ Erreur lors de la sauvegarde : " + json.error);
-    }
-  } catch(e) { alert("Erreur technique : " + e.message); }
+  const res = await fetch(API + "/save-question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-room-id": id, "x-room-key": key },
+    body: JSON.stringify(body)
+  });
+  const json = await res.json();
+  if(json.ok) {
+    login(); // Refresh
+    e.target.reset();
+  } else { alert("Erreur: " + json.error); }
 };
 
 function renderList(list) {
   const div = document.getElementById("list");
-  if(!list || list.length === 0) { div.innerHTML = "Aucune question pour le moment."; return; }
-  
+  if(!list || list.length === 0) { div.innerHTML = "Aucune question enregistrée."; return; }
   div.innerHTML = list.map(q => `
     <div class="q-item">
-      <div>
-        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:bold">${q.question_key}</span>
-        <span style="margin-left:8px; font-weight:500">${q.prompt}</span>
-      </div>
-      <button onclick="delQ('${q.question_key}')" style="background:#ef4444; width:auto; padding:6px 12px; font-size:12px">Supprimer</button>
+      <div><span class="tag">${q.question_key}</span> <span style="margin-left:8px">${q.prompt}</span></div>
+      <button onclick="delQ('${q.question_key}')" style="background:var(--danger); width:auto; padding:5px 10px; font-size:11px">Supprimer</button>
     </div>
   `).join('');
 }
