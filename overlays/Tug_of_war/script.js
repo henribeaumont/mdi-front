@@ -1,8 +1,7 @@
 /**
- * MDI TUG OF WAR - V9 (OBS SYNC FIX)
- * - Attend le chargement du CSS OBS avant de démarrer
- * - Message d'erreur standardisé (Access Denied)
- * - Logique CSS Driven (O/N, 1/2...)
+ * MDI TUG OF WAR - V10 (FONT SIZE CONTROL)
+ * - Ajout de la gestion de la taille de police via CSS
+ * - Variable: --label-font-size
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -18,19 +17,15 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// --- ATTENTE CSS OBS (CRUCIAL) ---
+// --- ATTENTE CSS OBS ---
 async function waitForObsConfig() {
-  // On tente pendant 3 secondes max de trouver la clé
   for (let i = 0; i < 30; i++) {
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
-    
-    // Si on a les infos, on arrête d'attendre
     if (room && key && room !== "DEMO_CLIENT") return; 
-    
-    await wait(100); // On attend 100ms
+    await wait(100);
   }
-  console.log("⚠️ Fin de l'attente OBS, utilisation des valeurs trouvées.");
+  console.log("⚠️ Fin de l'attente OBS.");
 }
 
 // --- CONFIGURATION ---
@@ -44,19 +39,20 @@ let CONFIG = {
 function updateConfig() {
   CONFIG.nameL = cssVar("--name-left") || "OUI";
   CONFIG.nameR = cssVar("--name-right") || "NON";
-  
-  // On récupère les triggers définis dans le CSS
   CONFIG.triggerL = (cssVar("--trigger-left") || "O").toUpperCase();
   CONFIG.triggerR = (cssVar("--trigger-right") || "N").toUpperCase();
   
-  // Mise à jour de l'affichage
+  // --- NOUVEAU : TAILLE DE POLICE ---
+  // Lit la variable CSS ou met 60px par défaut
+  const fontSize = cssVar("--label-font-size") || "60px";
+
   const elL = document.getElementById("name-left");
   const elR = document.getElementById("name-right");
   const trL = document.getElementById("trig-left");
   const trR = document.getElementById("trig-right");
 
-  if(elL) elL.innerText = CONFIG.nameL;
-  if(elR) elR.innerText = CONFIG.nameR;
+  if(elL) { elL.innerText = CONFIG.nameL; elL.style.fontSize = fontSize; }
+  if(elR) { elR.innerText = CONFIG.nameR; elR.style.fontSize = fontSize; }
   if(trL) trL.innerText = CONFIG.triggerL;
   if(trR) trR.innerText = CONFIG.triggerR;
 }
@@ -79,28 +75,19 @@ function updateDisplay(votes) {
 
 // --- MAIN BOOT ---
 (async function demarrer() {
-  
-  // 1. On attend que OBS injecte le CSS
   await waitForObsConfig();
-  
-  // 2. On lit la config
   updateConfig();
   
-  // 3. Lecture finale des identifiants
-  // Priorité : URL > CSS > Défaut
   const params = new URLSearchParams(window.location.search);
   const room = params.get("room") || cssVar("--room-id");
   const key = params.get("key") || cssVar("--room-key");
 
-  // 4. Vérification Sécurité
   if(!room || !key) {
-    console.error("⛔ Config manquante (Room ou Key introuvable)");
-    // On laisse l'écran de sécurité par défaut (ACCÈS REFUSÉ)
+    console.error("⛔ Config manquante");
     document.getElementById("security-screen").classList.remove("hidden");
-    return; // STOP
+    return;
   }
 
-  // 5. Connexion
   console.log(`🔌 Connexion vers ${room}...`);
   const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
@@ -115,19 +102,15 @@ function updateDisplay(votes) {
     }
 
     if (payload.overlay === OVERLAY_TYPE && payload.data && payload.data.votes) {
-      // Sésame ouvre-toi
       document.getElementById("container").classList.remove("hidden");
       document.getElementById("security-screen").classList.add("hidden");
-      
-      updateConfig(); // Rafraichissement dynamique du CSS
+      updateConfig(); 
       updateDisplay(payload.data.votes);
     }
   });
 
   socket.on("overlay:forbidden", () => {
-    console.warn("⛔ Accès interdit par le serveur");
     document.getElementById("container").classList.add("hidden");
     document.getElementById("security-screen").classList.remove("hidden");
   });
-
 })();
