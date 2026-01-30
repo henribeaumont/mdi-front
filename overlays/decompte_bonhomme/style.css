@@ -1,0 +1,64 @@
+/**
+ * MDI COMPTEUR DE MAINS - V5.5 SaaS
+ * Design épuré pour OBS
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap');
+
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: transparent; /* Indispensable pour OBS */
+    height: 100vh;
+    width: 100vw;
+    font-family: 'Montserrat', sans-serif;
+}
+
+canvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    /* On applique un léger drop-shadow global sur les dessins du canvas pour la lisibilité */
+    filter: drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.15));
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* --- ÉCRAN SÉCURITÉ STANDARD MDI --- */
+.mdi-security {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background-color: #000;
+    color: #ff3b30; /* Rouge alerte */
+    z-index: 1000;
+    position: absolute;
+    font-weight: 900;
+}
+
+.mdi-security h1 {
+    font-size: 84px;
+    margin: 0;
+    line-height: 1;
+}
+
+.mdi-security p {
+    font-size: 28px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* Verrouillage du scroll si l'accès est refusé */
+.mdi-locked {
+    overflow: hidden;
+}
