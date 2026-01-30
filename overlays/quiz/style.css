@@ -1,232 +1,155 @@
 /* ==========================================================
-   MDI QUIZ / SONDAGE — UI Stable OBS
-   - Boot transparent (ne masque jamais la caméra)
-   - 2 panels: question + réponses
-   - Espacement pilotable via --panel-gap (CSS OBS)
+   MDI QUIZ / SONDAGE — DESIGN FINAL
+   - Jauges dynamiques (Poll)
+   - Highlight bonne réponse (Quiz)
    ========================================================== */
 
 html, body {
   width: 100%;
   height: 100%;
   margin: 0;
-  background: transparent; /* IMPORTANT OBS */
+  background: transparent;
   overflow: hidden;
 }
 
-/* -------------------------
-   États pilotés par script
-   ------------------------- */
-#quiz-container,
-#security-screen {
-  display: none; /* rien au boot */
-}
-
+#quiz-container, #security-screen { display: none; }
 html.mdi-ready #quiz-container { display: grid; }
 html.mdi-denied #security-screen { display: flex; }
 
-/* Boot transparent = ne jamais masquer la caméra */
 .quiz-root {
   position: fixed;
   inset: 0;
-
-  /* ✅ Layout vertical centré */
   display: grid;
   justify-items: center;
   align-content: center;
-
-  /* ✅ ESPACE ENTRE PANELS (pilotable OBS) */
   row-gap: var(--panel-gap, 18px);
-
   pointer-events: none;
-  font-family: var(--font-family, "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif);
+  font-family: var(--font-family, "Montserrat", sans-serif);
 }
 
-/* ==========================================================
-   🔐 Refus d'accès (fond transparent)
-   ========================================================== */
+/* --- Sécurité --- */
 #security-screen {
-  position: fixed;
-  inset: 0;
-  background: transparent;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  gap: 18px;
-  pointer-events: none;
-  text-align: center;
-  font-family: var(--font-family, "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif);
-  font-weight: 600; /* Semi-bold */
+  position: fixed; inset: 0; background: transparent;
+  justify-content: center; align-items: center; flex-direction: column;
+  text-align: center; font-weight: 600;
 }
+.security-x { font-size: 120px; color: #ff3b30; text-shadow: 0 0 22px rgba(255, 59, 48, 0.35); }
+.security-text { font-size: 54px; color: #ff3b30; text-shadow: 0 0 22px rgba(255, 59, 48, 0.25); }
 
-.security-x {
-  font-size: 120px;
-  line-height: 1;
-  color: #ff3b30;
-  text-shadow: 0 0 22px rgba(255, 59, 48, 0.35);
-}
-
-.security-text {
-  font-size: 54px;
-  letter-spacing: 0.5px;
-  color: #ff3b30;
-  text-shadow: 0 0 22px rgba(255, 59, 48, 0.25);
-}
-
-/* ==========================================================
-   Panels (fond piloté par JS via CSS OBS vars)
-   ========================================================== */
+/* --- Panels --- */
 .panel {
   width: min(92vw, 1680px);
-  border-radius: var(--panel-radius, 48px);
-  padding: var(--panel-padding, 44px);
-  background: rgba(0,0,0,0); /* set inline par JS */
+  border-radius: 48px;
+  padding: 44px;
+  background: #585858; /* Fallback */
   box-shadow: 0 40px 80px rgba(0,0,0,0.35);
-}
-
-/* Panel question : plus compact */
-.panel-question {
-  height: auto;
-  opacity: 0;
-  transform: translateY(-10px);
   transition: opacity 280ms ease, transform 280ms ease;
 }
 
-/* Panel réponses : légèrement plus bas */
-.panel-answers {
-  position: relative;
-  height: auto;
+.panel-question { opacity: 0; transform: translateY(-10px); }
+.panel-answers { opacity: 0; transform: translateY(10px); position: relative; }
 
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity var(--answers-panel-fade-ms, 260ms) ease, transform var(--answers-panel-fade-ms, 260ms) ease;
-}
-
-/* Quand l'état est visible (prompt/open/results/reveal/winner), on affiche le panel question */
 html[data-mdi-state="prompt"] .panel-question,
 html[data-mdi-state="open"] .panel-question,
 html[data-mdi-state="results"] .panel-question,
 html[data-mdi-state="reveal"] .panel-question,
-html[data-mdi-state="winner"] .panel-question{
-  opacity: 1;
-  transform: translateY(0);
-}
+html[data-mdi-state="winner"] .panel-question { opacity: 1; transform: translateY(0); }
 
-/* Panel réponses visible uniquement à partir de open */
 html[data-mdi-state="open"] .panel-answers,
 html[data-mdi-state="results"] .panel-answers,
 html[data-mdi-state="reveal"] .panel-answers,
-html[data-mdi-state="winner"] .panel-answers{
-  opacity: 1;
-  transform: translateY(0);
-}
+html[data-mdi-state="winner"] .panel-answers { opacity: 1; transform: translateY(0); }
 
-/* -------------------------
-   Question
-   ------------------------- */
+/* --- Question --- */
 .question {
-  height: var(--question-height, 160px);
-  border-radius: var(--question-radius, 34px);
-  display: grid;
-  place-items: center;
-  text-align: center;
-
-  font-weight: 800;
-  font-size: var(--question-font-size, 82px);
-  color: var(--question-text-color, #ffffff);
-  padding: 0 40px;
-
-  background: rgba(0,0,0,0); /* set inline par JS */
+  min-height: 160px;
+  border-radius: 34px;
+  display: grid; place-items: center; text-align: center;
+  font-weight: 800; font-size: 82px; color: #fff;
+  padding: 20px 40px;
+  background: linear-gradient(180deg, #0A0F1E, #3A3F75);
+  border: 5px solid rgba(90, 95, 255, 0.95);
   box-shadow: 0 18px 30px rgba(0,0,0,0.35);
-  border: var(--question-border-size, 5px) solid rgba(90, 95, 255, 0.95);
 }
 
-/* -------------------------
-   Réponses
-   ------------------------- */
+/* --- Réponses --- */
 .answers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 26px 26px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 26px;
 }
 
 .answer {
-  height: var(--answer-height, 150px);
-  border-radius: var(--answer-radius, 999px);
-  display: grid;
-  grid-template-columns: 108px 1fr auto;
-  align-items: center;
-  column-gap: 18px;
+  height: 150px;
+  border-radius: 999px;
+  display: grid; grid-template-columns: 108px 1fr auto; align-items: center;
   padding: 0 30px 0 18px;
+  column-gap: 18px;
+  
+  /* Base Style */
+  background: #203B56; 
+  border: 3px solid rgba(80, 220, 255, 0.2);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+  
+  opacity: 1; transform: translateY(0);
+  transition: opacity 220ms ease, transform 220ms ease, border-color 0.3s, box-shadow 0.3s;
+  position: relative; overflow: hidden; /* Pour la jauge */
+}
 
-  background: rgba(0,0,0,0); /* set inline par JS */
-  border: var(--answer-border-size, 3px) solid rgba(80, 220, 255, 0.55);
-  box-shadow: 0 18px 30px rgba(0,0,0,0.25);
-
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 220ms ease, transform 220ms ease;
+/* Jauge de fond (gérée dynamiquement via style inline) */
+.answer::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: var(--gauge-bg, transparent);
+  width: var(--gauge-width, 0%);
+  transition: width 1s ease-out, background 0.3s;
 }
 
 .badge {
-  width: 94px;
-  height: 94px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  font-size: 40px;
-  color: #0a0f1e;
-  background: #ffffff;
-  box-shadow: 0 12px 18px rgba(0,0,0,0.25);
+  width: 94px; height: 94px; border-radius: 999px;
+  display: grid; place-items: center;
+  font-weight: 900; font-size: 40px; color: #0a0f1e; background: #fff;
+  z-index: 2;
 }
-
 .answer-text {
-  font-weight: 800;
-  font-size: var(--answer-font-size, 74px);
-  color: var(--answer-text-color, #ffffff);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 800; font-size: 74px; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2;
 }
-
-/* % lisibles */
 .pct {
-  font-weight: 900;
-  font-size: var(--pct-font-size, 74px);
-  color: var(--pct-color, #ffffff);
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 180ms ease;
+  font-weight: 900; font-size: 74px; color: #fff;
+  opacity: 0; transform: translateY(4px); transition: opacity 180ms; z-index: 2;
 }
 html.mdi-show-results .pct { opacity: 1; }
 
-/* Options cachées (apparition progressive pilotée par JS) */
-html.mdi-options-hidden .answer {
-  opacity: 0;
-  transform: translateY(10px);
+/* --- ETATS SPECIFIQUES --- */
+
+/* 1. QUIZ : Bonne réponse (Reveal/Winner) */
+.answer.is-correct {
+  border-color: #2ECC71;
+  box-shadow: 0 0 30px rgba(46, 204, 113, 0.6), inset 0 0 20px rgba(46, 204, 113, 0.2);
+  background: linear-gradient(90deg, rgba(46,204,113,0.3), rgba(46,204,113,0.1));
+}
+.answer.is-correct .badge { background: #2ECC71; color: #fff; }
+
+/* 2. QUIZ : Mauvaises réponses (Dimmed) */
+html.mdi-dim-others .answer:not(.is-correct) {
+  opacity: 0.2;
+  filter: grayscale(0.8);
 }
 
-/* Winner */
+/* 3. SONDAGE : Couleurs des jauges par rang */
+/* Rank 1 (Vert) */
+.answer[data-rank="1"] { --gauge-bg: linear-gradient(90deg, rgba(46,204,113,0.8), rgba(46,204,113,0.4)); }
+/* Rank 2 (Jaune) */
+.answer[data-rank="2"] { --gauge-bg: linear-gradient(90deg, rgba(241,196,15,0.8), rgba(241,196,15,0.4)); }
+/* Rank 3 (Orange) */
+.answer[data-rank="3"] { --gauge-bg: linear-gradient(90deg, rgba(230,126,34,0.8), rgba(230,126,34,0.4)); }
+/* Rank 4 (Rouge) */
+.answer[data-rank="4"] { --gauge-bg: linear-gradient(90deg, rgba(231,76,60,0.8), rgba(231,76,60,0.4)); }
+
+/* Winner Panel */
 .winner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-
-  font-weight: 900;
-  font-size: calc(var(--answer-font-size, 74px) * 2);
-  color: var(--winner-color, #ffffff);
-
-  opacity: 0;
-  transition: opacity 200ms ease;
+  position: absolute; inset: 0;
+  display: flex; justify-content: center; align-items: center; gap: 16px;
+  font-weight: 900; font-size: 140px; color: #fff;
+  opacity: 0; transition: opacity 200ms ease; pointer-events: none; z-index: 10;
+  text-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
-.winner-name { font-size: inherit; letter-spacing: 0.3px; }
 html.mdi-show-winner #winner { opacity: 1; }
-
-/* Quand winner => on atténue toutes les réponses simultanément */
-html.mdi-dim-answers .answer {
-  opacity: var(--answers-dim-opacity, 0.12);
-  transition-delay: 0ms !important;
-}
