@@ -1,3 +1,8 @@
+/* ==========================================================
+   MDI QUIZ / SONDAGE — LOGIQUE CORRIGÉE (V3.7)
+   - Fix: Mapping 'options' -> 'open'
+   - Fix: Visibilité Winner
+   ========================================================== */
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_NAME = "quiz_ou_sondage";
 
@@ -45,12 +50,17 @@ function resetVisuals() {
     el.removeAttribute("data-rank");
     el.style.setProperty("--gauge-width", "0%");
   });
-  document.documentElement.classList.remove("mdi-show-results", "mdi-show-winner", "mdi-dim-others");
+  // On nettoie toutes les classes d'état
+  document.documentElement.classList.remove(
+    "mdi-show-results", 
+    "mdi-show-winner", 
+    "mdi-dim-others", 
+    "mdi-dim-answers", 
+    "mdi-options-hidden"
+  );
 }
 
 function updateVisuals(state, data) {
-  resetVisuals();
-  
   // Data extraction
   let qType = "poll";
   let correctOpt = null;
@@ -66,7 +76,6 @@ function updateVisuals(state, data) {
   // Pourcentages
   const p = data?.percents || {};
   const stats = ["A","B","C","D"].map(k => ({ key: k, val: Number(p[k]) || 0 }));
-  
   stats.forEach(item => {
     answers[item.key].pct.textContent = Math.round(item.val) + "%";
   });
@@ -76,24 +85,22 @@ function updateVisuals(state, data) {
     document.documentElement.classList.add("mdi-show-results");
 
     if (qType === "poll") {
-      // SONDAGE: Calcul du rang (1 = plus haut score)
-      // On trie une copie pour trouver les positions
       const sortedValues = [...new Set(stats.map(s => s.val))].sort((a,b) => b - a);
-      
       stats.forEach(item => {
-        // Le rang est l'index de la valeur + 1
         const rank = sortedValues.indexOf(item.val) + 1;
-        const el = answers[item.key].el;
-        el.setAttribute("data-rank", rank); // Déclenche la couleur CSS
-        el.style.setProperty("--gauge-width", item.val + "%");
+        answers[item.key].el.setAttribute("data-rank", rank);
+        answers[item.key].el.style.setProperty("--gauge-width", item.val + "%");
       });
     } 
     else if (qType === "quiz") {
-      // QUIZ: Bonne réponse
       if ((state === "reveal" || state === "winner") && correctOpt) {
         document.documentElement.classList.add("mdi-dim-others");
         const winEl = answers[correctOpt].el;
-        if(winEl) winEl.classList.add("is-correct");
+        if(winEl) {
+           winEl.classList.add("is-correct");
+           // En mode winner, on force la bonne réponse à rester visible
+           if(state === "winner") winEl.classList.add("force-visible");
+        }
       }
     }
   }
@@ -101,6 +108,7 @@ function updateVisuals(state, data) {
   if (state === "winner") {
     elWinnerName.textContent = data?.winnerName || "Gagnant";
     document.documentElement.classList.add("mdi-show-winner");
+    document.documentElement.classList.add("mdi-dim-answers"); // Estompe tout le reste
   }
 }
 
@@ -109,13 +117,34 @@ function applyState(state, data) {
   if (AUTH_MODE === "strict" && !isAuthorized) return;
   if (!state || state === "idle") { setBootTransparent(); return; }
   
-  let uiState = (state === "question") ? "prompt" : state;
+  // --- LE CORRECTIF EST ICI ---
+  // On mappe les états serveur vers les états CSS attendus
+  let uiState = state;
+  if (state === "question") uiState = "prompt";
+  if (state === "options")  uiState = "open";   // <--- C'est ça qui manquait !
+
   document.documentElement.setAttribute("data-mdi-state", uiState);
   
   elQuiz.style.display = "grid";
   if(isAuthorized) elSecurity.style.display = "none";
 
+  // Reset visuals à chaque changement d'état pour éviter les résidus
+  resetVisuals();
   updateVisuals(uiState, data);
+
+  // Animations spécifiques (Stagger)
+  if (uiState === "prompt") {
+    document.documentElement.classList.add("mdi-options-hidden");
+  }
+  else if (uiState === "open") {
+    // Petit délai pour l'anim du panel puis les options
+    document.documentElement.classList.add("mdi-options-hidden");
+    setTimeout(() => {
+       requestAnimationFrame(() => {
+         document.documentElement.classList.remove("mdi-options-hidden");
+       });
+    }, 100);
+  }
 }
 
 /* --- 4. SOCKET --- */
