@@ -1,51 +1,35 @@
 /* ==========================================================
    MDI QUIZ / SONDAGE — DESIGN FINAL
-   - Jauges dynamiques (Poll)
-   - Highlight bonne réponse (Quiz)
    ========================================================== */
-
-html, body {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  background: transparent;
-  overflow: hidden;
-}
+html, body { width: 100%; height: 100%; margin: 0; background: transparent; overflow: hidden; }
 
 #quiz-container, #security-screen { display: none; }
 html.mdi-ready #quiz-container { display: grid; }
 html.mdi-denied #security-screen { display: flex; }
 
 .quiz-root {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  justify-items: center;
-  align-content: center;
+  position: fixed; inset: 0; display: grid;
+  justify-items: center; align-content: center;
   row-gap: var(--panel-gap, 18px);
   pointer-events: none;
   font-family: var(--font-family, "Montserrat", sans-serif);
 }
 
-/* --- Sécurité --- */
+/* Sécurité */
 #security-screen {
   position: fixed; inset: 0; background: transparent;
   justify-content: center; align-items: center; flex-direction: column;
   text-align: center; font-weight: 600;
 }
-.security-x { font-size: 120px; color: #ff3b30; text-shadow: 0 0 22px rgba(255, 59, 48, 0.35); }
-.security-text { font-size: 54px; color: #ff3b30; text-shadow: 0 0 22px rgba(255, 59, 48, 0.25); }
+.security-x { font-size: 120px; color: #ff3b30; }
+.security-text { font-size: 54px; color: #ff3b30; }
 
-/* --- Panels --- */
+/* Panels */
 .panel {
-  width: min(92vw, 1680px);
-  border-radius: 48px;
-  padding: 44px;
-  background: #585858; /* Fallback */
-  box-shadow: 0 40px 80px rgba(0,0,0,0.35);
+  width: min(92vw, 1680px); border-radius: 48px; padding: 44px;
+  background: #585858; box-shadow: 0 40px 80px rgba(0,0,0,0.35);
   transition: opacity 280ms ease, transform 280ms ease;
 }
-
 .panel-question { opacity: 0; transform: translateY(-10px); }
 .panel-answers { opacity: 0; transform: translateY(10px); position: relative; }
 
@@ -60,96 +44,77 @@ html[data-mdi-state="results"] .panel-answers,
 html[data-mdi-state="reveal"] .panel-answers,
 html[data-mdi-state="winner"] .panel-answers { opacity: 1; transform: translateY(0); }
 
-/* --- Question --- */
+/* Question */
 .question {
-  min-height: 160px;
-  border-radius: 34px;
+  min-height: 160px; border-radius: 34px;
   display: grid; place-items: center; text-align: center;
-  font-weight: 800; font-size: 82px; color: #fff;
-  padding: 20px 40px;
+  font-weight: 800; font-size: 82px; color: #fff; padding: 20px 40px;
   background: linear-gradient(180deg, #0A0F1E, #3A3F75);
   border: 5px solid rgba(90, 95, 255, 0.95);
   box-shadow: 0 18px 30px rgba(0,0,0,0.35);
 }
 
-/* --- Réponses --- */
-.answers {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 26px;
-}
+/* Réponses */
+.answers { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
 
 .answer {
-  height: 150px;
-  border-radius: 999px;
+  height: 150px; border-radius: 999px;
   display: grid; grid-template-columns: 108px 1fr auto; align-items: center;
-  padding: 0 30px 0 18px;
-  column-gap: 18px;
-  
-  /* Base Style */
+  padding: 0 30px 0 18px; column-gap: 18px;
   background: #203B56; 
   border: 3px solid rgba(80, 220, 255, 0.2);
   box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-  
   opacity: 1; transform: translateY(0);
-  transition: opacity 220ms ease, transform 220ms ease, border-color 0.3s, box-shadow 0.3s;
-  position: relative; overflow: hidden; /* Pour la jauge */
+  transition: all 0.3s ease;
+  position: relative; overflow: hidden; z-index: 1;
 }
 
-/* Jauge de fond (gérée dynamiquement via style inline) */
+/* Jauge de fond */
 .answer::before {
   content: ""; position: absolute; inset: 0; z-index: -1;
   background: var(--gauge-bg, transparent);
   width: var(--gauge-width, 0%);
-  transition: width 1s ease-out, background 0.3s;
+  transition: width 1s ease-out;
 }
 
 .badge {
   width: 94px; height: 94px; border-radius: 999px;
   display: grid; place-items: center;
   font-weight: 900; font-size: 40px; color: #0a0f1e; background: #fff;
-  z-index: 2;
 }
 .answer-text {
   font-weight: 800; font-size: 74px; color: #fff;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pct {
   font-weight: 900; font-size: 74px; color: #fff;
-  opacity: 0; transform: translateY(4px); transition: opacity 180ms; z-index: 2;
+  opacity: 0; transform: translateY(4px); transition: opacity 180ms;
 }
 html.mdi-show-results .pct { opacity: 1; }
 
-/* --- ETATS SPECIFIQUES --- */
+/* --- DESIGN DEMANDÉ --- */
 
-/* 1. QUIZ : Bonne réponse (Reveal/Winner) */
+/* 1. QUIZ : Bonne réponse (Vert + Glow) */
 .answer.is-correct {
   border-color: #2ECC71;
-  box-shadow: 0 0 30px rgba(46, 204, 113, 0.6), inset 0 0 20px rgba(46, 204, 113, 0.2);
+  box-shadow: 0 0 40px rgba(46, 204, 113, 0.8), inset 0 0 20px rgba(46, 204, 113, 0.4);
   background: linear-gradient(90deg, rgba(46,204,113,0.3), rgba(46,204,113,0.1));
 }
 .answer.is-correct .badge { background: #2ECC71; color: #fff; }
 
-/* 2. QUIZ : Mauvaises réponses (Dimmed) */
-html.mdi-dim-others .answer:not(.is-correct) {
-  opacity: 0.2;
-  filter: grayscale(0.8);
-}
+/* 2. QUIZ : Mauvaises réponses (Grisées) */
+html.mdi-dim-others .answer:not(.is-correct) { opacity: 0.3; filter: grayscale(1); }
 
-/* 3. SONDAGE : Couleurs des jauges par rang */
-/* Rank 1 (Vert) */
-.answer[data-rank="1"] { --gauge-bg: linear-gradient(90deg, rgba(46,204,113,0.8), rgba(46,204,113,0.4)); }
-/* Rank 2 (Jaune) */
-.answer[data-rank="2"] { --gauge-bg: linear-gradient(90deg, rgba(241,196,15,0.8), rgba(241,196,15,0.4)); }
-/* Rank 3 (Orange) */
-.answer[data-rank="3"] { --gauge-bg: linear-gradient(90deg, rgba(230,126,34,0.8), rgba(230,126,34,0.4)); }
-/* Rank 4 (Rouge) */
-.answer[data-rank="4"] { --gauge-bg: linear-gradient(90deg, rgba(231,76,60,0.8), rgba(231,76,60,0.4)); }
+/* 3. SONDAGE : Jauges par rang */
+.answer[data-rank="1"] { --gauge-bg: linear-gradient(90deg, rgba(46,204,113,0.8), rgba(46,204,113,0.4)); } /* Vert */
+.answer[data-rank="2"] { --gauge-bg: linear-gradient(90deg, rgba(241,196,15,0.8), rgba(241,196,15,0.4)); } /* Jaune */
+.answer[data-rank="3"] { --gauge-bg: linear-gradient(90deg, rgba(230,126,34,0.8), rgba(230,126,34,0.4)); } /* Orange */
+.answer[data-rank="4"] { --gauge-bg: linear-gradient(90deg, rgba(231,76,60,0.8), rgba(231,76,60,0.4)); } /* Rouge */
 
-/* Winner Panel */
+/* Winner */
 .winner {
-  position: absolute; inset: 0;
-  display: flex; justify-content: center; align-items: center; gap: 16px;
+  position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; gap: 16px;
   font-weight: 900; font-size: 140px; color: #fff;
-  opacity: 0; transition: opacity 200ms ease; pointer-events: none; z-index: 10;
-  text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  opacity: 0; pointer-events: none; z-index: 10; text-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 html.mdi-show-winner #winner { opacity: 1; }
