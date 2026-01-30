@@ -65,7 +65,7 @@ html[data-mdi-state="winner"] .panel-answers { opacity: 1; transform: translateY
   border: 3px solid rgba(80, 220, 255, 0.2);
   box-shadow: 0 10px 20px rgba(0,0,0,0.2);
   opacity: 1; transform: translateY(0);
-  transition: all 0.3s ease;
+  transition: all 0.5s ease; /* Transition douce pour l'estompage */
   position: relative; overflow: hidden; z-index: 1;
 }
 
@@ -92,9 +92,12 @@ html[data-mdi-state="winner"] .panel-answers { opacity: 1; transform: translateY
 }
 html.mdi-show-results .pct { opacity: 1; }
 
-/* --- DESIGN DEMANDÉ --- */
+/* Options cachées */
+html.mdi-options-hidden .answer { opacity: 0; transform: translateY(10px); }
 
-/* 1. QUIZ : Bonne réponse (Vert + Glow) */
+/* --- DESIGN QUIZ & POLL --- */
+
+/* 1. QUIZ : Bonne réponse */
 .answer.is-correct {
   border-color: #2ECC71;
   box-shadow: 0 0 40px rgba(46, 204, 113, 0.8), inset 0 0 20px rgba(46, 204, 113, 0.4);
@@ -102,19 +105,41 @@ html.mdi-show-results .pct { opacity: 1; }
 }
 .answer.is-correct .badge { background: #2ECC71; color: #fff; }
 
-/* 2. QUIZ : Mauvaises réponses (Grisées) */
-html.mdi-dim-others .answer:not(.is-correct) { opacity: 0.3; filter: grayscale(1); }
+/* 2. SONDAGE : Jauges */
+.answer[data-rank="1"] { --gauge-bg: linear-gradient(90deg, rgba(46,204,113,0.8), rgba(46,204,113,0.4)); }
+.answer[data-rank="2"] { --gauge-bg: linear-gradient(90deg, rgba(241,196,15,0.8), rgba(241,196,15,0.4)); }
+.answer[data-rank="3"] { --gauge-bg: linear-gradient(90deg, rgba(230,126,34,0.8), rgba(230,126,34,0.4)); }
+.answer[data-rank="4"] { --gauge-bg: linear-gradient(90deg, rgba(231,76,60,0.8), rgba(231,76,60,0.4)); }
 
-/* 3. SONDAGE : Jauges par rang */
-.answer[data-rank="1"] { --gauge-bg: linear-gradient(90deg, rgba(46,204,113,0.8), rgba(46,204,113,0.4)); } /* Vert */
-.answer[data-rank="2"] { --gauge-bg: linear-gradient(90deg, rgba(241,196,15,0.8), rgba(241,196,15,0.4)); } /* Jaune */
-.answer[data-rank="3"] { --gauge-bg: linear-gradient(90deg, rgba(230,126,34,0.8), rgba(230,126,34,0.4)); } /* Orange */
-.answer[data-rank="4"] { --gauge-bg: linear-gradient(90deg, rgba(231,76,60,0.8), rgba(231,76,60,0.4)); } /* Rouge */
+/* --- ETAT WINNER (Amélioré) --- */
 
-/* Winner */
+/* L'élément Winner passe par dessus tout */
 .winner {
-  position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; gap: 16px;
+  position: absolute; inset: 0; 
+  display: flex; justify-content: center; align-items: center; gap: 20px;
   font-weight: 900; font-size: 140px; color: #fff;
-  opacity: 0; pointer-events: none; z-index: 10; text-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  opacity: 0; pointer-events: none; z-index: 50; /* Z-index très haut */
+  
+  /* Grosse ombre portée noire pour lisibilité max */
+  text-shadow: 
+    0 10px 40px rgba(0,0,0,0.8),
+    0 0 0px #000, 
+    0 0 20px rgba(0,0,0,0.5);
+    
+  transform: scale(0.9);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-html.mdi-show-winner #winner { opacity: 1; }
+
+html.mdi-show-winner #winner { 
+  opacity: 1; 
+  transform: scale(1);
+}
+
+/* On éteint les réponses quand le gagnant est là */
+html.mdi-dim-answers .answer {
+  opacity: 0.05 !important; /* Quasi invisible */
+  filter: blur(4px);        /* Flou d'arrière plan */
+}
+
+/* (Optionnel) Si tu veux quand même voir la bonne réponse en fond, décommente ça : */
+/* html.mdi-dim-answers .answer.force-visible { opacity: 0.3 !important; filter: blur(2px); } */
