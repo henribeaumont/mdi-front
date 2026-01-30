@@ -6,16 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root { --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --accent: #3b82f6; }
+    :root { --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --accent: #3b82f6; --danger: #ef4444; }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
-    .container { max-width: 800px; margin: 0 auto; display: none; } /* Caché par défaut */
+    .container { max-width: 800px; margin: 0 auto; display: none; }
     .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
     input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box; }
     label { display: block; font-weight: 600; font-size: 13px; color: #64748b; margin-bottom: 5px; text-align: left; }
     button { background: var(--accent); color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; }
     button:hover { opacity: 0.9; }
     .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .q-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+    .q-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -38,19 +38,19 @@
     <h3>Ajouter une question</h3>
     <form id="formQ">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-        <div><label>Code (Q1, Q2...)</label><input id="q_key" required></div>
-        <div><label>Ordre</label><input type="number" id="q_order" value="1" required></div>
+        <div><label>Code (ex: Q1, Q2...)</label><input id="q_key" required placeholder="Identifiant unique"></div>
+        <div><label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select></div>
       </div>
-      <label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select>
-      <label>Question</label><textarea id="q_prompt" required></textarea>
+      
+      <label>Question</label><textarea id="q_prompt" required placeholder="Votre question ici..."></textarea>
       
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
         <div><label>Réponse A</label><input id="q_a" required></div>
         <div><label>Réponse B</label><input id="q_b" required></div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-        <div><label>Réponse C</label><input id="q_c"></div>
-        <div><label>Réponse D</label><input id="q_d"></div>
+        <div><label>Réponse C (Optionnel)</label><input id="q_c"></div>
+        <div><label>Réponse D (Optionnel)</label><input id="q_d"></div>
       </div>
       <label>Bonne Réponse (Quiz uniquement)</label>
       <select id="q_correct"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
@@ -60,15 +60,15 @@
   </div>
 
   <div class="card">
-    <h3>Liste</h3>
-    <div id="list">...</div>
+    <h3>Liste des questions</h3>
+    <div id="list">Chargement...</div>
   </div>
 </div>
 
 <script>
 const API = "https://magic-digital-impact-live.onrender.com/api/client";
 
-// Auto-Login si déjà connecté
+// Auto-Login
 const storedId = localStorage.getItem("mdi_id");
 const storedKey = localStorage.getItem("mdi_key");
 if(storedId && storedKey) {
@@ -82,53 +82,38 @@ async function login() {
   const key = document.getElementById("roomKey").value.trim();
   const errEl = document.getElementById("loginError");
   
-  if(!id || !key) return alert("Remplissez les champs !");
+  if(!id || !key) return alert("Remplissez tout !");
 
   try {
-    // On tente de charger la liste pour vérifier les accès
-    const res = await fetch(API + "/questions", {
-      headers: { "x-room-id": id, "x-room-key": key }
-    });
-
-    // Gestion erreur serveur (ex: 404 si serveur pas à jour)
-    if(res.status === 404) {
-      errEl.style.display = "block";
-      errEl.textContent = "Erreur 404: Le serveur n'est pas à jour (V5.0 requise).";
-      return;
-    }
-
+    const res = await fetch(API + "/questions", { headers: { "x-room-id": id, "x-room-key": key } });
     const json = await res.json();
 
     if(json.ok) {
-      // Succès
       localStorage.setItem("mdi_id", id);
       localStorage.setItem("mdi_key", key);
       document.getElementById("login").style.display = "none";
       document.getElementById("app").style.display = "block";
       renderList(json.questions);
     } else {
-      // Echec Auth
       errEl.style.display = "block";
-      errEl.textContent = "Refusé : " + (json.error || "ID ou Clé incorrecte");
+      errEl.textContent = "Erreur : " + (json.error || "Identifiants incorrects");
       localStorage.clear();
     }
-  } catch(e) {
-    alert("Erreur technique : " + e.message);
-  }
+  } catch(e) { alert("Erreur connexion: " + e.message); }
 }
 
 function logout() { localStorage.clear(); location.reload(); }
 
-// Sauvegarde
 document.getElementById("formQ").onsubmit = async (e) => {
   e.preventDefault();
   const id = localStorage.getItem("mdi_id");
   const key = localStorage.getItem("mdi_key");
   
+  // On utilise Date.now() pour l'ordre, pour que les dernières créées soient à la fin
   const body = {
     question_key: document.getElementById("q_key").value,
     type: document.getElementById("q_type").value,
-    order_index: parseInt(document.getElementById("q_order").value) || 1, // Fix parseInt
+    order_index: Date.now(), 
     prompt: document.getElementById("q_prompt").value,
     option_a: document.getElementById("q_a").value,
     option_b: document.getElementById("q_b").value,
@@ -147,28 +132,34 @@ document.getElementById("formQ").onsubmit = async (e) => {
     const json = await res.json();
     
     if(json.ok) {
-      alert("Question enregistrée !");
-      // Reload list
-      login(); 
+      alert("✅ Question enregistrée avec succès !");
+      login(); // Rafraîchir la liste
+      // Reset partiel du form
+      document.getElementById("q_key").value = "";
+      document.getElementById("q_prompt").value = "";
     } else {
-      alert("Erreur serveur : " + json.error);
+      alert("❌ Erreur lors de la sauvegarde : " + json.error);
     }
-  } catch(e) { alert("Erreur : " + e.message); }
+  } catch(e) { alert("Erreur technique : " + e.message); }
 };
 
 function renderList(list) {
   const div = document.getElementById("list");
-  if(!list || list.length === 0) { div.innerHTML = "Aucune question."; return; }
+  if(!list || list.length === 0) { div.innerHTML = "Aucune question pour le moment."; return; }
+  
   div.innerHTML = list.map(q => `
     <div class="q-item">
-      <div><strong>${q.question_key}</strong>: ${q.prompt}</div>
-      <button onclick="delQ('${q.question_key}')" style="background:#ef4444; width:auto; padding:5px 10px; font-size:12px">Suppr</button>
+      <div>
+        <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:12px; font-weight:bold">${q.question_key}</span>
+        <span style="margin-left:8px; font-weight:500">${q.prompt}</span>
+      </div>
+      <button onclick="delQ('${q.question_key}')" style="background:#ef4444; width:auto; padding:6px 12px; font-size:12px">Supprimer</button>
     </div>
   `).join('');
 }
 
 async function delQ(qid) {
-  if(!confirm("Supprimer ?")) return;
+  if(!confirm("Supprimer cette question ?")) return;
   const id = localStorage.getItem("mdi_id");
   const key = localStorage.getItem("mdi_key");
   await fetch(API + "/delete-question", {
@@ -176,7 +167,7 @@ async function delQ(qid) {
     headers: { "Content-Type": "application/json", "x-room-id": id, "x-room-key": key },
     body: JSON.stringify({ question_key: qid })
   });
-  login(); // Refresh
+  login();
 }
 </script>
 </body>
