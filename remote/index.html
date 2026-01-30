@@ -3,543 +3,134 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Télécommande Quiz / Sondage</title>
-
+  <title>MDI • Télécommande Quiz</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
   <style>
-    :root{
-      --bg: #0A0F1E;
-      --panel: rgba(255,255,255,0.06);
-      --stroke: rgba(255,255,255,0.12);
-      --text: rgba(255,255,255,0.92);
-      --muted: rgba(255,255,255,0.62);
-      --accent: #F9AD48;
-      --danger: #ff3b30;
-      --ok: #2ecc71;
-      --radius: 18px;
-      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    }
-
+    :root{ --bg:#0A0F1E; --panel:rgba(255,255,255,0.06); --text:rgba(255,255,255,0.92); --accent:#F9AD48; --danger:#ff3b30; --ok:#2ecc71; --font:ui-sans-serif,system-ui,sans-serif; }
     *{box-sizing:border-box}
-    body{
-      margin:0;
-      background: radial-gradient(1200px 600px at 30% -10%, rgba(249,173,72,0.18), transparent 60%),
-                  radial-gradient(900px 700px at 110% 0%, rgba(80,220,255,0.12), transparent 55%),
-                  var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      padding: 18px;
-    }
-
-    .wrap{
-      max-width: 980px;
-      margin: 0 auto;
-      display: grid;
-      gap: 14px;
-    }
-
-    .card{
-      background: var(--panel);
-      border: 1px solid var(--stroke);
-      border-radius: var(--radius);
-      padding: 14px;
-      backdrop-filter: blur(8px);
-    }
-
-    .title{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 12px;
-    }
-    .title h1{
-      margin:0;
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: .2px;
-    }
-
-    .status{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      font-size: 13px;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-    .dot{
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.22);
-      box-shadow: 0 0 0 4px rgba(255,255,255,0.06);
-    }
-    .dot.ok{ background: var(--ok); box-shadow: 0 0 0 4px rgba(46,204,113,0.16); }
-    .dot.bad{ background: var(--danger); box-shadow: 0 0 0 4px rgba(255,59,48,0.16); }
-
-    .grid2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    .grid3{
-      display:grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px;
-    }
-
-    label{
-      display:block;
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-
-    input, select{
-      width:100%;
-      padding: 11px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--stroke);
-      background: rgba(0,0,0,0.28);
-      color: var(--text);
-      outline: none;
-    }
-
-    .btn{
-      width:100%;
-      padding: 12px 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: rgba(255,255,255,0.08);
-      color: var(--text);
-      font-weight: 800;
-      cursor:pointer;
-      transition: transform .08s ease, background .12s ease, border-color .12s ease;
-      user-select:none;
-    }
-    .btn:active{ transform: scale(0.99); }
-    .btn.primary{
-      background: rgba(249,173,72,0.18);
-      border-color: rgba(249,173,72,0.32);
-      color: rgba(255,255,255,0.96);
-    }
-    .btn.primary:hover{ background: rgba(249,173,72,0.22); }
-    .btn.ghost{
-      background: rgba(255,255,255,0.06);
-    }
-    .btn.danger{
-      background: rgba(255,59,48,0.16);
-      border-color: rgba(255,59,48,0.28);
-    }
-    .btn:disabled{
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    .centerRow{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      align-items:center;
-      justify-items:center;
-      margin-top: 6px;
-    }
-    .centerRow .btn{
-      max-width: 420px;
-    }
-
-    .tv{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 10px;
-    }
-
-    .footerCenter{
-      margin-top: 10px;
-      display:flex;
-      justify-content:center;
-    }
-    .footerCenter .btn{
-      max-width: 420px;
-    }
-
-    .small{
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
-
-    .log{
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono";
-      font-size: 12px;
-      color: rgba(255,255,255,0.78);
-      background: rgba(0,0,0,0.28);
-      border: 1px solid var(--stroke);
-      border-radius: 12px;
-      padding: 10px;
-      max-height: 150px;
-      overflow:auto;
-      white-space: pre-wrap;
-    }
-
-    @media (max-width: 740px){
-      .grid2, .tv{ grid-template-columns: 1fr; }
-      .title{ flex-direction: column; align-items: flex-start; }
-    }
+    body{ margin:0; background:var(--bg); color:var(--text); font-family:var(--font); padding:18px; }
+    .wrap{ max-width:600px; margin:0 auto; display:grid; gap:14px; }
+    .card{ background:var(--panel); border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:14px; }
+    .title{ font-weight:800; display:flex; justify-content:space-between; align-items:center; }
+    .dot{ width:12px; height:12px; border-radius:99px; background:#555; display:inline-block; }
+    .dot.ok{ background:var(--ok); box-shadow:0 0 0 4px rgba(46,204,113,0.16); }
+    .dot.bad{ background:var(--danger); }
+    input, select{ width:100%; padding:12px; border-radius:12px; border:1px solid #444; background:#222; color:#fff; margin-bottom:8px; }
+    label{ font-size:12px; color:#aaa; display:block; margin-bottom:4px; }
+    .btn{ width:100%; padding:14px; border-radius:14px; border:none; background:rgba(255,255,255,0.1); color:#fff; font-weight:bold; cursor:pointer; margin-bottom:8px; }
+    .btn:active{ transform:scale(0.98); }
+    .btn.primary{ background:rgba(249,173,72,0.2); color:var(--accent); border:1px solid rgba(249,173,72,0.3); }
+    .btn.danger{ background:rgba(255,59,48,0.2); color:#ff6b6b; }
+    .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+    .tv{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .full{ grid-column: 1 / -1; }
   </style>
 </head>
-
 <body>
   <div class="wrap">
-
     <div class="card title">
-      <h1>MDI • Télécommande Quiz / Sondage</h1>
-      <div class="status">
-        <span id="dot" class="dot"></span>
-        <span id="statusText">Déconnecté</span>
-      </div>
+      <span>MDI • Quiz Remote</span>
+      <span id="dot" class="dot"></span>
     </div>
 
     <div class="card">
-      <div class="grid3">
-        <div>
-          <label>Serveur (Render)</label>
-          <input id="serverUrl" value="https://magic-digital-impact-live.onrender.com" />
-        </div>
-        <div>
-          <label>Room ID (client)</label>
-          <input id="roomId" placeholder="ex: DEMO_CLIENT" />
-        </div>
-        <div>
-          <label>Room Key</label>
-          <input id="roomKey" placeholder="ex: demo_key_123" />
-        </div>
-      </div>
-
-      <div style="height:10px"></div>
-
-      <div class="grid2">
-        <div>
-          <label>Question (catalogue)</label>
-          <select id="questionSelect">
-            <option value="">— Charger le catalogue —</option>
-          </select>
-          <div class="small" style="margin-top:8px">
-            Le menu se remplit via <code>/debug/questions?room=ROOM_ID</code>.
-            Les options A/B/C/D sont récupérées côté serveur quand tu changes d’état.
-          </div>
-        </div>
-
-        <div>
-          <label>Actions catalogue</label>
-          <div class="grid2">
-            <button id="btnConnect" class="btn primary">Connecter + Charger les questions</button>
-            <button id="btnReload" class="btn ghost">Recharger le catalogue</button>
-          </div>
-
-          <div class="centerRow">
-            <button id="btnReset" class="btn danger">Connecter l’overlay / Reset (IDLE = vide)</button>
-          </div>
-        </div>
-      </div>
+      <label>ID Client (Room ID)</label>
+      <input id="roomId" placeholder="ex: DEMO_CLIENT" />
+      <label>Clé Secrète (Room Key)</label>
+      <input id="roomKey" placeholder="ex: demo_key_123" />
+      <button id="btnConnect" class="btn primary">1. Connecter + Charger Catalogue</button>
     </div>
 
     <div class="card">
-      <div class="small">
-        Télécommande “TV” : une action = un état serveur.  
-        <b>❓</b> = question seule • <b>🗳️</b> = options visibles • <b>%</b> = résultats • <b>✅</b> = bonne réponse • <b>🥇</b> = plus rapide
-      </div>
-
+      <label>Choisir une question</label>
+      <select id="questionSelect"><option value="">(Connectez-vous d'abord)</option></select>
+      
       <div class="tv">
-        <button id="btnPrompt" class="btn">Afficher la question ❓</button>
-        <button id="btnOpen" class="btn">Afficher les options 🗳️</button>
-
-        <button id="btnResults" class="btn">Afficher les résultats (%)</button>
-        <button id="btnReveal" class="btn">Bonne réponse ✅ (Quiz)</button>
+        <button id="btnLoad" class="btn primary full">2. Afficher la question ❓ (DB)</button>
+        
+        <button id="btnOpen" class="btn">Afficher options 🗳️</button>
+        <button id="btnResults" class="btn">Résultats %</button>
+        <button id="btnReveal" class="btn">Réponse ✅</button>
+        <button id="btnWinner" class="btn">Gagnant 🥇</button>
       </div>
 
-      <div class="footerCenter">
-        <button id="btnWinner" class="btn primary">+ Rapide 🥇 (Quiz)</button>
-      </div>
-
-      <div style="height:10px"></div>
-      <div id="log" class="log">Prêt.</div>
+      <button id="btnReset" class="btn danger" style="margin-top:12px">Reset (Effacer)</button>
     </div>
-
   </div>
 
 <script>
-(() => {
-  // ===== constants =====
-  const OVERLAY_NAME = "quiz_ou_sondage";
+const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+const OVERLAY_NAME = "quiz_ou_sondage";
 
-  // ===== dom =====
-  const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
+let socket = null;
+let questions = [];
 
-  const dot = $("dot");
-  const statusText = $("statusText");
-  const logEl = $("log");
+function setStatus(ok) {
+  $("dot").className = ok ? "dot ok" : "dot bad";
+}
 
-  const serverUrlEl = $("serverUrl");
-  const roomIdEl = $("roomId");
-  const roomKeyEl = $("roomKey");
-  const questionSelect = $("questionSelect");
+// 1. Connexion + Chargement Catalogue
+$("btnConnect").onclick = async () => {
+  const room = $("roomId").value.trim();
+  const key = $("roomKey").value.trim();
+  if(!room || !key) return alert("Il manque l'ID ou la Clé !");
 
-  const btnConnect = $("btnConnect");
-  const btnReload = $("btnReload");
-  const btnReset = $("btnReset");
-
-  const btnPrompt = $("btnPrompt");
-  const btnOpen = $("btnOpen");
-  const btnResults = $("btnResults");
-  const btnReveal = $("btnReveal");
-  const btnWinner = $("btnWinner");
-
-  // ===== state =====
-  let socket = null;
-  let connected = false;
-  let authorized = false;
-  let lastForbidden = null;
-
-  let questions = []; // from debug endpoint
-  let selected = null; // {question_key, type, prompt, ...}
-
-  // ===== utils =====
-  function log(msg) {
-    const t = new Date().toLocaleTimeString();
-    logEl.textContent = `[${t}] ${msg}\n` + logEl.textContent;
-  }
-
-  function setStatus(ok, text) {
-    dot.classList.remove("ok", "bad");
-    if (ok === true) dot.classList.add("ok");
-    if (ok === false) dot.classList.add("bad");
-    statusText.textContent = text;
-  }
-
-  function getConfig() {
-    return {
-      serverUrl: (serverUrlEl.value || "").trim(),
-      room: (roomIdEl.value || "").trim(),
-      key: (roomKeyEl.value || "").trim()
-    };
-  }
-
-  function getSelectedKey() {
-    return (questionSelect.value || "").trim();
-  }
-
-  function refreshButtons() {
-    const key = getSelectedKey();
-    selected = questions.find(q => q.question_key === key) || null;
-
-    const isQuiz = selected?.type === "quiz";
-    btnReveal.disabled = !selected || !isQuiz;
-    btnWinner.disabled = !selected || !isQuiz;
-
-    // actions require auth
-    const canSend = connected && authorized;
-    [btnPrompt, btnOpen, btnResults, btnReveal, btnWinner, btnReset].forEach(b => b.disabled = !canSend);
-    // reload allowed if connected (even if forbidden it's useless, but ok)
-    btnReload.disabled = !connected;
-  }
-
-  function populateSelect() {
-    const prev = getSelectedKey();
-    questionSelect.innerHTML = "";
-    const opt0 = document.createElement("option");
-    opt0.value = "";
-    opt0.textContent = "— Choisir une question —";
-    questionSelect.appendChild(opt0);
-
-    // group polls then quizzes
-    const polls = questions.filter(q => q.type === "poll");
-    const quizzes = questions.filter(q => q.type === "quiz");
-
-    function addGroup(label, arr) {
-      if (!arr.length) return;
-      const og = document.createElement("optgroup");
-      og.label = label;
-      arr.forEach(q => {
-        const o = document.createElement("option");
-        o.value = q.question_key;
-        o.textContent = `${q.question_key} — ${q.prompt}`;
-        og.appendChild(o);
-      });
-      questionSelect.appendChild(og);
-    }
-
-    addGroup("Sondages", polls);
-    addGroup("Quiz", quizzes);
-
-    // restore selection if possible
-    if (prev && questions.some(q => q.question_key === prev)) {
-      questionSelect.value = prev;
-    }
-  }
-
-  async function loadCatalog() {
-    const { serverUrl, room } = getConfig();
-    if (!serverUrl || !room) {
-      log("⚠️ Renseigne Server + Room ID pour charger le catalogue.");
-      return;
-    }
-
-    const url = `${serverUrl.replace(/\/$/, "")}/debug/questions?room=${encodeURIComponent(room)}`;
-    log(`📚 Chargement questions: ${url}`);
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      const json = await res.json();
-      if (!json?.ok) throw new Error("Réponse serveur non OK");
-      questions = Array.isArray(json.data) ? json.data : [];
-      populateSelect();
-      log(`✅ Catalogue chargé: ${questions.length} question(s)`);
-    } catch (e) {
-      log(`⛔ Impossible de charger le catalogue: ${e?.message || e}`);
-    } finally {
-      refreshButtons();
-    }
-  }
-
-  function connectSocket() {
-    const { serverUrl, room, key } = getConfig();
-    if (!serverUrl || !room || !key) {
-      log("⚠️ Renseigne Server + Room ID + Room Key.");
-      return;
-    }
-
-    // reset previous
-    if (socket) {
-      try { socket.disconnect(); } catch {}
-      socket = null;
-    }
-    connected = false;
-    authorized = false;
-    lastForbidden = null;
-    setStatus(null, "Connexion…");
-    refreshButtons();
-
-    socket = io(serverUrl, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: 10
-    });
-
-    socket.on("connect", () => {
-      connected = true;
-      authorized = false;
-      setStatus(null, "Connecté… (auth en cours)");
-      log(`✅ Socket connecté: ${socket.id}`);
-      // auth (strict)
-      socket.emit("overlay:join", { room, key, overlay: OVERLAY_NAME });
-      // request current state (if allowed)
-      socket.emit("overlay:get_state", { room, key, overlay: OVERLAY_NAME });
-      refreshButtons();
-    });
-
-    socket.on("overlay:forbidden", (payload) => {
-      authorized = false;
-      lastForbidden = payload?.reason || "forbidden";
-      setStatus(false, `Refusé (${lastForbidden})`);
-      log(`⛔ Accès refusé: ${JSON.stringify(payload || {})}`);
-      refreshButtons();
-    });
-
-    socket.on("overlay:state", (payload) => {
-      if (payload?.overlay !== OVERLAY_NAME) return;
-      if (!authorized) {
-        authorized = true;
-        setStatus(true, "Connecté (OK)");
-        log("🟢 Autorisé (state reçu)");
-      }
-      refreshButtons();
-    });
-
-    socket.on("connect_error", (err) => {
-      setStatus(false, "Erreur connexion");
-      log(`❌ connect_error: ${err?.message || err}`);
-      refreshButtons();
-    });
-
-    socket.on("disconnect", (reason) => {
-      connected = false;
-      authorized = false;
-      setStatus(false, `Déconnecté (${reason || "?"})`);
-      log(`⚠️ Déconnecté: ${reason || "?"}`);
-      refreshButtons();
-    });
-  }
-
-  function sendState(state) {
-    const { room, key } = getConfig();
-    const qKey = getSelectedKey();
-    const q = questions.find(x => x.question_key === qKey) || null;
-
-    if (!connected || !authorized) {
-      log("⛔ Pas autorisé / pas connecté.");
-      return;
-    }
-
-    // IDLE => transparent total, pas besoin de question
-    const data = (state === "idle") ? {} : { questionKey: q?.question_key || qKey || "" };
-
-    if (state !== "idle" && !data.questionKey) {
-      log("⚠️ Choisis une question d’abord.");
-      return;
-    }
-
-    socket.emit("control:set_state", {
-      room,
-      key,
-      overlay: OVERLAY_NAME,
-      state,
-      data
-    });
-
-    log(`🎮 Envoyé: state="${state}" ${data.questionKey ? `questionKey=${data.questionKey}` : ""}`);
-  }
-
-  // ===== events =====
-  btnConnect.addEventListener("click", async () => {
-    connectSocket();
-    // petit délai puis catalogue
-    setTimeout(loadCatalog, 350);
+  if(socket) socket.disconnect();
+  socket = io(SERVER_URL);
+  
+  socket.on("connect", () => {
+    setStatus(true);
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_NAME });
   });
+  
+  socket.on("overlay:forbidden", () => { setStatus(false); alert("Accès refusé ! Vérifiez la clé."); });
+  socket.on("disconnect", () => setStatus(false));
 
-  btnReload.addEventListener("click", loadCatalog);
-
-  btnReset.addEventListener("click", () => sendState("idle"));
-
-  btnPrompt.addEventListener("click", () => sendState("prompt"));
-  btnOpen.addEventListener("click", () => sendState("open"));
-  btnResults.addEventListener("click", () => sendState("results"));
-  btnReveal.addEventListener("click", () => sendState("reveal"));
-  btnWinner.addEventListener("click", () => sendState("winner"));
-
-  questionSelect.addEventListener("change", () => {
-    refreshButtons();
-    const qKey = getSelectedKey();
-    const q = questions.find(x => x.question_key === qKey);
-    if (q) log(`✅ Sélection: ${q.question_key} (${q.type})`);
-  });
-
-  // ===== init from URL params (pratique) =====
   try {
-    const u = new URL(location.href);
-    const pRoom = u.searchParams.get("room");
-    const pKey = u.searchParams.get("key");
-    const pServer = u.searchParams.get("server");
-    if (pServer) serverUrlEl.value = pServer;
-    if (pRoom) roomIdEl.value = pRoom;
-    if (pKey) roomKeyEl.value = pKey;
-  } catch {}
+    const res = await fetch(`${SERVER_URL}/debug/questions?room=${room}`);
+    const json = await res.json();
+    questions = json.data || [];
+    
+    const sel = $("questionSelect");
+    sel.innerHTML = '<option value="">-- Choisir --</option>';
+    questions.forEach(q => {
+      const opt = document.createElement("option");
+      opt.value = q.question_key;
+      opt.textContent = `${q.question_key} - ${q.prompt}`;
+      sel.appendChild(opt);
+    });
+  } catch(e) { alert("Erreur catalogue: " + e.message); }
+};
 
-  setStatus(false, "Déconnecté");
-  refreshButtons();
-})();
+// Helper
+function send(action, payload={}) {
+  if(!socket || !socket.connected) return alert("Pas connecté !");
+  const room = $("roomId").value.trim();
+  const key = $("roomKey").value.trim();
+  socket.emit(action, { room, key, overlay: OVERLAY_NAME, ...payload });
+}
+
+// 2. Afficher Question (VERSION CORRIGÉE)
+$("btnLoad").onclick = () => {
+  const qKey = $("questionSelect").value;
+  if(!qKey) return alert("Choisis une question !");
+  
+  // C'est cette ligne qui change tout : on utilise control:load_question
+  console.log("Envoi demande chargement:", qKey);
+  send("control:load_question", { question_key: qKey });
+};
+
+$("btnOpen").onclick = () => send("control:show_options");
+$("btnResults").onclick = () => send("control:set_state", { state: "results" });
+$("btnReveal").onclick = () => send("control:set_state", { state: "reveal" });
+$("btnWinner").onclick = () => send("control:set_state", { state: "winner" });
+$("btnReset").onclick = () => send("control:idle");
+
+// Init URL
+const u = new URL(location.href);
+if(u.searchParams.get("room")) $("roomId").value = u.searchParams.get("room");
+if(u.searchParams.get("key")) $("roomKey").value = u.searchParams.get("key");
 </script>
-
 </body>
 </html>
