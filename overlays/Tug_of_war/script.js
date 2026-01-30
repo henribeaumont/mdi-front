@@ -1,13 +1,13 @@
 /**
- * MDI TUG OF WAR - V10 (FONT SIZE CONTROL)
- * - Ajout de la gestion de la taille de police via CSS
- * - Variable: --label-font-size
+ * MDI TUG OF WAR - V11 (STABLE DISPLAY)
+ * - S'affiche immédiatement (même avec 0 votes) pour éviter le clignotement
+ * - Gère la taille de police CSS
+ * - Attend la config OBS proprement
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "tug_of_war";
 
-// --- UTILITAIRES ---
 function cssVar(name) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v ? v.replace(/^['"]|['"]$/g, "") : "";
@@ -17,23 +17,22 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// --- ATTENTE CSS OBS ---
+// --- ATTENTE CSS ---
 async function waitForObsConfig() {
+  // On attend un peu que OBS injecte le CSS
   for (let i = 0; i < 30; i++) {
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
-    if (room && key && room !== "DEMO_CLIENT") return; 
+    // Si on trouve une config valide (différente du défaut HTML si besoin)
+    if (room && key) return; 
     await wait(100);
   }
-  console.log("⚠️ Fin de l'attente OBS.");
 }
 
-// --- CONFIGURATION ---
+// --- CONFIG ---
 let CONFIG = {
-  nameL: "OUI", 
-  nameR: "NON",
-  triggerL: "O",
-  triggerR: "N"
+  nameL: "OUI", nameR: "NON",
+  triggerL: "O", triggerR: "N"
 };
 
 function updateConfig() {
@@ -42,8 +41,6 @@ function updateConfig() {
   CONFIG.triggerL = (cssVar("--trigger-left") || "O").toUpperCase();
   CONFIG.triggerR = (cssVar("--trigger-right") || "N").toUpperCase();
   
-  // --- NOUVEAU : TAILLE DE POLICE ---
-  // Lit la variable CSS ou met 60px par défaut
   const fontSize = cssVar("--label-font-size") || "60px";
 
   const elL = document.getElementById("name-left");
@@ -58,8 +55,10 @@ function updateConfig() {
 }
 
 function updateDisplay(votes) {
-  const countL = votes[CONFIG.triggerL] || 0;
-  const countR = votes[CONFIG.triggerR] || 0;
+  // Protection si votes est vide/undefined
+  const safeVotes = votes || {};
+  const countL = safeVotes[CONFIG.triggerL] || 0;
+  const countR = safeVotes[CONFIG.triggerR] || 0;
   const total = countL + countR;
   
   let percentL = 50;
@@ -67,13 +66,11 @@ function updateDisplay(votes) {
     percentL = (countL / total) * 100;
   }
   
-  const bar = document.getElementById("bar-fill");
-  const cur = document.getElementById("cursor");
-  if(bar) bar.style.width = percentL + "%";
-  if(cur) cur.style.left = percentL + "%";
+  document.getElementById("bar-fill").style.width = percentL + "%";
+  document.getElementById("cursor").style.left = percentL + "%";
 }
 
-// --- MAIN BOOT ---
+// --- BOOT ---
 (async function demarrer() {
   await waitForObsConfig();
   updateConfig();
@@ -83,12 +80,15 @@ function updateDisplay(votes) {
   const key = params.get("key") || cssVar("--room-key");
 
   if(!room || !key) {
-    console.error("⛔ Config manquante");
+    // Si vraiment pas de config, on affiche l'erreur
     document.getElementById("security-screen").classList.remove("hidden");
     return;
   }
 
-  console.log(`🔌 Connexion vers ${room}...`);
+  // Si on a la config, ON AFFICHE L'INTERFACE TOUT DE SUITE (pour éviter le trésautement)
+  document.getElementById("container").classList.remove("hidden");
+  document.getElementById("security-screen").classList.add("hidden");
+
   const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
   socket.on("connect", () => {
@@ -101,11 +101,15 @@ function updateDisplay(votes) {
       return;
     }
 
-    if (payload.overlay === OVERLAY_TYPE && payload.data && payload.data.votes) {
+    if (payload.overlay === OVERLAY_TYPE) {
+      // On s'assure que c'est visible
       document.getElementById("container").classList.remove("hidden");
-      document.getElementById("security-screen").classList.add("hidden");
-      updateConfig(); 
-      updateDisplay(payload.data.votes);
+      
+      updateConfig(); // On relit le CSS au cas où
+      
+      if (payload.data && payload.data.votes) {
+        updateDisplay(payload.data.votes);
+      }
     }
   });
 
