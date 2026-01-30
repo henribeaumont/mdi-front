@@ -1,6 +1,3 @@
-/* ==========================================================
-   MDI OVERLAY — LOGIQUE SONDAGE & QUIZ (V3.5)
-   ========================================================== */
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_NAME = "quiz_ou_sondage";
 
@@ -18,7 +15,7 @@ const answers = {
   D: { el: document.querySelector('.answer[data-choice="D"]'), txt: document.getElementById("txtD"), pct: document.getElementById("pctD") }
 };
 
-/* --- 1. BOOT & AUTH --- */
+/* --- 1. BOOT --- */
 let isAuthorized = false;
 function setBootTransparent() {
   elQuiz.style.display = "none";
@@ -41,7 +38,7 @@ function showAuthorized() {
 }
 setBootTransparent();
 
-/* --- 2. LOGIQUE VISUELLE (POLL & QUIZ) --- */
+/* --- 2. LOGIQUE VISUELLE --- */
 function resetVisuals() {
   answerEls.forEach(el => {
     el.classList.remove("is-correct");
@@ -52,54 +49,47 @@ function resetVisuals() {
 }
 
 function updateVisuals(state, data) {
-  // Reset
   resetVisuals();
   
-  // A. Mise à jour textes
-  let qType = "poll"; // default
+  // Data extraction
+  let qType = "poll";
   let correctOpt = null;
-
   if (data?.question) {
-    // Format V3.5 : { question: { prompt: "...", type: "quiz", correct: "A", options: {...} } }
     if (data.question.type) qType = data.question.type;
     if (data.question.correct) correctOpt = data.question.correct;
     
     elQuestion.textContent = data.question.prompt || "Question sans titre";
     const opts = data.question.options || {};
-    ["A","B","C","D"].forEach(k => {
-      answers[k].txt.textContent = opts[k] || "—";
-    });
+    ["A","B","C","D"].forEach(k => answers[k].txt.textContent = opts[k] || "—");
   }
 
-  // B. Mise à jour pourcentages & Ranks (Poll)
+  // Pourcentages
   const p = data?.percents || {};
   const stats = ["A","B","C","D"].map(k => ({ key: k, val: Number(p[k]) || 0 }));
   
-  // Affichage textuel %
   stats.forEach(item => {
     answers[item.key].pct.textContent = Math.round(item.val) + "%";
   });
 
-  // Si Resultats (Poll ou Quiz)
+  // États Résultats
   if (state === "results" || state === "reveal" || state === "winner") {
     document.documentElement.classList.add("mdi-show-results");
 
     if (qType === "poll") {
-      // --- LOGIQUE SONDAGE (Jauges Couleur) ---
-      // Trier pour le rang : Plus grand score = Rank 1
-      const sorted = [...stats].sort((a,b) => b.val - a.val);
+      // SONDAGE: Calcul du rang (1 = plus haut score)
+      // On trie une copie pour trouver les positions
+      const sortedValues = [...new Set(stats.map(s => s.val))].sort((a,b) => b - a);
       
       stats.forEach(item => {
-        const rankIndex = sorted.findIndex(s => s.key === item.key); // 0 = 1er
-        const rank = rankIndex + 1;
+        // Le rang est l'index de la valeur + 1
+        const rank = sortedValues.indexOf(item.val) + 1;
         const el = answers[item.key].el;
-        
-        el.setAttribute("data-rank", rank); // Active la couleur CSS (Vert/Jaune...)
-        el.style.setProperty("--gauge-width", item.val + "%"); // Remplit la jauge
+        el.setAttribute("data-rank", rank); // Déclenche la couleur CSS
+        el.style.setProperty("--gauge-width", item.val + "%");
       });
     } 
     else if (qType === "quiz") {
-      // --- LOGIQUE QUIZ (Bonne réponse) ---
+      // QUIZ: Bonne réponse
       if ((state === "reveal" || state === "winner") && correctOpt) {
         document.documentElement.classList.add("mdi-dim-others");
         const winEl = answers[correctOpt].el;
@@ -108,7 +98,6 @@ function updateVisuals(state, data) {
     }
   }
 
-  // C. Winner Screen
   if (state === "winner") {
     elWinnerName.textContent = data?.winnerName || "Gagnant";
     document.documentElement.classList.add("mdi-show-winner");
@@ -118,23 +107,18 @@ function updateVisuals(state, data) {
 /* --- 3. STATE MACHINE --- */
 function applyState(state, data) {
   if (AUTH_MODE === "strict" && !isAuthorized) return;
-  if (!state || state === "idle") {
-    setBootTransparent();
-    return;
-  }
+  if (!state || state === "idle") { setBootTransparent(); return; }
   
-  // Mapping "question" -> "prompt" pour CSS
   let uiState = (state === "question") ? "prompt" : state;
   document.documentElement.setAttribute("data-mdi-state", uiState);
   
-  // Visible
   elQuiz.style.display = "grid";
   if(isAuthorized) elSecurity.style.display = "none";
 
   updateVisuals(uiState, data);
 }
 
-/* --- 4. SOCKET & AUTH --- */
+/* --- 4. SOCKET --- */
 let socket = null;
 let AUTH_MODE = "strict";
 let ROOM_ID = "";
@@ -149,14 +133,11 @@ function readCssVars() {
 
 function initSocket() {
   socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
-  
   socket.on("connect", () => {
     if(AUTH_MODE==="strict") socket.emit("overlay:join", { room: ROOM_ID, key: ROOM_KEY, overlay: OVERLAY_NAME });
     else socket.emit("rejoindre_salle", ROOM_ID);
   });
-
   socket.on("overlay:forbidden", () => showDenied());
-  
   socket.on("overlay:state", (payload) => {
     if(payload?.overlay !== OVERLAY_NAME) return;
     showAuthorized();
@@ -164,11 +145,7 @@ function initSocket() {
   });
 }
 
-// Boucle d'attente OBS CSS
 const t = setInterval(() => {
   readCssVars();
-  if(ROOM_ID && ROOM_KEY) {
-    clearInterval(t);
-    initSocket();
-  }
+  if(ROOM_ID && ROOM_KEY) { clearInterval(t); initSocket(); }
 }, 200);
