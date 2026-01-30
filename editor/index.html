@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>MDI • Éditeur de Questions</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --accent: #3b82f6; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    
+    .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
+    
+    .card { background: var(--panel); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    h1, h2, h3 { margin-top: 0; }
+    
+    label { display: block; font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 5px; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; font-family: inherit; }
+    
+    button { background: var(--accent); color: white; border: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+    button:hover { opacity: 0.9; }
+    button.danger { background: #ef4444; }
+    
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .q-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #e2e8f0; }
+    .q-item:last-child { border-bottom: none; }
+    
+    #app { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="login" class="login-box">
+  <h2>👋 Bienvenue</h2>
+  <p style="color:#64748b; margin-bottom:20px">Connectez-vous à votre espace MDI.</p>
+  <div style="text-align:left">
+    <label>Identifiant (Room ID)</label>
+    <input id="roomId" placeholder="Ex: MON_ENTREPRISE">
+    <label>Clé d'accès</label>
+    <input id="roomKey" type="password">
+  </div>
+  <button onclick="login()" style="width:100%">Accéder à mes questions</button>
+</div>
+
+<div id="app" class="container">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <h2>✏️ Mes Questions</h2>
+    <button onclick="logout()" style="background:#94a3b8; font-size:12px">Déconnexion</button>
+  </div>
+
+  <div class="card">
+    <h3>Ajouter / Modifier une question</h3>
+    <form id="formQ">
+      <div class="row">
+        <div><label>Code (ex: Q1)</label><input id="q_key" required></div>
+        <div><label>Ordre (1, 2, 3...)</label><input type="number" id="q_order" value="1" required></div>
+      </div>
+      <div><label>Type</label><select id="q_type"><option value="poll">Sondage (Avis)</option><option value="quiz">Quiz (Bonne réponse)</option></select></div>
+      <div><label>Question</label><textarea id="q_prompt" rows="2" required placeholder="Quelle est la capitale de..."></textarea></div>
+      
+      <div class="row">
+        <div><label>Réponse A</label><input id="q_a" required></div>
+        <div><label>Réponse B</label><input id="q_b" required></div>
+      </div>
+      <div class="row">
+        <div><label>Réponse C (Optionnel)</label><input id="q_c"></div>
+        <div><label>Réponse D (Optionnel)</label><input id="q_d"></div>
+      </div>
+      
+      <div><label>Bonne réponse (Si Quiz)</label><select id="q_correct"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
+      
+      <button type="submit" style="width:100%">💾 Enregistrer la question</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Catalogue existant</h3>
+    <div id="list">Chargement...</div>
+  </div>
+</div>
+
+<script>
+const API = "https://magic-digital-impact-live.onrender.com/api/client";
+let auth = { id: localStorage.getItem("mdi_client_id"), key: localStorage.getItem("mdi_client_key") };
+
+if(auth.id && auth.key) {
+  document.getElementById("roomId").value = auth.id;
+  document.getElementById("roomKey").value = auth.key;
+  login(true);
+}
+
+async function login(auto=false) {
+  const id = document.getElementById("roomId").value.trim();
+  const key = document.getElementById("roomKey").value.trim();
+  if(!id || !key) return alert("Remplissez tout !");
+  
+  // Test connection
+  const res = await fetch(API+"/questions", { headers: { "x-room-id": id, "x-room-key": key } });
+  const json = await res.json();
+  
+  if(json.ok) {
+    auth = { id, key };
+    localStorage.setItem("mdi_client_id", id);
+    localStorage.setItem("mdi_client_key", key);
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    renderList(json.questions);
+  } else {
+    if(!auto) alert("Connexion refusée : " + (json.error || "Vérifiez vos identifiants"));
+  }
+}
+
+function logout() { localStorage.clear(); location.reload(); }
+
+async function saveQ(e) {
+  e.preventDefault();
+  const body = {
+    question_key: document.getElementById("q_key").value,
+    type: document.getElementById("q_type").value,
+    order_index: parseInt(document.getElementById("q_order").value),
+    prompt: document.getElementById("q_prompt").value,
+    option_a: document.getElementById("q_a").value,
+    option_b: document.getElementById("q_b").value,
+    option_c: document.getElementById("q_c").value,
+    option_d: document.getElementById("q_d").value,
+    correct_option: document.getElementById("q_correct").value,
+    enabled: true
+  };
+  
+  const res = await fetch(API+"/save-question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-room-id": auth.id, "x-room-key": auth.key },
+    body: JSON.stringify(body)
+  });
+  const json = await res.json();
+  if(json.ok) { 
+    alert("Sauvegardé !"); 
+    // Reload list
+    const r2 = await fetch(API+"/questions", { headers: { "x-room-id": auth.id, "x-room-key": auth.key } });
+    const j2 = await r2.json();
+    renderList(j2.questions);
+  } else {
+    alert("Erreur: " + json.error);
+  }
+}
+document.getElementById("formQ").onsubmit = saveQ;
+
+async function deleteQ(qid) {
+  if(!confirm("Supprimer la question "+qid+" ?")) return;
+  const res = await fetch(API+"/delete-question", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-room-id": auth.id, "x-room-key": auth.key },
+    body: JSON.stringify({ question_key: qid })
+  });
+  const json = await res.json();
+  if(json.ok) {
+    const r2 = await fetch(API+"/questions", { headers: { "x-room-id": auth.id, "x-room-key": auth.key } });
+    const j2 = await r2.json();
+    renderList(j2.questions);
+  }
+}
+
+function renderList(list) {
+  const el = document.getElementById("list");
+  if(!list || list.length === 0) { el.innerHTML = "Aucune question pour le moment."; return; }
+  
+  el.innerHTML = list.map(q => `
+    <div class="q-item">
+      <div>
+        <strong>${q.question_key}</strong> <small style="color:#64748b">(${q.type})</small><br>
+        ${q.prompt}
+      </div>
+      <div>
+        <button onclick="editQ('${q.question_key}')" style="padding:5px 10px; font-size:12px; background:#64748b">Edit</button>
+        <button onclick="deleteQ('${q.question_key}')" class="danger" style="padding:5px 10px; font-size:12px">Suppr</button>
+      </div>
+    </div>
+  `).join('');
+  
+  // Save raw data for edit
+  window.rawQs = list;
+}
+
+window.editQ = (qid) => {
+  const q = window.rawQs.find(x => x.question_key === qid);
+  if(!q) return;
+  document.getElementById("q_key").value = q.question_key;
+  document.getElementById("q_order").value = q.order_index;
+  document.getElementById("q_type").value = q.type;
+  document.getElementById("q_prompt").value = q.prompt;
+  document.getElementById("q_a").value = q.option_a;
+  document.getElementById("q_b").value = q.option_b;
+  document.getElementById("q_c").value = q.option_c;
+  document.getElementById("q_d").value = q.option_d;
+  document.getElementById("q_correct").value = q.correct_option;
+  window.scrollTo(0,0);
+};
+</script>
+</body>
+</html>
