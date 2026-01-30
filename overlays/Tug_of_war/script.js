@@ -1,120 +1,118 @@
 /**
- * MDI TUG OF WAR - V11 (STABLE DISPLAY)
- * - S'affiche immédiatement (même avec 0 votes) pour éviter le clignotement
- * - Gère la taille de police CSS
- * - Attend la config OBS proprement
+ * MDI TUG OF WAR - V5.5 SaaS
+ * Adapté pour écouter le canal universel 'raw_vote'
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "tug_of_war";
 
-function cssVar(name) {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v ? v.replace(/^['"]|['"]$/g, "") : "";
+/* --- UTILS --- */
+function cssVar(name, fallback = "") {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
 }
 
-function wait(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+/* --- UI CONTROLS --- */
+function lockScreen() {
+  document.getElementById("container").classList.add("hidden");
+  document.getElementById("security-screen").classList.remove("hidden");
 }
 
-// --- ATTENTE CSS ---
-async function waitForObsConfig() {
-  // On attend un peu que OBS injecte le CSS
-  for (let i = 0; i < 30; i++) {
-    const room = cssVar("--room-id");
-    const key = cssVar("--room-key");
-    // Si on trouve une config valide (différente du défaut HTML si besoin)
-    if (room && key) return; 
-    await wait(100);
-  }
+function unlockScreen() {
+  document.getElementById("security-screen").classList.add("hidden");
+  document.getElementById("container").classList.remove("hidden");
 }
 
-// --- CONFIG ---
-let CONFIG = {
-  nameL: "OUI", nameR: "NON",
-  triggerL: "O", triggerR: "N"
-};
+/* --- GAME LOGIC --- */
+let scoreLeft = 0;
+let scoreRight = 0;
+const votersSeen = new Set();
+let CONFIG = { nameL: "OUI", nameR: "NON", trigL: "O", trigR: "N" };
 
-function updateConfig() {
-  CONFIG.nameL = cssVar("--name-left") || "OUI";
-  CONFIG.nameR = cssVar("--name-right") || "NON";
-  CONFIG.triggerL = (cssVar("--trigger-left") || "O").toUpperCase();
-  CONFIG.triggerR = (cssVar("--trigger-right") || "N").toUpperCase();
+function resetScores() {
+  scoreLeft = 0;
+  scoreRight = 0;
+  votersSeen.clear();
+  updateDisplay();
+}
+
+function updateDisplay() {
+  const total = scoreLeft + scoreRight;
+  const percentLeft = total > 0 ? (scoreLeft / total) * 100 : 50;
+  document.getElementById("bar-fill").style.width = percentLeft + "%";
+  document.getElementById("cursor").style.left = percentLeft + "%";
+}
+
+function lireConfigurationCSS() {
+  CONFIG.nameL = cssVar("--name-left", "OUI");
+  CONFIG.nameR = cssVar("--name-right", "NON");
+  CONFIG.trigL = cssVar("--trigger-left", "O").toUpperCase();
+  CONFIG.trigR = cssVar("--trigger-right", "N").toUpperCase();
+
+  document.getElementById("name-left").innerText = CONFIG.nameL;
+  document.getElementById("name-right").innerText = CONFIG.nameR;
+  document.getElementById("trig-left").innerText = CONFIG.trigL;
+  document.getElementById("trig-right").innerText = CONFIG.trigR;
   
-  const fontSize = cssVar("--label-font-size") || "60px";
-
-  const elL = document.getElementById("name-left");
-  const elR = document.getElementById("name-right");
-  const trL = document.getElementById("trig-left");
-  const trR = document.getElementById("trig-right");
-
-  if(elL) { elL.innerText = CONFIG.nameL; elL.style.fontSize = fontSize; }
-  if(elR) { elR.innerText = CONFIG.nameR; elR.style.fontSize = fontSize; }
-  if(trL) trL.innerText = CONFIG.triggerL;
-  if(trR) trR.innerText = CONFIG.triggerR;
+  // Appliquer les couleurs
+  document.documentElement.style.setProperty("--color-left", cssVar("--color-left", "#2ecc71"));
+  document.documentElement.style.setProperty("--color-right", cssVar("--color-right", "#e74c3c"));
 }
 
-function updateDisplay(votes) {
-  // Protection si votes est vide/undefined
-  const safeVotes = votes || {};
-  const countL = safeVotes[CONFIG.triggerL] || 0;
-  const countR = safeVotes[CONFIG.triggerR] || 0;
-  const total = countL + countR;
-  
-  let percentL = 50;
-  if (total > 0) {
-    percentL = (countL / total) * 100;
-  }
-  
-  document.getElementById("bar-fill").style.width = percentL + "%";
-  document.getElementById("cursor").style.left = percentL + "%";
-}
+/* --- SOCKET & BOOT --- */
+const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
-// --- BOOT ---
-(async function demarrer() {
-  await waitForObsConfig();
-  updateConfig();
+async function boot() {
+  // Attente du chargement CSS OBS
+  await wait(500);
   
-  const params = new URLSearchParams(window.location.search);
-  const room = params.get("room") || cssVar("--room-id");
-  const key = params.get("key") || cssVar("--room-key");
+  const room = cssVar("--room-id", "");
+  const key = cssVar("--room-key", "");
+  const authMode = cssVar("--auth-mode", "strict");
+  const autoReset = cssVar("--auto-reset", "false");
 
-  if(!room || !key) {
-    // Si vraiment pas de config, on affiche l'erreur
-    document.getElementById("security-screen").classList.remove("hidden");
+  if (authMode === "strict" && (!room || !key)) {
+    lockScreen();
     return;
   }
-
-  // Si on a la config, ON AFFICHE L'INTERFACE TOUT DE SUITE (pour éviter le trésautement)
-  document.getElementById("container").classList.remove("hidden");
-  document.getElementById("security-screen").classList.add("hidden");
-
-  const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
   socket.on("connect", () => {
     socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
   });
 
+  socket.on("overlay:forbidden", () => lockScreen());
+
   socket.on("overlay:state", (payload) => {
-    if(payload.state === "reset") {
-      updateDisplay({}); 
-      return;
-    }
-
-    if (payload.overlay === OVERLAY_TYPE) {
-      // On s'assure que c'est visible
-      document.getElementById("container").classList.remove("hidden");
-      
-      updateConfig(); // On relit le CSS au cas où
-      
-      if (payload.data && payload.data.votes) {
-        updateDisplay(payload.data.votes);
-      }
-    }
+    if (payload?.overlay !== OVERLAY_TYPE) return;
+    unlockScreen();
+    lireConfigurationCSS();
+    if (autoReset === "true") resetScores();
+    else updateDisplay();
   });
 
-  socket.on("overlay:forbidden", () => {
-    document.getElementById("container").classList.add("hidden");
-    document.getElementById("security-screen").classList.remove("hidden");
+  // ÉCOUTE DU CANAL UNIVERSEL
+  socket.on("raw_vote", (data) => {
+    const vote = (data.vote || "").trim().toUpperCase();
+    const user = data.user || "Anonyme";
+    const oneVoteOnly = cssVar("--tug-one-vote-per-person", "off") === "on";
+
+    if (!vote) return;
+    if (oneVoteOnly && votersSeen.has(user) && user !== "Anonyme") return;
+
+    if (vote === CONFIG.trigL) {
+      scoreLeft++;
+      if (oneVoteOnly) votersSeen.add(user);
+      updateDisplay();
+    } else if (vote === CONFIG.trigR) {
+      scoreRight++;
+      if (oneVoteOnly) votersSeen.add(user);
+      updateDisplay();
+    } else if (vote === "RESET") {
+      resetScores();
+    }
   });
-})();
+}
+
+boot();
