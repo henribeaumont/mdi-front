@@ -2,107 +2,92 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>MDI • Mon Catalogue</title>
+  <title>MDI • Mon Catalogue Client</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root { --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --accent: #3b82f6; --danger: #ef4444; }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
     .container { max-width: 800px; margin: 0 auto; display: none; }
-    .login-box { max-width: 400px; margin: 80px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
-    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box; font-family: inherit; }
+    .login-box { max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box; }
     label { display: block; font-weight: 600; font-size: 13px; color: #64748b; margin-bottom: 5px; text-align: left; }
-    button { background: var(--accent); color: white; border: none; padding: 14px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-    button:hover { filter: brightness(1.1); }
-    .card { background: white; padding: 25px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
-    .q-item { padding: 15px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-    .q-item:last-child { border-bottom: none; }
-    .tag { background:#e2e8f0; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; color:#475569; }
+    button { background: var(--accent); color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .q-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
 
 <div id="login" class="login-box">
-  <h2>👋 Mon Catalogue MDI</h2>
-  <div id="loginError" style="color:var(--danger); font-size:13px; margin-bottom:15px; display:none"></div>
-  <label>ID Client</label><input id="roomId" placeholder="Ex: CLIENT_DEMO">
-  <label>Clé Secrète</label><input id="roomKey" type="password" placeholder="••••••••">
-  <button onclick="login()">Accéder à mes questions</button>
+  <h2>👋 Accès Catalogue</h2>
+  <label>ID Client (Room ID)</label><input id="roomId">
+  <label>Clé Secrète</label><input id="roomKey" type="password">
+  <button onclick="login()">Se connecter</button>
 </div>
 
 <div id="app" class="container">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px">
+  <div style="display:flex; justify-content:space-between; margin-bottom:20px">
     <h2>Mes Questions</h2>
-    <button onclick="logout()" style="width:auto; background:#64748b; padding:8px 15px">Déconnexion</button>
+    <button onclick="logout()" style="width:auto; background:#94a3b8">Déconnexion</button>
   </div>
 
   <div class="card">
-    <h3>➕ Nouvelle Question</h3>
+    <h3>Ajouter une question</h3>
     <form id="formQ">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-        <div><label>Code (ex: Q01)</label><input id="q_key" required></div>
+        <div><label>Code (ex: Q1)</label><input id="q_key" required></div>
         <div><label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select></div>
       </div>
-      <label>Question</label><textarea id="q_prompt" required rows="2"></textarea>
+      <label>Question</label><textarea id="q_prompt" required></textarea>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
         <div><label>Réponse A</label><input id="q_a" required></div>
         <div><label>Réponse B</label><input id="q_b" required></div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-        <div><label>Réponse C (Optionnel)</label><input id="q_c"></div>
-        <div><label>Réponse D (Optionnel)</label><input id="q_d"></div>
+        <div><label>Réponse C</label><input id="q_c"></div>
+        <div><label>Réponse D</label><input id="q_d"></div>
       </div>
-      <label>Bonne Réponse (Quiz uniquement)</label>
+      <label>Bonne Réponse (Quiz)</label>
       <select id="q_correct"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
-      <button type="submit">💾 Enregistrer dans mon catalogue</button>
+      <button type="submit">💾 Enregistrer</button>
     </form>
   </div>
-
-  <div class="card">
-    <h3>📚 Liste des questions</h3>
-    <div id="list">Chargement...</div>
-  </div>
+  <div class="card"><div id="list">Chargement...</div></div>
 </div>
 
 <script>
-const API = "https://magic-digital-impact-live.onrender.com/api/client";
+const API_BASE = "https://magic-digital-impact-live.onrender.com/api/client";
+const store = localStorage;
 
-const storedId = localStorage.getItem("mdi_id");
-const storedKey = localStorage.getItem("mdi_key");
-if(storedId && storedKey) {
-  document.getElementById("roomId").value = storedId;
-  document.getElementById("roomKey").value = storedKey;
-  login();
-}
+if(store.getItem("mdi_id")) login(true);
 
-async function login() {
-  const id = document.getElementById("roomId").value.trim();
-  const key = document.getElementById("roomKey").value.trim();
-  if(!id || !key) return;
-
+async function login(auto=false) {
+  const id = auto ? store.getItem("mdi_id") : document.getElementById("roomId").value.trim();
+  const key = auto ? store.getItem("mdi_key") : document.getElementById("roomKey").value.trim();
+  
   try {
-    const res = await fetch(API + "/questions", { headers: { "x-room-id": id, "x-room-key": key } });
+    const res = await fetch(API_BASE + "/questions", { 
+      headers: { "x-room-id": id, "x-room-key": key } 
+    });
     const json = await res.json();
     if(json.ok) {
-      localStorage.setItem("mdi_id", id);
-      localStorage.setItem("mdi_key", key);
+      store.setItem("mdi_id", id);
+      store.setItem("mdi_key", key);
       document.getElementById("login").style.display = "none";
       document.getElementById("app").style.display = "block";
       renderList(json.questions);
     } else {
-      document.getElementById("loginError").style.display = "block";
-      document.getElementById("loginError").textContent = "Identifiants invalides.";
-      localStorage.clear();
+      if(!auto) alert("Identifiants incorrects.");
+      logout();
     }
   } catch(e) { console.error(e); }
 }
 
-function logout() { localStorage.clear(); location.reload(); }
+function logout() { store.clear(); location.reload(); }
 
 document.getElementById("formQ").onsubmit = async (e) => {
   e.preventDefault();
-  const id = localStorage.getItem("mdi_id");
-  const key = localStorage.getItem("mdi_key");
   const body = {
     question_key: document.getElementById("q_key").value,
     type: document.getElementById("q_type").value,
@@ -115,39 +100,40 @@ document.getElementById("formQ").onsubmit = async (e) => {
     correct_option: document.getElementById("q_correct").value,
     enabled: true
   };
-  const res = await fetch(API + "/save-question", {
+  const res = await fetch(API_BASE + "/save-question", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-room-id": id, "x-room-key": key },
+    headers: { 
+      "Content-Type": "application/json", 
+      "x-room-id": store.getItem("mdi_id"), 
+      "x-room-key": store.getItem("mdi_key") 
+    },
     body: JSON.stringify(body)
   });
-  const json = await res.json();
-  if(json.ok) {
-    login(); // Refresh
-    e.target.reset();
-  } else { alert("Erreur: " + json.error); }
+  if((await res.json()).ok) login(true);
 };
 
 function renderList(list) {
-  const div = document.getElementById("list");
-  if(!list || list.length === 0) { div.innerHTML = "Aucune question enregistrée."; return; }
-  div.innerHTML = list.map(q => `
+  document.getElementById("list").innerHTML = list.map(q => `
     <div class="q-item">
-      <div><span class="tag">${q.question_key}</span> <span style="margin-left:8px">${q.prompt}</span></div>
-      <button onclick="delQ('${q.question_key}')" style="background:var(--danger); width:auto; padding:5px 10px; font-size:11px">Supprimer</button>
+      <span><b>${q.question_key}</b> : ${q.prompt}</span>
+      <button onclick="delQ('${q.question_key}')" style="background:#ef4444; width:auto">X</button>
     </div>
   `).join('');
 }
 
 async function delQ(qid) {
-  if(!confirm("Supprimer cette question ?")) return;
-  const id = localStorage.getItem("mdi_id");
-  const key = localStorage.getItem("mdi_key");
-  await fetch(API + "/delete-question", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-room-id": id, "x-room-key": key },
-    body: JSON.stringify({ question_key: qid })
-  });
-  login();
+  if(confirm("Supprimer ?")) {
+    await fetch(API_BASE + "/delete-question", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json", 
+        "x-room-id": store.getItem("mdi_id"), 
+        "x-room-key": store.getItem("mdi_key") 
+      },
+      body: JSON.stringify({ question_key: qid })
+    });
+    login(true);
+  }
 }
 </script>
 </body>
