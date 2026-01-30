@@ -1,0 +1,232 @@
+/* ==========================================================
+   MDI QUIZ / SONDAGE — UI Stable OBS
+   - Boot transparent (ne masque jamais la caméra)
+   - 2 panels: question + réponses
+   - Espacement pilotable via --panel-gap (CSS OBS)
+   ========================================================== */
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent; /* IMPORTANT OBS */
+  overflow: hidden;
+}
+
+/* -------------------------
+   États pilotés par script
+   ------------------------- */
+#quiz-container,
+#security-screen {
+  display: none; /* rien au boot */
+}
+
+html.mdi-ready #quiz-container { display: grid; }
+html.mdi-denied #security-screen { display: flex; }
+
+/* Boot transparent = ne jamais masquer la caméra */
+.quiz-root {
+  position: fixed;
+  inset: 0;
+
+  /* ✅ Layout vertical centré */
+  display: grid;
+  justify-items: center;
+  align-content: center;
+
+  /* ✅ ESPACE ENTRE PANELS (pilotable OBS) */
+  row-gap: var(--panel-gap, 18px);
+
+  pointer-events: none;
+  font-family: var(--font-family, "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif);
+}
+
+/* ==========================================================
+   🔐 Refus d'accès (fond transparent)
+   ========================================================== */
+#security-screen {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 18px;
+  pointer-events: none;
+  text-align: center;
+  font-family: var(--font-family, "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif);
+  font-weight: 600; /* Semi-bold */
+}
+
+.security-x {
+  font-size: 120px;
+  line-height: 1;
+  color: #ff3b30;
+  text-shadow: 0 0 22px rgba(255, 59, 48, 0.35);
+}
+
+.security-text {
+  font-size: 54px;
+  letter-spacing: 0.5px;
+  color: #ff3b30;
+  text-shadow: 0 0 22px rgba(255, 59, 48, 0.25);
+}
+
+/* ==========================================================
+   Panels (fond piloté par JS via CSS OBS vars)
+   ========================================================== */
+.panel {
+  width: min(92vw, 1680px);
+  border-radius: var(--panel-radius, 48px);
+  padding: var(--panel-padding, 44px);
+  background: rgba(0,0,0,0); /* set inline par JS */
+  box-shadow: 0 40px 80px rgba(0,0,0,0.35);
+}
+
+/* Panel question : plus compact */
+.panel-question {
+  height: auto;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+
+/* Panel réponses : légèrement plus bas */
+.panel-answers {
+  position: relative;
+  height: auto;
+
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--answers-panel-fade-ms, 260ms) ease, transform var(--answers-panel-fade-ms, 260ms) ease;
+}
+
+/* Quand l'état est visible (prompt/open/results/reveal/winner), on affiche le panel question */
+html[data-mdi-state="prompt"] .panel-question,
+html[data-mdi-state="open"] .panel-question,
+html[data-mdi-state="results"] .panel-question,
+html[data-mdi-state="reveal"] .panel-question,
+html[data-mdi-state="winner"] .panel-question{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Panel réponses visible uniquement à partir de open */
+html[data-mdi-state="open"] .panel-answers,
+html[data-mdi-state="results"] .panel-answers,
+html[data-mdi-state="reveal"] .panel-answers,
+html[data-mdi-state="winner"] .panel-answers{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* -------------------------
+   Question
+   ------------------------- */
+.question {
+  height: var(--question-height, 160px);
+  border-radius: var(--question-radius, 34px);
+  display: grid;
+  place-items: center;
+  text-align: center;
+
+  font-weight: 800;
+  font-size: var(--question-font-size, 82px);
+  color: var(--question-text-color, #ffffff);
+  padding: 0 40px;
+
+  background: rgba(0,0,0,0); /* set inline par JS */
+  box-shadow: 0 18px 30px rgba(0,0,0,0.35);
+  border: var(--question-border-size, 5px) solid rgba(90, 95, 255, 0.95);
+}
+
+/* -------------------------
+   Réponses
+   ------------------------- */
+.answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px 26px;
+}
+
+.answer {
+  height: var(--answer-height, 150px);
+  border-radius: var(--answer-radius, 999px);
+  display: grid;
+  grid-template-columns: 108px 1fr auto;
+  align-items: center;
+  column-gap: 18px;
+  padding: 0 30px 0 18px;
+
+  background: rgba(0,0,0,0); /* set inline par JS */
+  border: var(--answer-border-size, 3px) solid rgba(80, 220, 255, 0.55);
+  box-shadow: 0 18px 30px rgba(0,0,0,0.25);
+
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.badge {
+  width: 94px;
+  height: 94px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 40px;
+  color: #0a0f1e;
+  background: #ffffff;
+  box-shadow: 0 12px 18px rgba(0,0,0,0.25);
+}
+
+.answer-text {
+  font-weight: 800;
+  font-size: var(--answer-font-size, 74px);
+  color: var(--answer-text-color, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* % lisibles */
+.pct {
+  font-weight: 900;
+  font-size: var(--pct-font-size, 74px);
+  color: var(--pct-color, #ffffff);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 180ms ease;
+}
+html.mdi-show-results .pct { opacity: 1; }
+
+/* Options cachées (apparition progressive pilotée par JS) */
+html.mdi-options-hidden .answer {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* Winner */
+.winner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+
+  font-weight: 900;
+  font-size: calc(var(--answer-font-size, 74px) * 2);
+  color: var(--winner-color, #ffffff);
+
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.winner-name { font-size: inherit; letter-spacing: 0.3px; }
+html.mdi-show-winner #winner { opacity: 1; }
+
+/* Quand winner => on atténue toutes les réponses simultanément */
+html.mdi-dim-answers .answer {
+  opacity: var(--answers-dim-opacity, 0.12);
+  transition-delay: 0ms !important;
+}

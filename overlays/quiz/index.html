@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MDI • Quiz / Sondage</title>
+
+  <!-- Montserrat (fallback system si offline) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap" rel="stylesheet">
+
+  <!-- socket.io-client (CDN) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- Écran sécurité (uniquement si REFUS) -->
+  <div id="security-screen" aria-hidden="true">
+    <div class="security-x">✕</div>
+    <div class="security-text">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  </div>
+
+  <!-- Conteneur QUIZ -->
+  <div id="quiz-container" class="quiz-root" aria-hidden="true">
+    <!-- Panel Question -->
+    <div class="panel panel-question" id="panel-question">
+      <div id="question" class="question">En attente…</div>
+    </div>
+
+    <!-- Panel Réponses -->
+    <div class="panel panel-answers" id="panel-answers">
+      <div class="answers">
+        <div class="answer" data-choice="A">
+          <div class="badge">A</div>
+          <div class="answer-text" id="txtA">—</div>
+          <div class="pct" id="pctA">0%</div>
+        </div>
+
+        <div class="answer" data-choice="B">
+          <div class="badge">B</div>
+          <div class="answer-text" id="txtB">—</div>
+          <div class="pct" id="pctB">0%</div>
+        </div>
+
+        <div class="answer" data-choice="C">
+          <div class="badge">C</div>
+          <div class="answer-text" id="txtC">—</div>
+          <div class="pct" id="pctC">0%</div>
+        </div>
+
+        <div class="answer" data-choice="D">
+          <div class="badge">D</div>
+          <div class="answer-text" id="txtD">—</div>
+          <div class="pct" id="pctD">0%</div>
+        </div>
+      </div>
+
+      <!-- Winner (centré dans le panel réponses) -->
+      <div id="winner" class="winner" aria-hidden="true">
+        <span class="medal">🥇</span>
+        <span id="winnerName" class="winner-name">—</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
