@@ -1,136 +1,174 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Télécommande Quiz</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    :root{ --bg:#0A0F1E; --panel:rgba(255,255,255,0.06); --text:rgba(255,255,255,0.92); --accent:#F9AD48; --danger:#ff3b30; --ok:#2ecc71; --font:ui-sans-serif,system-ui,sans-serif; }
-    *{box-sizing:border-box}
-    body{ margin:0; background:var(--bg); color:var(--text); font-family:var(--font); padding:18px; }
-    .wrap{ max-width:600px; margin:0 auto; display:grid; gap:14px; }
-    .card{ background:var(--panel); border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:14px; }
-    .title{ font-weight:800; display:flex; justify-content:space-between; align-items:center; }
-    .dot{ width:12px; height:12px; border-radius:99px; background:#555; display:inline-block; }
-    .dot.ok{ background:var(--ok); box-shadow:0 0 0 4px rgba(46,204,113,0.16); }
-    .dot.bad{ background:var(--danger); }
-    input, select{ width:100%; padding:12px; border-radius:12px; border:1px solid #444; background:#222; color:#fff; margin-bottom:8px; }
-    label{ font-size:12px; color:#aaa; display:block; margin-bottom:4px; }
-    .btn{ width:100%; padding:14px; border-radius:14px; border:none; background:rgba(255,255,255,0.1); color:#fff; font-weight:bold; cursor:pointer; margin-bottom:8px; }
-    .btn:active{ transform:scale(0.98); }
-    .btn.primary{ background:rgba(249,173,72,0.2); color:var(--accent); border:1px solid rgba(249,173,72,0.3); }
-    .btn.danger{ background:rgba(255,59,48,0.2); color:#ff6b6b; }
-    .btn:disabled{ opacity:0.4; cursor:not-allowed; }
-    .tv{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
-    .full{ grid-column: 1 / -1; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card title">
-      <span>MDI • Quiz Remote</span>
-      <span id="dot" class="dot"></span>
-    </div>
-
-    <div class="card">
-      <label>ID Client (Room ID)</label>
-      <input id="roomId" placeholder="ex: DEMO_CLIENT" />
-      <label>Clé Secrète (Room Key)</label>
-      <input id="roomKey" placeholder="ex: demo_key_123" />
-      <button id="btnConnect" class="btn primary">1. Connecter + Charger Catalogue</button>
-    </div>
-
-    <div class="card">
-      <label>Choisir une question</label>
-      <select id="questionSelect"><option value="">(Connectez-vous d'abord)</option></select>
-      
-      <div class="tv">
-        <button id="btnLoad" class="btn primary full">2. Afficher la question ❓ (DB)</button>
-        
-        <button id="btnOpen" class="btn">Afficher options 🗳️</button>
-        <button id="btnResults" class="btn">Résultats %</button>
-        <button id="btnReveal" class="btn">Réponse ✅</button>
-        <button id="btnWinner" class="btn">Gagnant 🥇</button>
-      </div>
-
-      <button id="btnReset" class="btn danger" style="margin-top:12px">Reset (Effacer)</button>
-    </div>
-  </div>
-
-<script>
+/* ==========================================================
+   MDI OVERLAY — LOGIQUE SONDAGE & QUIZ (V3.5)
+   ========================================================== */
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_NAME = "quiz_ou_sondage";
 
-const $ = (id) => document.getElementById(id);
-let socket = null;
-let questions = [];
+/* UI Refs */
+const elQuiz = document.getElementById("quiz-container");
+const elSecurity = document.getElementById("security-screen");
+const elQuestion = document.getElementById("question");
+const elWinner = document.getElementById("winner");
+const elWinnerName = document.getElementById("winnerName");
+const answerEls = Array.from(document.querySelectorAll(".answer"));
+const answers = {
+  A: { el: document.querySelector('.answer[data-choice="A"]'), txt: document.getElementById("txtA"), pct: document.getElementById("pctA") },
+  B: { el: document.querySelector('.answer[data-choice="B"]'), txt: document.getElementById("txtB"), pct: document.getElementById("pctB") },
+  C: { el: document.querySelector('.answer[data-choice="C"]'), txt: document.getElementById("txtC"), pct: document.getElementById("pctC") },
+  D: { el: document.querySelector('.answer[data-choice="D"]'), txt: document.getElementById("txtD"), pct: document.getElementById("pctD") }
+};
 
-function setStatus(ok) {
-  $("dot").className = ok ? "dot ok" : "dot bad";
+/* --- 1. BOOT & AUTH --- */
+let isAuthorized = false;
+function setBootTransparent() {
+  elQuiz.style.display = "none";
+  elSecurity.style.display = "none";
+  document.documentElement.className = ""; 
+  document.documentElement.removeAttribute("data-mdi-state");
+}
+function showDenied() {
+  isAuthorized = false;
+  document.documentElement.classList.add("mdi-denied");
+  document.documentElement.classList.remove("mdi-ready");
+  elQuiz.style.display = "none";
+  elSecurity.style.display = "flex";
+}
+function showAuthorized() {
+  isAuthorized = true;
+  document.documentElement.classList.remove("mdi-denied");
+  document.documentElement.classList.add("mdi-ready");
+  elSecurity.style.display = "none";
+}
+setBootTransparent();
+
+/* --- 2. LOGIQUE VISUELLE (POLL & QUIZ) --- */
+function resetVisuals() {
+  answerEls.forEach(el => {
+    el.classList.remove("is-correct");
+    el.removeAttribute("data-rank");
+    el.style.setProperty("--gauge-width", "0%");
+  });
+  document.documentElement.classList.remove("mdi-show-results", "mdi-show-winner", "mdi-dim-others");
 }
 
-// 1. Connexion + Chargement Catalogue
-$("btnConnect").onclick = async () => {
-  const room = $("roomId").value.trim();
-  const key = $("roomKey").value.trim();
-  if(!room || !key) return alert("Il manque l'ID ou la Clé !");
+function updateVisuals(state, data) {
+  // Reset
+  resetVisuals();
+  
+  // A. Mise à jour textes
+  let qType = "poll"; // default
+  let correctOpt = null;
 
-  // Socket
-  if(socket) socket.disconnect();
-  socket = io(SERVER_URL);
+  if (data?.question) {
+    // Format V3.5 : { question: { prompt: "...", type: "quiz", correct: "A", options: {...} } }
+    if (data.question.type) qType = data.question.type;
+    if (data.question.correct) correctOpt = data.question.correct;
+    
+    elQuestion.textContent = data.question.prompt || "Question sans titre";
+    const opts = data.question.options || {};
+    ["A","B","C","D"].forEach(k => {
+      answers[k].txt.textContent = opts[k] || "—";
+    });
+  }
+
+  // B. Mise à jour pourcentages & Ranks (Poll)
+  const p = data?.percents || {};
+  const stats = ["A","B","C","D"].map(k => ({ key: k, val: Number(p[k]) || 0 }));
+  
+  // Affichage textuel %
+  stats.forEach(item => {
+    answers[item.key].pct.textContent = Math.round(item.val) + "%";
+  });
+
+  // Si Resultats (Poll ou Quiz)
+  if (state === "results" || state === "reveal" || state === "winner") {
+    document.documentElement.classList.add("mdi-show-results");
+
+    if (qType === "poll") {
+      // --- LOGIQUE SONDAGE (Jauges Couleur) ---
+      // Trier pour le rang : Plus grand score = Rank 1
+      const sorted = [...stats].sort((a,b) => b.val - a.val);
+      
+      stats.forEach(item => {
+        const rankIndex = sorted.findIndex(s => s.key === item.key); // 0 = 1er
+        const rank = rankIndex + 1;
+        const el = answers[item.key].el;
+        
+        el.setAttribute("data-rank", rank); // Active la couleur CSS (Vert/Jaune...)
+        el.style.setProperty("--gauge-width", item.val + "%"); // Remplit la jauge
+      });
+    } 
+    else if (qType === "quiz") {
+      // --- LOGIQUE QUIZ (Bonne réponse) ---
+      if ((state === "reveal" || state === "winner") && correctOpt) {
+        document.documentElement.classList.add("mdi-dim-others");
+        const winEl = answers[correctOpt].el;
+        if(winEl) winEl.classList.add("is-correct");
+      }
+    }
+  }
+
+  // C. Winner Screen
+  if (state === "winner") {
+    elWinnerName.textContent = data?.winnerName || "Gagnant";
+    document.documentElement.classList.add("mdi-show-winner");
+  }
+}
+
+/* --- 3. STATE MACHINE --- */
+function applyState(state, data) {
+  if (AUTH_MODE === "strict" && !isAuthorized) return;
+  if (!state || state === "idle") {
+    setBootTransparent();
+    return;
+  }
+  
+  // Mapping "question" -> "prompt" pour CSS
+  let uiState = (state === "question") ? "prompt" : state;
+  document.documentElement.setAttribute("data-mdi-state", uiState);
+  
+  // Visible
+  elQuiz.style.display = "grid";
+  if(isAuthorized) elSecurity.style.display = "none";
+
+  updateVisuals(uiState, data);
+}
+
+/* --- 4. SOCKET & AUTH --- */
+let socket = null;
+let AUTH_MODE = "strict";
+let ROOM_ID = "";
+let ROOM_KEY = "";
+
+function readCssVars() {
+  const s = getComputedStyle(document.documentElement);
+  AUTH_MODE = s.getPropertyValue("--auth-mode").trim().replace(/"/g, "") || "strict";
+  ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g, "") || "";
+  ROOM_KEY = s.getPropertyValue("--room-key").trim().replace(/"/g, "") || "";
+}
+
+function initSocket() {
+  socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
   
   socket.on("connect", () => {
-    setStatus(true);
-    socket.emit("overlay:join", { room, key, overlay: OVERLAY_NAME });
+    if(AUTH_MODE==="strict") socket.emit("overlay:join", { room: ROOM_ID, key: ROOM_KEY, overlay: OVERLAY_NAME });
+    else socket.emit("rejoindre_salle", ROOM_ID);
   });
+
+  socket.on("overlay:forbidden", () => showDenied());
   
-  socket.on("overlay:forbidden", () => { setStatus(false); alert("Accès refusé ! Vérifiez la clé."); });
-  socket.on("disconnect", () => setStatus(false));
-
-  // Catalogue
-  try {
-    const res = await fetch(`${SERVER_URL}/debug/questions?room=${room}`);
-    const json = await res.json();
-    questions = json.data || [];
-    
-    const sel = $("questionSelect");
-    sel.innerHTML = '<option value="">-- Choisir --</option>';
-    questions.forEach(q => {
-      const opt = document.createElement("option");
-      opt.value = q.question_key;
-      opt.textContent = `${q.question_key} - ${q.prompt}`;
-      sel.appendChild(opt);
-    });
-  } catch(e) { alert("Erreur catalogue: " + e.message); }
-};
-
-// Helper pour envoyer des commandes
-function send(action, payload={}) {
-  if(!socket || !socket.connected) return alert("Pas connecté !");
-  const room = $("roomId").value.trim();
-  const key = $("roomKey").value.trim();
-  socket.emit(action, { room, key, overlay: OVERLAY_NAME, ...payload });
+  socket.on("overlay:state", (payload) => {
+    if(payload?.overlay !== OVERLAY_NAME) return;
+    showAuthorized();
+    applyState(payload.state, payload.data);
+  });
 }
 
-// 2. Afficher Question (LOAD depuis DB)
-$("btnLoad").onclick = () => {
-  const qKey = $("questionSelect").value;
-  if(!qKey) return alert("Choisis une question !");
-  // C'est ici la magie : on demande au serveur de charger la data
-  send("control:load_question", { question_key: qKey });
-};
-
-$("btnOpen").onclick = () => send("control:show_options"); // Usage optimisé server V3.5
-$("btnResults").onclick = () => send("control:set_state", { state: "results" });
-$("btnReveal").onclick = () => send("control:set_state", { state: "reveal" });
-$("btnWinner").onclick = () => send("control:set_state", { state: "winner" });
-$("btnReset").onclick = () => send("control:idle");
-
-// Init simple
-const u = new URL(location.href);
-if(u.searchParams.get("room")) $("roomId").value = u.searchParams.get("room");
-if(u.searchParams.get("key")) $("roomKey").value = u.searchParams.get("key");
-</script>
-</body>
-</html>
+// Boucle d'attente OBS CSS
+const t = setInterval(() => {
+  readCssVars();
+  if(ROOM_ID && ROOM_KEY) {
+    clearInterval(t);
+    initSocket();
+  }
+}, 200);
