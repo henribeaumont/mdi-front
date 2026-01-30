@@ -1,42 +1,38 @@
 /**
- * MDI TUG OF WAR - V5.5 SaaS
- * Adapté pour écouter le canal universel 'raw_vote'
+ * MDI TUG OF WAR - V5.5 SaaS (ÉDITION SÉCURISÉE)
+ * - Correction de la détection des variables OBS
+ * - Authentification stricte via socket.emit("overlay:join")
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "tug_of_war";
 
-/* --- UTILS --- */
+/* --- 1. RÉCUPÉRATION RIGOUREUSE DU CSS OBS --- */
 function cssVar(name, fallback = "") {
+  // getComputedStyle est la seule méthode fiable pour lire le champ CSS d'OBS
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
-  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+  if (!v) return fallback;
+  return v.trim().replace(/^['"]+|['"]+$/g, ""); // Nettoyage des guillemets
 }
 
-const wait = (ms) => new Promise(r => setTimeout(r, ms));
-
-/* --- UI CONTROLS --- */
-function lockScreen() {
+/* --- 2. GESTION DE L'INTERFACE --- */
+function showSecurityDenied() {
   document.getElementById("container").classList.add("hidden");
   document.getElementById("security-screen").classList.remove("hidden");
+  document.body.style.backgroundColor = "rgba(0,0,0,1)"; // Fond noir en cas d'erreur
 }
 
-function unlockScreen() {
+function showGame() {
   document.getElementById("security-screen").classList.add("hidden");
   document.getElementById("container").classList.remove("hidden");
+  document.body.style.backgroundColor = "transparent"; 
 }
 
-/* --- GAME LOGIC --- */
+/* --- 3. LOGIQUE DE JEU --- */
 let scoreLeft = 0;
 let scoreRight = 0;
 const votersSeen = new Set();
 let CONFIG = { nameL: "OUI", nameR: "NON", trigL: "O", trigR: "N" };
-
-function resetScores() {
-  scoreLeft = 0;
-  scoreRight = 0;
-  votersSeen.clear();
-  updateDisplay();
-}
 
 function updateDisplay() {
   const total = scoreLeft + scoreRight;
@@ -45,7 +41,7 @@ function updateDisplay() {
   document.getElementById("cursor").style.left = percentLeft + "%";
 }
 
-function lireConfigurationCSS() {
+function applyVisualConfig() {
   CONFIG.nameL = cssVar("--name-left", "OUI");
   CONFIG.nameR = cssVar("--name-right", "NON");
   CONFIG.trigL = cssVar("--trigger-left", "O").toUpperCase();
@@ -55,64 +51,70 @@ function lireConfigurationCSS() {
   document.getElementById("name-right").innerText = CONFIG.nameR;
   document.getElementById("trig-left").innerText = CONFIG.trigL;
   document.getElementById("trig-right").innerText = CONFIG.trigR;
-  
-  // Appliquer les couleurs
-  document.documentElement.style.setProperty("--color-left", cssVar("--color-left", "#2ecc71"));
-  document.documentElement.style.setProperty("--color-right", cssVar("--color-right", "#e74c3c"));
 }
 
-/* --- SOCKET & BOOT --- */
+/* --- 4. CONNEXION ET AUTHENTIFICATION --- */
 const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
-async function boot() {
-  // Attente du chargement CSS OBS
-  await wait(500);
-  
-  const room = cssVar("--room-id", "");
-  const key = cssVar("--room-key", "");
-  const authMode = cssVar("--auth-mode", "strict");
-  const autoReset = cssVar("--auto-reset", "false");
+async function init() {
+  console.log("[MDI] Initialisation de l'authentification...");
 
-  if (authMode === "strict" && (!room || !key)) {
-    lockScreen();
+  // On attend un court instant que OBS injecte le CSS personnalisé
+  await new Promise(r => setTimeout(r, 800));
+
+  const room = cssVar("--room-id");
+  const key = cssVar("--room-key");
+
+  // Rigueur : Si les identifiants manquent, on bloque tout de suite
+  if (!room || !key) {
+    console.error("[MDI] Erreur : --room-id ou --room-key manquant dans le CSS OBS.");
+    showSecurityDenied();
     return;
   }
 
-  socket.on("connect", () => {
-    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  // Envoi de la demande de connexion sécurisée au serveur
+  socket.emit("overlay:join", { 
+    room: room, 
+    key: key, 
+    overlay: OVERLAY_TYPE 
   });
 
-  socket.on("overlay:forbidden", () => lockScreen());
+  // Réponse du serveur si la clé est mauvaise
+  socket.on("overlay:forbidden", () => {
+    console.error("[MDI] Accès refusé par le serveur.");
+    showSecurityDenied();
+  });
 
+  // Réponse du serveur si tout est OK
   socket.on("overlay:state", (payload) => {
-    if (payload?.overlay !== OVERLAY_TYPE) return;
-    unlockScreen();
-    lireConfigurationCSS();
-    if (autoReset === "true") resetScores();
-    else updateDisplay();
+    if (payload?.overlay === OVERLAY_TYPE) {
+      applyVisualConfig();
+      showGame(); 
+      if (cssVar("--auto-reset") === "true") {
+        scoreLeft = 0; scoreRight = 0; votersSeen.clear();
+      }
+      updateDisplay();
+    }
   });
 
-  // ÉCOUTE DU CANAL UNIVERSEL
+  // Écoute des votes en temps réel
   socket.on("raw_vote", (data) => {
     const vote = (data.vote || "").trim().toUpperCase();
     const user = data.user || "Anonyme";
-    const oneVoteOnly = cssVar("--tug-one-vote-per-person", "off") === "on";
+    const uniqueVote = cssVar("--tug-one-vote-per-person") === "on";
 
-    if (!vote) return;
-    if (oneVoteOnly && votersSeen.has(user) && user !== "Anonyme") return;
+    if (uniqueVote && votersSeen.has(user) && user !== "Anonyme") return;
 
     if (vote === CONFIG.trigL) {
       scoreLeft++;
-      if (oneVoteOnly) votersSeen.add(user);
+      if (uniqueVote) votersSeen.add(user);
       updateDisplay();
     } else if (vote === CONFIG.trigR) {
       scoreRight++;
-      if (oneVoteOnly) votersSeen.add(user);
+      if (uniqueVote) votersSeen.add(user);
       updateDisplay();
-    } else if (vote === "RESET") {
-      resetScores();
     }
   });
 }
 
-boot();
+init();
