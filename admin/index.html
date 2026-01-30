@@ -2,210 +2,156 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>MDI • Admin Cockpit</title>
+  <title>MDI • Admin Cockpit (Secure)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root { --bg: #0f172a; --panel: #1e293b; --text: #f1f5f9; --accent: #3b82f6; --danger: #ef4444; --success: #22c55e; }
+    /* ... (Même CSS qu'avant + Login Screen) ... */
+    :root { --bg: #0f172a; --panel: #1e293b; --text: #f1f5f9; --accent: #3b82f6; --danger: #ef4444; }
     body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
-    .container { max-width: 1000px; margin: 0 auto; }
-    h1 { display: flex; align-items: center; justify-content: space-between; }
-    
-    /* Tabs */
+    .container { max-width: 1000px; margin: 0 auto; display: none; /* Caché par défaut */ }
+    h1 { display: flex; justify-content: space-between; }
     .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab { background: var(--panel); padding: 10px 20px; border-radius: 8px; cursor: pointer; opacity: 0.6; font-weight: 600; }
+    .tab { background: var(--panel); padding: 10px 20px; border-radius: 8px; cursor: pointer; opacity: 0.6; }
     .tab.active { opacity: 1; background: var(--accent); }
-    
-    /* Panels */
     .view { display: none; }
     .view.active { display: block; }
-    
-    /* Cards */
-    .card { background: var(--panel); padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.05); }
+    .card { background: var(--panel); padding: 20px; border-radius: 12px; margin-bottom: 15px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    
     label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-    input, select, textarea { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 6px; box-sizing: border-box; }
-    
+    input, select, textarea { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 6px; box-sizing:border-box; }
     button { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    button:hover { opacity: 0.9; }
-    button.danger { background: var(--danger); }
-    button.secondary { background: #334155; }
-    
     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
     th, td { text-align: left; padding: 10px; border-bottom: 1px solid #334155; }
-    th { color: #94a3b8; }
-    .tag { padding: 2px 6px; border-radius: 4px; font-size: 10px; text-transform: uppercase; font-weight: bold; }
-    .tag.quiz { background: #8b5cf6; color: white; }
-    .tag.poll { background: #06b6d4; color: white; }
     
-    .loading { opacity: 0.5; pointer-events: none; }
+    /* LOGIN OVERLAY */
+    #login-screen { position: fixed; inset: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 999; }
+    .login-box { background: var(--panel); padding: 40px; border-radius: 16px; text-align: center; width: 300px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>
-    <span>🚀 MDI Admin</span>
-    <button onclick="refreshData()" class="secondary">🔄 Refresh</button>
-  </h1>
+<div id="login-screen">
+  <div class="login-box">
+    <h2>🔒 Accès Admin</h2>
+    <div style="margin-bottom:15px; text-align:left;">
+      <label>Mot de passe serveur</label>
+      <input type="password" id="adminPass" placeholder="MDI_SUPER_ADMIN..." >
+    </div>
+    <button onclick="tryLogin()" style="width:100%">Déverrouiller</button>
+  </div>
+</div>
+
+<div class="container" id="app">
+  <h1><span>🚀 MDI Admin</span> <button onclick="logout()" style="background:#334155">Logout</button></h1>
 
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('clients')">👥 Clients (Rooms)</div>
+    <div class="tab active" onclick="switchTab('clients')">👥 Clients</div>
     <div class="tab" onclick="switchTab('questions')">❓ Questions</div>
   </div>
 
   <div id="view-clients" class="view active">
     <div class="card">
-      <h3>Ajouter / Modifier un Client</h3>
+      <h3>Ajouter / Modifier Client</h3>
       <form id="formClient">
         <div class="row">
-          <div><label>ID Client (Room ID)</label><input id="c_id" placeholder="Ex: CLIENT_BMW" required></div>
-          <div><label>Clé Secrète (Room Key)</label><input id="c_key" placeholder="Ex: secret_123" required></div>
+          <div><label>ID Client</label><input id="c_id" required></div>
+          <div><label>Clé Secrète</label><input id="c_key" required></div>
         </div>
-        <div class="row">
-          <div><label>Actif ?</label><select id="c_active"><option value="true">OUI</option><option value="false">NON</option></select></div>
-        </div>
-        <div style="margin-bottom:10px">
-          <label>Droits (Entitlements)</label>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <label><input type="checkbox" class="ent" value="quiz_ou_sondage" checked> Quiz/Sondage</label>
-            <label><input type="checkbox" class="ent" value="confetti" checked> Confettis</label>
-            <label><input type="checkbox" class="ent" value="tug_of_war" checked> Tug of War</label>
-          </div>
-        </div>
-        <button type="submit">💾 Sauvegarder Client</button>
+        <div><label>Actif ?</label><select id="c_active"><option value="true">OUI</option><option value="false">NON</option></select></div>
+        <button type="submit" style="margin-top:10px">💾 Sauvegarder</button>
       </form>
     </div>
-
     <div class="card">
-      <h3>Liste des Clients</h3>
-      <table id="tableClients">
-        <thead><tr><th>Room ID</th><th>Key</th><th>Active</th><th>Actions</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <table id="tableClients"><thead><tr><th>Room ID</th><th>Key</th><th>Actif</th><th>Action</th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 
   <div id="view-questions" class="view">
     <div class="card">
-      <h3>Éditer une Question</h3>
+      <h3>Éditer Question</h3>
       <form id="formQuestion">
         <div class="row">
-          <div><label>Client (Room ID)</label><input id="q_room" placeholder="Ex: DEMO_CLIENT" required></div>
-          <div><label>Code Question (ex: Q001)</label><input id="q_key" placeholder="Q001" required></div>
+          <div><label>Room ID</label><input id="q_room" required></div>
+          <div><label>Code (ex: Q01)</label><input id="q_key" required></div>
         </div>
         <div class="row">
-          <div><label>Type</label><select id="q_type"><option value="quiz">Quiz (Bonne réponse)</option><option value="poll">Sondage (Avis)</option></select></div>
+          <div><label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select></div>
           <div><label>Ordre</label><input type="number" id="q_order" value="1"></div>
         </div>
-        <div style="margin-bottom:10px"><label>Intitulé (Prompt)</label><textarea id="q_prompt" rows="2" required></textarea></div>
-        
+        <div style="margin-bottom:10px"><label>Question</label><textarea id="q_prompt" rows="2" required></textarea></div>
         <div class="row">
-          <div><label>Option A</label><input id="q_a" required></div>
-          <div><label>Option B</label><input id="q_b" required></div>
+          <div><label>A</label><input id="q_a" required></div>
+          <div><label>B</label><input id="q_b" required></div>
         </div>
         <div class="row">
-          <div><label>Option C</label><input id="q_c"></div>
-          <div><label>Option D</label><input id="q_d"></div>
+          <div><label>C</label><input id="q_c"></div>
+          <div><label>D</label><input id="q_d"></div>
         </div>
-        
-        <div class="row" id="rowCorrect">
-          <div><label>Bonne Réponse (Quiz)</label><select id="q_correct"><option value="A">Option A</option><option value="B">Option B</option><option value="C">Option C</option><option value="D">Option D</option></select></div>
-        </div>
-
-        <button type="submit">💾 Sauvegarder Question</button>
+        <div style="margin-bottom:10px"><label>Bonne Réponse (Quiz)</label><select id="q_correct"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div>
+        <button type="submit">💾 Sauvegarder</button>
       </form>
     </div>
-
-    <div class="card">
-      <h3>Catalogue Questions</h3>
-      <table id="tableQuestions">
-        <thead><tr><th>Room</th><th>Key</th><th>Type</th><th>Prompt</th><th>Action</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <div class="card"><table id="tableQuestions"><thead><tr><th>Room</th><th>Key</th><th>Txt</th><th>Action</th></tr></thead><tbody></tbody></table></div>
   </div>
-
 </div>
 
 <script>
 const API_URL = "https://magic-digital-impact-live.onrender.com/api/admin";
-const SECRET = "MDI_SUPER_ADMIN_2026"; // Doit matcher server.js
+let SECRET = localStorage.getItem("mdi_admin_secret") || "";
 
-// --- NAVIGATION ---
-function switchTab(tab) {
-  document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
-  document.getElementById('view-'+tab).classList.add('active');
-  document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-}
+// AUTH
+if(SECRET) tryLogin(true);
 
-// --- DATA FETCH ---
-async function apiCall(endpoint, method="GET", body=null) {
-  const opts = {
-    method,
-    headers: { "Content-Type": "application/json", "x-admin-secret": SECRET }
-  };
-  if(body) opts.body = JSON.stringify(body);
-  try {
-    const res = await fetch(API_URL + endpoint, opts);
-    return await res.json();
-  } catch(e) { alert("Erreur API: " + e); return {ok:false}; }
-}
-
-async function refreshData() {
-  document.body.classList.add("loading");
+async function tryLogin(auto=false) {
+  if(!auto) SECRET = document.getElementById("adminPass").value;
+  // Test simple : on essaie de charger les data
   const res = await apiCall("/data");
-  document.body.classList.remove("loading");
-  
-  if(!res.ok) return alert("Erreur chargement (Check server logs)");
-  
-  // Render Clients
-  const tbodyC = document.querySelector("#tableClients tbody");
-  tbodyC.innerHTML = res.clients.map(c => `
-    <tr>
-      <td><b>${c.room_id}</b></td>
-      <td>${c.room_key}</td>
-      <td>${c.active ? '✅' : '❌'}</td>
-      <td><button class="secondary" onclick="editClient('${c.room_id}')">Edit</button></td>
-    </tr>
-  `).join('');
-  
-  // Render Questions
-  const tbodyQ = document.querySelector("#tableQuestions tbody");
-  tbodyQ.innerHTML = res.questions.map(q => `
-    <tr>
-      <td>${q.room_id}</td>
-      <td><b>${q.question_key}</b></td>
-      <td><span class="tag ${q.type}">${q.type}</span></td>
-      <td>${q.prompt}</td>
-      <td>
-        <button class="secondary" onclick="editQuestion('${q.room_id}', '${q.question_key}')">✏️</button>
-        <button class="danger" onclick="deleteQuestion('${q.room_id}', '${q.question_key}')">🗑️</button>
-      </td>
-    </tr>
-  `).join('');
-  
-  window.rawData = res; // Stocker pour edit
+  if(res.ok) {
+    localStorage.setItem("mdi_admin_secret", SECRET);
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    renderData(res);
+  } else {
+    if(!auto) alert("Mot de passe refusé par le serveur !");
+  }
+}
+function logout() { localStorage.removeItem("mdi_admin_secret"); location.reload(); }
+
+// API
+async function apiCall(endpoint, method="GET", body=null) {
+  const opts = { method, headers: { "Content-Type": "application/json", "x-admin-secret": SECRET } };
+  if(body) opts.body = JSON.stringify(body);
+  try { return await (await fetch(API_URL+endpoint, opts)).json(); } catch(e){ return {ok:false}; }
 }
 
-// --- FORMS ---
+async function refresh() { renderData(await apiCall("/data")); }
+
+function renderData(res) {
+  if(!res.clients) return;
+  window.rawData = res;
+  
+  // Clients
+  document.querySelector("#tableClients tbody").innerHTML = res.clients.map(c => 
+    `<tr><td>${c.room_id}</td><td>${c.room_key}</td><td>${c.active?'✅':'❌'}</td><td><button onclick="editClient('${c.room_id}')">Edit</button></td></tr>`
+  ).join('');
+  
+  // Questions
+  document.querySelector("#tableQuestions tbody").innerHTML = res.questions.map(q => 
+    `<tr><td>${q.room_id}</td><td><b>${q.question_key}</b></td><td>${q.prompt}</td><td><button onclick="editQ('${q.room_id}','${q.question_key}')">Edit</button> <button onclick="delQ('${q.room_id}','${q.question_key}')" style="background:#ef4444">X</button></td></tr>`
+  ).join('');
+}
+
+// FORMS (CORRECTIF BUG: parseInt sur order_index)
 document.getElementById("formClient").onsubmit = async (e) => {
   e.preventDefault();
-  const ents = {};
-  document.querySelectorAll(".ent:checked").forEach(el => ents[el.value] = true);
-  
   const body = {
     room_id: document.getElementById("c_id").value,
     room_key: document.getElementById("c_key").value,
     active: document.getElementById("c_active").value === "true",
-    entitlements: ents
+    entitlements: {"quiz_ou_sondage":true} 
   };
-  
-  await apiCall("/client", "POST", body);
-  refreshData();
-  alert("Client sauvegardé !");
+  await apiCall("/client", "POST", body); refresh();
 };
 
 document.getElementById("formQuestion").onsubmit = async (e) => {
@@ -214,7 +160,7 @@ document.getElementById("formQuestion").onsubmit = async (e) => {
     room_id: document.getElementById("q_room").value,
     question_key: document.getElementById("q_key").value,
     type: document.getElementById("q_type").value,
-    order_index: document.getElementById("q_order").value,
+    order_index: parseInt(document.getElementById("q_order").value) || 1, // <--- ICI LE FIX IMPORTANTE
     prompt: document.getElementById("q_prompt").value,
     option_a: document.getElementById("q_a").value,
     option_b: document.getElementById("q_b").value,
@@ -223,44 +169,37 @@ document.getElementById("formQuestion").onsubmit = async (e) => {
     correct_option: document.getElementById("q_correct").value,
     enabled: true
   };
-  
-  await apiCall("/question", "POST", body);
-  refreshData();
-  alert("Question sauvegardée !");
+  const res = await apiCall("/question", "POST", body);
+  if(!res.ok) alert("Erreur: " + res.error); // On affiche l'erreur si ça plante encore
+  refresh();
 };
 
-// --- ACTIONS ---
+// ACTIONS
 window.editClient = (id) => {
   const c = window.rawData.clients.find(x => x.room_id === id);
-  if(!c) return;
-  document.getElementById("c_id").value = c.room_id;
-  document.getElementById("c_key").value = c.room_key;
-  document.getElementById("c_active").value = c.active.toString();
+  if(c) { document.getElementById("c_id").value=c.room_id; document.getElementById("c_key").value=c.room_key; }
 };
-
-window.editQuestion = (rid, qid) => {
+window.editQ = (rid, qid) => {
   const q = window.rawData.questions.find(x => x.room_id === rid && x.question_key === qid);
-  if(!q) return;
-  document.getElementById("q_room").value = q.room_id;
-  document.getElementById("q_key").value = q.question_key;
-  document.getElementById("q_type").value = q.type;
-  document.getElementById("q_prompt").value = q.prompt;
-  document.getElementById("q_a").value = q.option_a;
-  document.getElementById("q_b").value = q.option_b;
-  document.getElementById("q_c").value = q.option_c;
-  document.getElementById("q_d").value = q.option_d;
-  switchTab('questions');
+  if(q) {
+    document.getElementById("q_room").value = q.room_id;
+    document.getElementById("q_key").value = q.question_key;
+    document.getElementById("q_prompt").value = q.prompt;
+    document.getElementById("q_a").value = q.option_a;
+    document.getElementById("q_b").value = q.option_b;
+    document.getElementById("q_c").value = q.option_c;
+    document.getElementById("q_d").value = q.option_d;
+    switchTab('questions');
+  }
+};
+window.delQ = async (rid, qid) => {
+  if(confirm("Supprimer ?")) { await apiCall("/delete-question", "POST", {room_id:rid, question_key:qid}); refresh(); }
 };
 
-window.deleteQuestion = async (rid, qid) => {
-  if(!confirm("Supprimer " + qid + " ?")) return;
-  await apiCall("/delete-question", "POST", { room_id: rid, question_key: qid });
-  refreshData();
-};
-
-// Init
-refreshData();
+function switchTab(t) {
+  document.querySelectorAll(".view").forEach(e => e.classList.remove("active"));
+  document.getElementById("view-"+t).classList.add("active");
+}
 </script>
-
 </body>
 </html>
