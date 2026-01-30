@@ -1,13 +1,14 @@
 /**
- * MDI - CONFETTI OVERLAY (V5.5 SaaS Pro)
- * - Supporte les mots déclencheurs depuis le chat
- * - Paramétrage intégral via CSS OBS
+ * MDI - CONFETTI OVERLAY (V5.5 SaaS Pro - Fixed Range)
+ * - Gestion de la gravité liée au --confetti-range
+ * - Détection des mots triggers du chat
+ * - Sécurité SaaS Strict
  */
 
 const ADRESSE_SERVEUR = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "confetti";
 
-// ---------- CSS helpers (Extraction des réglages OBS) ----------
+// ---------- CSS helpers (Extraction OBS) ----------
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return (v || "").trim() || fallback;
@@ -39,17 +40,23 @@ function randomInRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-// ---------- Auth config (Lecture CSS OBS) ----------
+// ---------- Auth & Triggers config ----------
 function readConfig() {
   const room = stripQuotes(cssVar("--room-id", "DEMO_CLIENT"));
   const key = stripQuotes(cssVar("--room-key", ""));
   const authMode = lower(cssVar("--auth-mode", "strict"));
-  const triggers = stripQuotes(cssVar("--confetti-triggers", "BRAVO,MERCI,TOP,WOW,GG,FEU"));
+  const triggersRaw = stripQuotes(cssVar("--confetti-triggers", "BRAVO,MERCI,TOP,WOW,GG,FEU"));
   
-  return { room, key, overlay: OVERLAY_TYPE, authMode, triggers: triggers.toUpperCase().split(",") };
+  return { 
+    room, 
+    key, 
+    overlay: OVERLAY_TYPE, 
+    authMode, 
+    triggers: triggersRaw.toUpperCase().split(",").map(t => t.trim()).filter(Boolean) 
+  };
 }
 
-// ---------- Gestion de l'affichage / Sécurité ----------
+// ---------- UI / Sécurité ----------
 let estAutorise = false;
 let hardForbidden = false;
 
@@ -77,7 +84,7 @@ function unlock() {
   showSecurity(false);
 }
 
-// ---------- Moteur Confetti (Canvas) ----------
+// ---------- Moteur Confetti ----------
 const myCanvas = document.getElementById("my-canvas");
 const myConfetti = confetti.create(myCanvas, { resize: true, useWorker: true });
 
@@ -103,12 +110,29 @@ function getCanonList(mode, rainColumns = 9) {
 function lancerCelebration() {
   if (!estAutorise || hardForbidden) return;
 
+  // Lecture des paramètres de base
   const bursts = clamp(cssInt("--confetti-bursts", 6), 1, 60);
   const duration = clamp(cssInt("--confetti-duration-ms", 2200), 200, 20000);
   const particleCount = clamp(cssInt("--confetti-particle-count", 70), 1, 500);
+  const startVelocityBase = clamp(cssNum("--confetti-start-velocity", 45), 0, 200);
+  const ticksBase = clamp(cssInt("--confetti-ticks", 120), 20, 600);
   const colors = parseColors(cssVar("--confetti-colors", ""), ["#FFD700", "#FF0000", "#00BFFF", "#FFFFFF"]);
   const canons = getCanonList(stripQuotes(cssVar("--confetti-canons", "corners+sides")), cssInt("--confetti-rain-columns", 10));
+
+  // --- LOGIQUE PORTÉE (RANGE) CORRIGÉE ---
+  const range = clamp(cssNum("--confetti-range", 0.7), 0, 1);
   
+  // 1. Vitesse : plus de range = plus de propulsion
+  const velocityMul = 0.5 + (range * 1.5);
+  const startVelocity = clamp(startVelocityBase * velocityMul, 5, 250);
+
+  // 2. Gravité : plus de range = gravité faible (effet "flottant")
+  // Range 1.0 => Gravité 0.3 | Range 0.0 => Gravité 2.0
+  const gravity = clamp(2.0 - (range * 1.7), 0.3, 2.0);
+
+  // 3. Durée de vie : on l'augmente pour que les particules ne disparaissent pas trop tôt
+  const ticks = clamp(Math.floor(ticksBase * (1 + range)), 20, 1000);
+
   let fired = 0;
   const gap = Math.floor(duration / bursts);
 
@@ -122,7 +146,9 @@ function lancerCelebration() {
         spread: cssInt("--confetti-spread", 360),
         origin: { x: c.x, y: c.y },
         colors: colors,
-        startVelocity: cssInt("--confetti-start-velocity", 45),
+        startVelocity: startVelocity,
+        gravity: gravity, // Application de la gravité corrigée
+        ticks: ticks,
         scalar: randomInRange(cssNum("--confetti-size-min", 1.2), cssNum("--confetti-size-max", 2.2))
       });
     });
@@ -130,9 +156,8 @@ function lancerCelebration() {
   }, gap);
 }
 
-// ---------- Initialisation & Sockets ----------
+// ---------- Initialisation ----------
 async function start() {
-  // Attente pour que OBS injecte les variables CSS
   await new Promise(r => setTimeout(r, 1000));
   const cfg = readConfig();
 
@@ -142,26 +167,23 @@ async function start() {
     socket.emit("overlay:join", { room: cfg.room, key: cfg.key, overlay: cfg.overlay });
   });
 
-  socket.on("overlay:forbidden", (p) => hardLock());
+  socket.on("overlay:forbidden", () => hardLock());
   
   socket.on("overlay:state", (payload) => {
     if (payload?.overlay === cfg.overlay) {
       unlock();
-      // Auto-fire au démarrage si configuré
       if (lower(cssVar("--confetti-auto", "off")) === "on") lancerCelebration();
     }
   });
 
-  // Détection des mots dans le chat (Universal)
   socket.on("raw_vote", (data) => {
     const msg = data.vote.toUpperCase().trim();
-    if (cfg.triggers.some(t => msg.includes(t.trim()))) {
+    if (cfg.triggers.some(t => msg.includes(t))) {
       lancerCelebration();
     }
   });
 
-  // Compatibilité ancien mode
   socket.on("declencher_explosion", () => lancerCelebration());
 }
 
-start().catch(e => console.error("Erreur Confetti:", e));
+start().catch(e => console.error("Confetti Error:", e));
