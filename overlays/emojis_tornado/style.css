@@ -1,45 +1,82 @@
-:root {
-    /* Identifiants SaaS obligatoires */
-    --room-id: "";
-    --room-key: "";
+/* ==========================================================
+   MDI EMOJIS TORNADO - V6 SaaS (ZERO FLICKER)
+   Overlay code : emojis_tornado
+   Sécurité : --room-id / --room-key via CSS OBS
+   ========================================================== */
 
-    /* Configuration par défaut */
-    --zone-width: 100vw;
-    --zone-height: 100vh;
-    --particle-density: 0.1;
-    --particle-max: 60;
-    --particle-opacity: 0.8;
-    --particle-spread: 0.5;
-    --particle-size-min: 22;
-    --particle-size-max: 45;
-    --velocity-base: 2.0;
+:root{
+  /* --- 🔐 ACCÈS / MODE --- */
+  --auth-mode: "strict";     /* "strict" | "legacy" */
+
+  /* --- 🌪️ RÉGLAGES TORNADE --- */
+  --particle-density: 0.15;  /* Intensité : 0.01 (calme) → 0.5 (tempête) */
+  --particle-max: 80;        /* Max emojis simultanés à l'écran */
+
+  /* --- ✨ APPARENCE --- */
+  --particle-opacity: 0.85;  /* 0.1 → 1.0 */
+  --particle-size-min: 25;   /* px */
+  --particle-size-max: 55;   /* px */
+
+  /* --- ⚙️ PHYSIQUE --- */
+  --particle-spread: 0.40;   /* 0.10 étroit → 1.0 large */
+  --velocity-base: 2.5;      /* vitesse de montée */
+
+  /* --- 🧠 COMPORTEMENT --- */
+  --only-emoji-messages: "on"; /* "on" : ignore les messages sans emoji */
+  --auto-reset: "false";       /* "true" : vide à chaque affichage */
 }
 
-body, html {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    background: transparent; overflow: hidden;
+/* base */
+html, body{
+  margin:0; padding:0;
+  width:100vw; height:100vh;
+  overflow:hidden;
+  background: transparent;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
-/* Écran de refus (Noir/Rouge/Gras) */
-.auth-screen {
-    position: fixed; inset: 0; background: #000;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 10000;
-}
-.auth-screen h1 {
-    color: #ff0000; font-family: sans-serif; font-weight: 900; 
-    font-size: 2.5rem; text-transform: uppercase;
+.hidden{
+  display:none !important;
+  opacity:0 !important;
 }
 
-#loading-shield {
-    position: fixed; inset: 0; background: transparent; z-index: 9999;
+/* Écran sécurité (immuable) */
+.mdi-security{
+  width:100%; height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  background:#000;
+  color:#ff3b30;
+  z-index:100;
+}
+.mdi-security .mdi-x{
+  font-size:84px;
+  font-weight:900;
+  line-height:1;
+}
+.mdi-security .mdi-msg{
+  margin-top:10px;
+  font-size:34px;
+  font-weight:900;
+  text-align:center;
+  letter-spacing:0.5px;
 }
 
-#app-viewport {
-    width: var(--zone-width); height: var(--zone-height);
-    opacity: 0; transition: opacity 0.5s ease;
+/* Container (canvas plein écran) */
+.mdi-container{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  background: transparent;
 }
 
-#app-viewport.visible { opacity: 1; }
-
-.hidden { display: none !important; }
+#stage{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  display:block;
+}
