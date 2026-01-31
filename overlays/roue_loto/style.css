@@ -9,8 +9,7 @@
   --pointer-color: #ffffff;
 
   --pointer-rotate-180: "on";
-  /* ✅ encore plus proche par défaut */
-  --pointer-overlap: 0.78;
+  --pointer-overlap: 0.82;
 
   --winner-panel-bg: rgba(10,15,30,0.78);
   --winner-panel-border: rgba(255,255,255,0.18);
