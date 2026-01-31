@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>MDI Poker Counter - SaaS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <div id="security-screen" class="mdi-security hidden">
+        <h1>✖</h1>
+        <p>ACCÈS REFUSÉ</p>
+    </div>
+
+    <div id="game-scene">
+        <div id="stacks-container"></div>
+        <div id="floating-score">0</div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
