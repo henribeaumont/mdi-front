@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>MDI Golden Word - SaaS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <div id="security-screen" class="mdi-security hidden">
+        <h1 style="font-size:80px; margin:0;">✖</h1>
+        <p style="font-size:24px; font-weight:bold; margin:0;">ACCÈS REFUSÉ</p>
+        <p style="font-size:18px; opacity:0.8;">ACCESS DENIED</p>
+    </div>
+
+    <div id="container" class="hidden">
+        <div id="golden-word">CHARGEMENT...</div>
+        <div id="stats" class="hidden">0% (0/0)</div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
