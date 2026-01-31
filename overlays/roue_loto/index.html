@@ -1,117 +1,45 @@
-:root{
-  /* ==========================================================
-     🔐 ACCÈS (OBLIGATOIRE EN PROD)
-     - "strict" : clé obligatoire (SaaS) ✅ recommandé
-     - "legacy" : ancien mode (à éviter en prod)
-  ========================================================== */
-  --auth-mode: "strict";      /* "strict" | "legacy" */
-  --room-id:  "H_Perso";      /* ID client */
-  --room-key: "H2208";        /* clé secrète */
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MDI • Roue Loto</title>
 
-  /* ==========================================================
-     🎡 TAILLE & STYLE DE LA ROUE
-     - wheel-size : taille globale
-     - wheel-stroke : épaisseur du contour
-  ========================================================== */
-  --wheel-size: 820px;        /* ex: 650px (petit) → 950px (grand) */
-  --wheel-stroke: 16px;       /* épaisseur du cercle */
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
 
-  /* ==========================================================
-     🔤 TEXTE SUR LA ROUE (prénoms)
-     - text-size : taille des prénoms
-     - text-weight : graisse
-     NOTE : les prénoms longs sont automatiquement tronqués en "…"
-  ========================================================== */
-  --wheel-text-size: 30px;    /* ex: 24 → 38 */
-  --wheel-text-weight: 900;   /* 800 / 900 */
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
 
-  /* ==========================================================
-     📍 AIGUILLE (POINTE VERS LE CENTRE)
-     - side : position à droite ou à gauche
-     - rotate-180 : retourne l’aiguille (180°) ✅
-     - overlap : chevauchement sur la roue
-        0.00 = aiguille à l’extérieur
-        0.50 = moitié sur la roue
-        0.70 = encore plus proche (recommandé si tu veux "coller" la roue)
-  ========================================================== */
-  --pointer-side: "right";        /* "right" | "left" */
-  --pointer-size: 34px;           /* taille du triangle */
-  --pointer-color: #ffffff;       /* couleur de l’aiguille */
+<body>
+  <!-- Écran sécurité (uniquement si REFUS) -->
+  <div id="security-screen" aria-hidden="true">
+    <div class="security-x">✖</div>
+    <div class="security-text">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  </div>
 
-  --pointer-rotate-180: "on";     /* "on" | "off" */
-  --pointer-overlap: 0.70;        /* 0.50..0.80 selon ton goût */
+  <!-- Overlay -->
+  <div id="app" aria-hidden="true">
+    <div class="stage">
+      <canvas id="wheel" width="1200" height="1200"></canvas>
 
-  /* ==========================================================
-     🎯 TRIGGERS CHAT (actions)
-     - Un message EXACT (ex: "SPIN") déclenche le spin
-     - Un message EXACT (ex: "RESET") vide la liste
-     IMPORTANT : évite les mots trop courants
-  ========================================================== */
-  --spin-trigger: "SPIN";         /* ex: "GO" / "TIRAGE" */
-  --reset-trigger: "RESET";       /* ex: "CLEAR" */
+      <!-- Aiguille -->
+      <div class="pointer" aria-hidden="true"></div>
 
-  /* ==========================================================
-     👤 COLLECTE DES PRÉNOMS (anti-bugs / anti-historique)
-     But : empêcher que des anciens messages du chat soient repris
-     quand l’overlay s’affiche, ou que l’extension renvoie 2–3 fois
-     le même message.
+      <!-- Winner (uniquement après spin) -->
+      <div id="winner" class="winner" aria-hidden="true">
+        <div class="winner-panel">
+          <span id="winnerName" class="winner-name"></span>
+        </div>
+      </div>
+    </div>
 
-     1) warmup-ms:
-        - Ignore tout ce qui arrive juste après l’affichage de l’overlay
-        - Utile car certaines plateformes/DOM “rejouent” les derniers messages
-        Recommandé: 1200 à 2500 ms
-     
-     2) replay-ttl-ms:
-        - Si le même message (même user + même texte) revient,
-          on l’ignore pendant cette durée (TTL)
-        Recommandé: 180000 (3 min) à 300000 (5 min)
+    <!-- Confetti -->
+    <canvas id="confetti" class="confetti" width="1920" height="1080"></canvas>
+  </div>
 
-     3) min/max-name-length:
-        - Filtre les entrées trop courtes / trop longues
-     
-     4) max-participants:
-        - Limite le nombre de prénoms pour éviter une roue illisible
-  ========================================================== */
-  --collect-warmup-ms: 1500;     /* 0..8000 */
-  --replay-ttl-ms: 180000;       /* 30000..900000 */
-
-  --min-name-length: 1;          /* 1..6 */
-  --max-name-length: 18;         /* 6..40 */
-  --max-participants: 48;        /* 4..120 */
-
-  /* ==========================================================
-     🏆 GAGNANT (affiché UNIQUEMENT APRÈS LE SPIN)
-     - Panel derrière le prénom + texte responsive
-  ========================================================== */
-  --winner-panel-bg: rgba(10,15,30,0.78);      /* fond du panel */
-  --winner-panel-border: rgba(255,255,255,0.18);
-  --winner-panel-radius: 999px;               /* arrondi max */
-  --winner-panel-pad-y: 22px;
-  --winner-panel-pad-x: 38px;
-
-  --winner-font-min: 44px;      /* taille min */
-  --winner-font-max: 140px;     /* taille max */
-
-  /* ==========================================================
-     🎉 CONFETTIS (optionnel)
-     - winner-confetti : active/désactive
-     - density : quantité de confettis
-     - duration : durée de l’animation (ms)
-  ========================================================== */
-  --winner-confetti: "on";       /* "on" | "off" */
-  --confetti-density: 180;       /* 30..600 */
-  --confetti-duration-ms: 2200;  /* 600..8000 */
-
-  /* ==========================================================
-     🔄 RESET AUTO
-     - "true" : vide les prénoms à chaque affichage de l’overlay
-     - "false": conserve la liste tant que la page est chargée
-  ========================================================== */
-  --auto-reset: "false";         /* "true" | "false" */
-}
-
-/* ==========================================================
-   ✅ Fond transparent OBS (recommandé)
-   (Laisse tel quel, sauf si tu veux forcer un fond coloré)
-========================================================== */
-html, body { background: rgba(0,0,0,0) !important; }
+  <script src="script.js"></script>
+</body>
+</html>
