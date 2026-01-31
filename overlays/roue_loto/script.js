@@ -53,12 +53,14 @@ function hideWinner(){
 let spinTrigger = "SPIN";
 let resetTrigger = "RESET";
 let collectStartTrigger = "INSCRIVEZ UN PSEUDO";
-let collectStopTrigger  = "STOP INSCRIPTION";
+let collectStopTrigger  = "PRET?";
 let collectClearTrigger = "CLEAR INSCRIPTION";
 
-let blockSpinWhileCollecting = true;
+let cmdMatchMode = "exact"; // exact | startsWith | contains
+let preWindowMs = 15000;    // snapshot window before START (ms)
+
 let spinCooldownMs = 1800;
-let replayTtlMs = 300000;
+let blockSpinWhileCollecting = true;
 
 let minNameLen = 1;
 let maxNameLen = 18;
@@ -66,20 +68,22 @@ let maxParticipants = 48;
 
 let clearOnStart = true;
 let pointerSide = "right";
-let collectWarmupMs = 1200;
 
 function readConfig(){
-  spinTrigger  = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
-  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim().toUpperCase();
+  spinTrigger  = (cssVar("--spin-trigger","SPIN") || "SPIN").trim();
+  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim();
 
-  collectStartTrigger = (cssVar("--collect-start-trigger","INSCRIVEZ UN PSEUDO") || "INSCRIVEZ UN PSEUDO").trim().toUpperCase();
-  collectStopTrigger  = (cssVar("--collect-stop-trigger","STOP INSCRIPTION") || "STOP INSCRIPTION").trim().toUpperCase();
-  collectClearTrigger = (cssVar("--collect-clear-trigger","CLEAR INSCRIPTION") || "CLEAR INSCRIPTION").trim().toUpperCase();
+  collectStartTrigger = (cssVar("--collect-start-trigger","INSCRIVEZ UN PSEUDO") || "INSCRIVEZ UN PSEUDO").trim();
+  collectStopTrigger  = (cssVar("--collect-stop-trigger","PRET?") || "PRET?").trim();
+  collectClearTrigger = (cssVar("--collect-clear-trigger","CLEAR INSCRIPTION") || "CLEAR INSCRIPTION").trim();
+
+  cmdMatchMode = (cssVar("--cmd-match-mode","exact") || "exact").trim().toLowerCase();
+  if (!["exact","startswith","contains"].includes(cmdMatchMode)) cmdMatchMode = "exact";
+
+  preWindowMs = clamp(cssNum("--prewindow-ms", 15000), 3000, 60000);
 
   blockSpinWhileCollecting = cssOnOff("--block-spin-while-collecting", true);
-
   spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
-  replayTtlMs = clamp(cssNum("--replay-ttl-ms", 300000), 30000, 900000);
 
   minNameLen = clamp(cssNum("--min-name-length", 1), 1, 6);
   maxNameLen = clamp(cssNum("--max-name-length", 18), 6, 40);
@@ -93,72 +97,95 @@ function readConfig(){
 
   const flip = cssOnOff("--pointer-rotate-180", true);
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
-
-  collectWarmupMs = clamp(cssNum("--collect-warmup-ms", 1200), 0, 6000);
 }
 
-/* ---------------- TEXT-ONLY Anti replay (robuste avec user aléatoire) ---------------- */
-function normTextKey(text){
-  return String(text || "").trim().toUpperCase().replace(/\s+/g, " ");
-}
-
-const TTL_TEXT = new Map(); // textKey -> ts
-function isReplayTTL_textOnly(text){
-  const now = Date.now();
-  const k = normTextKey(text);
-  if (!k) return true;
-
-  const prev = TTL_TEXT.get(k) || 0;
-  if (prev && (now - prev) < replayTtlMs) return true;
-  TTL_TEXT.set(k, now);
-
-  if (TTL_TEXT.size > 1500){
-    const limit = now - replayTtlMs;
-    for (const [key, ts] of TTL_TEXT.entries()){
-      if (ts < limit) TTL_TEXT.delete(key);
-    }
-  }
-  return false;
-}
-
-/* ---------------- Barrier anti-reliquat ----------------
-   Avant START : on ignore tout.
-   Au START : on active COLLECTING mais on ignore aussi pendant warmupMs
-              (reflush des vieux messages du chat).
-*/
-let phase = "IDLE"; // IDLE | COLLECTING | READY
-let barrierUntilTs = 0;
-const seenBeforeStart = new Set(); // textKey vu avant START (blacklist hard)
-
-function noteBeforeStart(text){
-  const k = normTextKey(text);
-  if (k) seenBeforeStart.add(k);
-}
-function isBeforeStartText(text){
-  return seenBeforeStart.has(normTextKey(text));
-}
-
-/* ---------------- Names ---------------- */
-function normalizeName(raw){
-  let t = String(raw || "").trim();
+/* ---------------- Text normalization / command match ---------------- */
+function normalizeText(raw){
+  let t = String(raw || "");
   t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
   return t;
 }
-function keyOf(name){ return normalizeName(name).toLowerCase(); }
+function normKey(raw){
+  return normalizeText(raw).toUpperCase();
+}
 
-function isValidName(name){
-  const t = normalizeName(name);
+// Petit extract “après préfixe” si jamais on reçoit "Henri: PSEUDO"
+function extractPayload(text){
+  const t = normalizeText(text);
+  const m = t.match(/^.{1,18}:\s*(.+)$/); // "Name: payload"
+  if (m && m[1]) return m[1].trim();
+  return t;
+}
+
+function cmdMatch(message, trigger){
+  const msg = normKey(extractPayload(message));
+  const trg = normKey(trigger);
+
+  if (!msg || !trg) return false;
+
+  if (cmdMatchMode === "exact") return msg === trg;
+  if (cmdMatchMode === "startswith") return msg.startsWith(trg);
+  return msg.includes(trg); // contains
+}
+
+/* ---------------- Recent buffer + snapshot (robuste anti-reliquat) ---------------- */
+const recent = new Map(); // key -> ts (ms)
+function bumpRecent(msg){
+  const k = normKey(extractPayload(msg));
+  const now = Date.now();
+  if (!k) return;
+
+  recent.set(k, now);
+
+  // purge
+  const limit = now - Math.max(preWindowMs, 10000);
+  if (recent.size > 2000){
+    for (const [key, ts] of recent.entries()){
+      if (ts < limit) recent.delete(key);
+    }
+  }
+}
+
+let phase = "IDLE"; // IDLE | COLLECTING | READY
+let collectEpoch = 0;
+let snapshotBeforeStart = new Map(); // key -> ts taken at START time
+
+function takeSnapshot(){
+  const now = Date.now();
+  const limit = now - preWindowMs;
+  const snap = new Map();
+  for (const [k, ts] of recent.entries()){
+    if (ts >= limit) snap.set(k, ts);
+  }
+  snapshotBeforeStart = snap;
+}
+
+function isInSnapshot(msg){
+  const k = normKey(extractPayload(msg));
+  if (!k) return true;
+  return snapshotBeforeStart.has(k);
+}
+
+/* ---------------- Names ---------------- */
+function keyOfName(name){ return normalizeText(name).toLowerCase(); }
+
+function isValidName(raw){
+  const t = normalizeText(extractPayload(raw));
   if (!t) return false;
 
-  const up = t.toUpperCase();
-  if (up === spinTrigger || up === resetTrigger) return false;
-  if (up === collectStartTrigger || up === collectStopTrigger || up === collectClearTrigger) return false;
-  if (/^[ABCD]$/.test(up)) return false;
+  // Interdit si c'est une commande
+  if (cmdMatch(t, collectStartTrigger)) return false;
+  if (cmdMatch(t, collectStopTrigger))  return false;
+  if (cmdMatch(t, spinTrigger))         return false;
+  if (cmdMatch(t, collectClearTrigger)) return false;
+  if (cmdMatch(t, resetTrigger))        return false;
 
   if (t.length < minNameLen || t.length > maxNameLen) return false;
   if (t.split(" ").filter(Boolean).length > 2) return false;
 
+  // Lettres/chiffres/espaces/accents + apostrophes
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
+
   return true;
 }
 
@@ -366,10 +393,14 @@ function clearAllForNewSession(){
 
 /* ---------------- Participants ---------------- */
 function addParticipant(message){
-  const clean = normalizeName(message);
-  if (!isValidName(clean)) return;
+  const payload = extractPayload(message);
+  if (!isValidName(payload)) return;
 
-  const k = keyOf(clean);
+  // Anti-reliquat: si c'était visible "avant START", on ignore
+  if (isInSnapshot(payload)) return;
+
+  const clean = normalizeText(payload);
+  const k = keyOfName(clean);
   if (participants.some(p => p.key === k)) return;
   if (participants.length >= maxParticipants) return;
 
@@ -490,92 +521,57 @@ function initSocket(){
       drawWheel();
     }
 
-    // Reset logique de session
+    // Reset state machine
     phase = "IDLE";
-    barrierUntilTs = 0;
-    // seenBeforeStart: volontairement conservé pendant la vie de la page,
-    // car il sert à blacklister l'historique du chat déjà relu.
+    collectEpoch = 0;
+    snapshotBeforeStart = new Map();
   });
 
   socket.on("raw_vote", (data) => {
     if (!data) return;
-    readConfig();
 
-    const msg = String(data.vote || "").trim();
+    readConfig();
+    const raw = String(data.vote || "");
+    const msg = normalizeText(raw);
     if (!msg) return;
 
-    // Anti-spam robuste: texte-only (user est aléatoire côté extension)
-    if (isReplayTTL_textOnly(msg)) return;
+    // Toujours alimenter le buffer récent (sert au snapshot)
+    bumpRecent(msg);
 
-    const up = normTextKey(msg);
-
-    // ---- IDLE : on ignore tout, sauf les commandes START / CLEAR / RESET
-    if (phase === "IDLE") {
-      if (up === collectStartTrigger) {
-        if (clearOnStart) clearAllForNewSession();
-        hideWinner();
-        phase = "COLLECTING";
-
-        // barrière anti-reliquat : on ignore les "flush" de vieux messages
-        barrierUntilTs = Date.now() + collectWarmupMs;
-
-        // IMPORTANT: on ne “blackliste” pas le START lui-même,
-        // sinon tu peux te bloquer sur un second START.
-        return;
-      }
-
-      if (up === collectClearTrigger || up === resetTrigger) {
-        clearAllForNewSession();
-        phase = "IDLE";
-        barrierUntilTs = 0;
-        return;
-      }
-
-      // tout ce qu'on voit en IDLE = historisé comme reliquat
-      noteBeforeStart(msg);
-      return;
-    }
-
-    // ---- Après START : on ignore TOUT ce qui appartenait à l'historique
-    // et on ignore aussi pendant la fenêtre warmup
-    if (Date.now() < barrierUntilTs) {
-      noteBeforeStart(msg);
-      return;
-    }
-    if (isBeforeStartText(msg)) return;
-
-    // ---- CLEAR / RESET : revient en IDLE (re-collect possible)
-    if (up === collectClearTrigger || up === resetTrigger) {
+    // --- Commandes (robustes, indépendantes du user)
+    if (cmdMatch(msg, collectClearTrigger) || cmdMatch(msg, resetTrigger)) {
       clearAllForNewSession();
       phase = "IDLE";
-      barrierUntilTs = 0;
+      collectEpoch++;
+      snapshotBeforeStart = new Map();
       return;
     }
 
-    // ---- STOP : fige (READY)
-    if (up === collectStopTrigger) {
-      phase = "READY";
-      return;
-    }
-
-    // ---- START pendant session : relance une nouvelle collecte
-    if (up === collectStartTrigger) {
+    if (cmdMatch(msg, collectStartTrigger)) {
       if (clearOnStart) clearAllForNewSession();
-      hideWinner();
+
+      // SNAPSHOT: on capture les messages récents AVANT de collecter
+      takeSnapshot();
+
       phase = "COLLECTING";
-      barrierUntilTs = Date.now() + collectWarmupMs;
+      collectEpoch++;
+      hideWinner();
       return;
     }
 
-    // ---- SPIN : uniquement READY, jamais en auto
-    if (up === spinTrigger) {
+    if (cmdMatch(msg, collectStopTrigger)) {
+      if (phase === "COLLECTING") phase = "READY";
+      return;
+    }
+
+    if (cmdMatch(msg, spinTrigger)) {
       if (blockSpinWhileCollecting && phase === "COLLECTING") return;
       if (phase !== "READY") return;
       spin();
       return;
     }
 
-    // ---- Inscription : uniquement COLLECTING
+    // --- Collecte
     if (phase !== "COLLECTING") return;
     addParticipant(msg);
   });
