@@ -30,7 +30,6 @@ function setBootTransparent(){
   );
   document.documentElement.removeAttribute("data-pointer-side");
 }
-
 function showDenied(){
   document.documentElement.classList.remove("mdi-ready");
   document.documentElement.classList.add("mdi-denied");
@@ -38,7 +37,6 @@ function showDenied(){
   elSecurity.style.display = "flex";
   document.body.style.backgroundColor = "black";
 }
-
 function showReady(){
   document.documentElement.classList.remove("mdi-denied");
   document.documentElement.classList.add("mdi-ready");
@@ -46,7 +44,6 @@ function showReady(){
   elApp.style.display = "grid";
   document.body.style.backgroundColor = "transparent";
 }
-
 function hideWinner(){
   document.documentElement.classList.remove("mdi-show-winner");
   elWinnerName.textContent = "";
@@ -57,29 +54,46 @@ let spinTrigger = "SPIN";
 let resetTrigger = "RESET";
 
 let collectStartTrigger = "INSCRIVEZ UN PSEUDO";
-let collectStopTrigger = "STOP INSCRIPTION";
+let collectStopTrigger  = "STOP INSCRIPTION";
 let collectClearTrigger = "CLEAR INSCRIPTION";
 
-let pointerSide = "right";
+/* IMPORTANT : si true, on bloque SPIN tant que collecte ON */
+let blockSpinWhileCollecting = true;
 
+/* Sécurité SPIN */
+let spinCooldownMs = 1800;
+
+/* TTL anti-replay générique */
+let replayTtlMs = 300000;
+
+/* Limites prénoms */
 let minNameLen = 1;
 let maxNameLen = 18;
 let maxParticipants = 48;
 
-/* ✅ Safety anti-ghost spin */
-let spinCooldownMs = 1600;
+/* Comportement au START */
+let clearOnStart = true;
 
-/* ✅ Collect windows */
-let collectWarmupMs = 800;         // ignore shortly after collect start
-let replayTtlMs = 300000;          // 5 min anti replay
+let pointerSide = "right";
 
 function readConfig(){
-  spinTrigger = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
+  spinTrigger  = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
   resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim().toUpperCase();
 
   collectStartTrigger = (cssVar("--collect-start-trigger","INSCRIVEZ UN PSEUDO") || "INSCRIVEZ UN PSEUDO").trim().toUpperCase();
   collectStopTrigger  = (cssVar("--collect-stop-trigger","STOP INSCRIPTION") || "STOP INSCRIPTION").trim().toUpperCase();
   collectClearTrigger = (cssVar("--collect-clear-trigger","CLEAR INSCRIPTION") || "CLEAR INSCRIPTION").trim().toUpperCase();
+
+  blockSpinWhileCollecting = cssOnOff("--block-spin-while-collecting", true);
+
+  spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
+  replayTtlMs = clamp(cssNum("--replay-ttl-ms", 300000), 30000, 900000);
+
+  minNameLen = clamp(cssNum("--min-name-length", 1), 1, 6);
+  maxNameLen = clamp(cssNum("--max-name-length", 18), 6, 40);
+  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 120);
+
+  clearOnStart = cssOnOff("--clear-on-start", true);
 
   pointerSide = (cssVar("--pointer-side","right") || "right").trim().toLowerCase();
   pointerSide = (pointerSide === "left") ? "left" : "right";
@@ -87,15 +101,81 @@ function readConfig(){
 
   const flip = cssOnOff("--pointer-rotate-180", true);
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
+}
 
-  minNameLen = clamp(cssNum("--min-name-length", 1), 1, 6);
-  maxNameLen = clamp(cssNum("--max-name-length", 18), 6, 40);
-  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 120);
+/* ---------------- Anti replay & PRESTART barrier ---------------- */
+/**
+ * On tient 2 mécanismes complémentaires :
+ * 1) REPLAY TTL: ignore les doublons identiques sur une fenêtre de temps.
+ * 2) PRESTART BARRIER: tout ce qui a été vu AVANT "START" est blacklisté
+ *    et restera blacklisté même si ça revient plus tard (reliquats).
+ */
 
-  spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1600), 500, 8000);
+const TTL_SEEN = new Map();     // fp -> ts
+const PRESTART = new Set();     // fp vus avant START (et donc à ignorer en collecte)
+const PRESTART_CMD = new Set(); // fp commandes vues avant START (protection SPIN fantôme)
 
-  collectWarmupMs = clamp(cssNum("--collect-warmup-ms", 800), 0, 8000);
-  replayTtlMs = clamp(cssNum("--replay-ttl-ms", 300000), 30000, 900000);
+function fingerprint(user, text){
+  const u = (user && String(user).trim()) ? String(user).trim().toLowerCase() : "";
+  const t = String(text || "").trim().toLowerCase();
+  return u ? `${u}::${t}` : `::${t}`;
+}
+
+function isReplayTTL(user, text){
+  const now = Date.now();
+  const fp = fingerprint(user, text);
+  const prev = TTL_SEEN.get(fp) || 0;
+  if (prev && (now - prev) < replayTtlMs) return true;
+  TTL_SEEN.set(fp, now);
+
+  if (TTL_SEEN.size > 2000){
+    const limit = now - replayTtlMs;
+    for (const [k, ts] of TTL_SEEN.entries()){
+      if (ts < limit) TTL_SEEN.delete(k);
+    }
+  }
+  return false;
+}
+
+function notePrestart(user, text){
+  const fp = fingerprint(user, text);
+  PRESTART.add(fp);
+  // commandes uniquement
+  const up = String(text || "").trim().toUpperCase();
+  if (up) PRESTART_CMD.add(fp);
+}
+
+function wasSeenPrestart(user, text){
+  const fp = fingerprint(user, text);
+  return PRESTART.has(fp);
+}
+function wasCommandSeenPrestart(user, text){
+  const fp = fingerprint(user, text);
+  return PRESTART_CMD.has(fp);
+}
+
+/* ---------------- Names ---------------- */
+function normalizeName(raw){
+  let t = String(raw || "").trim();
+  t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
+  return t;
+}
+function keyOf(name){ return normalizeName(name).toLowerCase(); }
+
+function isValidName(name){
+  const t = normalizeName(name);
+  if (!t) return false;
+
+  const up = t.toUpperCase();
+  if (up === spinTrigger || up === resetTrigger) return false;
+  if (up === collectStartTrigger || up === collectStopTrigger || up === collectClearTrigger) return false;
+  if (/^[ABCD]$/.test(up)) return false;
+
+  if (t.length < minNameLen || t.length > maxNameLen) return false;
+  if (t.split(" ").filter(Boolean).length > 2) return false;
+
+  if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
+  return true;
 }
 
 /* ---------------- Canvas: Wheel ---------------- */
@@ -290,62 +370,24 @@ function tickConfetti(ts){
   requestAnimationFrame(tickConfetti);
 }
 
-/* ---------------- Controlled Collection (the fix) ---------------- */
+/* ---------------- State machine (robuste) ---------------- */
 /**
- * ✅ Collecte ARMÉE :
- * - Tant qu'on n'a pas reçu collectStartTrigger => on ignore tout
- * - Une fois armé => on accepte les prénoms
- * - On peut STOP / CLEAR / RESTART dans la même session
+ * IDLE:   collecte OFF, ignore noms, ignore SPIN
+ * COLLECTING: collecte ON, accepte noms, ignore SPIN si blockSpinWhileCollecting
+ * READY:  collecte OFF, liste figée, SPIN autorisé
  */
-let collecting = false;
-let collectingEnabledAt = 0;
+let phase = "IDLE"; // "IDLE" | "COLLECTING" | "READY"
 
-/* fingerprints anti replay (ignore repeated DOM spam) */
-const FP = new Map();
-function fingerprint(user, text){
-  const u = (user && String(user).trim()) ? String(user).trim().toLowerCase() : "";
-  const t = String(text || "").trim().toLowerCase();
-  return u ? `${u}::${t}` : `::${t}`;
-}
-function seenRecently(user, text){
-  const now = Date.now();
-  const fp = fingerprint(user, text);
-  const prev = FP.get(fp) || 0;
-  if (prev && (now - prev) < replayTtlMs) return true;
-  FP.set(fp, now);
-
-  if (FP.size > 1400){
-    const limit = now - replayTtlMs;
-    for (const [k, ts] of FP.entries()){
-      if (ts < limit) FP.delete(k);
-    }
-  }
-  return false;
+function clearAllForNewSession(){
+  participants = [];
+  winnerIndex = -1;
+  spinning = false;
+  wheelAngle = 0;
+  hideWinner();
+  drawWheel();
 }
 
-function normalizeName(raw){
-  let t = String(raw || "").trim();
-  t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
-  return t;
-}
-function keyOf(name){ return normalizeName(name).toLowerCase(); }
-
-function isValidName(name){
-  const t = normalizeName(name);
-  if (!t) return false;
-
-  const up = t.toUpperCase();
-  if (up === spinTrigger || up === resetTrigger) return false;
-  if (up === collectStartTrigger || up === collectStopTrigger || up === collectClearTrigger) return false;
-  if (/^[ABCD]$/.test(up)) return false;
-
-  if (t.length < minNameLen || t.length > maxNameLen) return false;
-  if (t.split(" ").filter(Boolean).length > 2) return false;
-
-  if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
-  return true;
-}
-
+/* ---------------- Participants ---------------- */
 function addParticipant(message){
   const clean = normalizeName(message);
   if (!isValidName(clean)) return;
@@ -360,16 +402,7 @@ function addParticipant(message){
   drawWheel();
 }
 
-function clearParticipants(){
-  participants = [];
-  winnerIndex = -1;
-  spinning = false;
-  wheelAngle = 0;
-  hideWinner();
-  drawWheel();
-}
-
-/* ---------------- Spin (secured) ---------------- */
+/* ---------------- Spin (blindé) ---------------- */
 let lastSpinAt = 0;
 
 function normalizeAngle(a){
@@ -389,11 +422,10 @@ function pointerTargetAngle(){
 function spin(){
   const now = Date.now();
 
-  /* ✅ Hard guards */
   if (spinning) return;
-  if (now - lastSpinAt < spinCooldownMs) return;         // anti double-trigger
-  if (participants.length < 2) return;                   // pas assez de monde
-  if (collecting && cssOnOff("--block-spin-while-collecting", true)) return; // option safety
+  if (phase !== "READY") return;               // ✅ SPIN uniquement en READY
+  if (participants.length < 2) return;         // ✅ pas assez de joueurs
+  if (now - lastSpinAt < spinCooldownMs) return;
 
   lastSpinAt = now;
   hideWinner();
@@ -406,6 +438,7 @@ function spin(){
 
   const pointerAngle = pointerTargetAngle();
   const desired = pointerAngle - selectedCenter;
+
   const extraTurns = 6 + Math.floor(rand01()*4);
   const extra = extraTurns * Math.PI*2;
 
@@ -438,6 +471,8 @@ function spin(){
     elWinnerName.textContent = participants[winnerIndex]?.name || "";
     document.documentElement.classList.add("mdi-show-winner");
     startConfetti();
+
+    // on reste en READY pour pouvoir re-spin sans recollect si tu veux
   }
 }
 
@@ -469,16 +504,20 @@ function initSocket(){
 
   socket.on("overlay:state", (payload) => {
     if (!payload || payload.overlay !== OVERLAY_NAME) return;
+
     showReady();
     readConfig();
 
-    /* Par défaut : collecte OFF tant que START pas reçu */
-    collecting = false;
-    collectingEnabledAt = 0;
-
+    // reset visuel optionnel
     if ((cssVar("--auto-reset","false") || "false") === "true"){
-      clearParticipants();
+      clearAllForNewSession();
+    } else {
+      hideWinner();
+      drawWheel();
     }
+
+    // ✅ point clé : au chargement, on est en IDLE et on blackliste tout avant START
+    phase = "IDLE";
   });
 
   socket.on("raw_vote", (data) => {
@@ -489,49 +528,71 @@ function initSocket(){
     if (!msg) return;
 
     const user = data.user || "";
-    if (seenRecently(user, msg)) return; // anti replay global
-
     const up = msg.toUpperCase();
 
-    /* ----------- COMMANDES COLLECTE ----------- */
-    if (up === collectStartTrigger){
-      collecting = true;
-      collectingEnabledAt = Date.now();
-      hideWinner();               // propre
+    // 1) TTL anti replay (très utile)
+    if (isReplayTTL(user, msg)) return;
+
+    // 2) Tant qu’on n’a pas démarré la collecte, on stocke en PRESTART et on ignore
+    //    (c’est ce qui élimine les reliquats, même s’ils reviennent en retard)
+    if (phase === "IDLE") {
+      notePrestart(user, msg);
+
+      // START est la seule commande active en IDLE (mais protégée contre reliquat)
+      if (up === collectStartTrigger) {
+        // Si ce START est un reliquat (déjà vu en prestart), on ignore
+        if (wasCommandSeenPrestart(user, msg)) return;
+
+        if (clearOnStart) clearAllForNewSession();
+        phase = "COLLECTING";
+        hideWinner();
+      }
+
+      // CLEAR / RESET aussi autorisés en IDLE (mais idem : pas depuis reliquats)
+      if (up === collectClearTrigger || up === resetTrigger) {
+        if (wasCommandSeenPrestart(user, msg)) return;
+        clearAllForNewSession();
+        phase = "IDLE";
+      }
+
       return;
     }
 
-    if (up === collectStopTrigger){
-      collecting = false;
+    // 3) COLLECTING / READY : on ignore tout message qui était vu avant START
+    //    -> c’est le “verrou” robuste anti-historique
+    if (wasSeenPrestart(user, msg)) return;
+
+    // --- COMMANDES ---
+    if (up === collectClearTrigger || up === resetTrigger) {
+      clearAllForNewSession();
+      phase = "IDLE";
       return;
     }
 
-    if (up === collectClearTrigger){
-      collecting = false;
-      clearParticipants();        // permet de rejouer une nouvelle session
+    if (up === collectStopTrigger) {
+      // Stop la collecte et fige la liste
+      phase = "READY";
       return;
     }
 
-    /* ----------- COMMANDES SPIN/RESET ----------- */
-    if (up === resetTrigger){
-      collecting = false;
-      clearParticipants();
+    if (up === collectStartTrigger) {
+      // relance une collecte (nouvelle session)
+      if (clearOnStart) clearAllForNewSession();
+      phase = "COLLECTING";
+      hideWinner();
       return;
     }
 
-    if (up === spinTrigger){
-      // ✅ anti-ghost: ignore si reçu trop tôt après start collecte
-      if (collectingEnabledAt && (Date.now() - collectingEnabledAt) < collectWarmupMs) return;
+    if (up === spinTrigger) {
+      // ✅ SPIN ne fonctionne que si READY
+      if (blockSpinWhileCollecting && phase === "COLLECTING") return;
+      if (phase !== "READY") return;
       spin();
       return;
     }
 
-    /* ----------- INSCRIPTION ----------- */
-    if (!collecting) return; // ✅ le coeur du fix: tout avant START est ignoré
-
-    // anti-ghost: ignore très court après START (DOM replay)
-    if (collectingEnabledAt && (Date.now() - collectingEnabledAt) < collectWarmupMs) return;
-
+    // --- INSCRIPTION ---
+    if (phase !== "COLLECTING") return; // en READY on n'ajoute plus de prénoms
     addParticipant(msg);
   });
 }
