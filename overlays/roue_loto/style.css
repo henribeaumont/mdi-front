@@ -65,7 +65,6 @@ html.mdi-denied #security-screen { display: flex; }
   filter: drop-shadow(0 22px 36px rgba(0,0,0,0.35));
 }
 
-/* AIGUILLE */
 .pointer{
   position: absolute;
   top: 50%;
@@ -76,28 +75,21 @@ html.mdi-denied #security-screen { display: flex; }
 }
 
 html[data-pointer-side="right"] .pointer{
-  left: calc(
-    50% + (var(--wheel-size) / 2) - (var(--pointer-size) * 1.6 * var(--pointer-overlap))
-  );
+  left: calc(50% + (var(--wheel-size) / 2) - (var(--pointer-size) * 1.6 * var(--pointer-overlap)));
   border-top: var(--pointer-size) solid transparent;
   border-bottom: var(--pointer-size) solid transparent;
   border-left: calc(var(--pointer-size) * 1.6) solid var(--pointer-color);
 }
-
 html[data-pointer-side="left"] .pointer{
-  left: calc(
-    50% - (var(--wheel-size) / 2) - (var(--pointer-size) * 1.6) + (var(--pointer-size) * 1.6 * var(--pointer-overlap))
-  );
+  left: calc(50% - (var(--wheel-size) / 2) - (var(--pointer-size) * 1.6) + (var(--pointer-size) * 1.6 * var(--pointer-overlap)));
   border-top: var(--pointer-size) solid transparent;
   border-bottom: var(--pointer-size) solid transparent;
   border-right: calc(var(--pointer-size) * 1.6) solid var(--pointer-color);
 }
-
 html.mdi-pointer-flip .pointer{
   transform: translateY(-50%) rotate(180deg);
 }
 
-/* WINNER */
 .winner{
   position: absolute;
   inset: 0;
@@ -133,7 +125,6 @@ html.mdi-show-winner .winner{ opacity: 1; transform: scale(1); }
   text-overflow: ellipsis;
 }
 
-/* Confetti */
 .confetti{
   position: fixed;
   inset: 0;
