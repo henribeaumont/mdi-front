@@ -1,5 +1,5 @@
 const ADRESSE_SERVEUR = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_TYPE = "mot_magique"; // <--- CE NOM DOIT ÊTRE DANS SUPABASE
+const OVERLAY_TYPE = "mot_magique"; // Vérifie bien ce nom dans Supabase !
 
 let estAutorise = false;
 let triggerCount = 0;
@@ -12,17 +12,25 @@ const securityEl = document.getElementById("security-screen");
 const socket = io(ADRESSE_SERVEUR, { transports: ["websocket", "polling"] });
 
 function cssVar(name, fallback) {
+    // Nettoyage rigoureux des variables CSS d'OBS
     let val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return val ? val.replace(/^['"]+|['"]+$/g, "") : fallback;
+    if (!val) return fallback;
+    return val.replace(/^['"]+|['"]+$/g, "");
 }
 
-function init() {
+async function init() {
+    // PAUSE CRITIQUE : Laisse le temps à OBS d'injecter le CSS personnalisé
+    await new Promise(r => setTimeout(r, 500));
+
     const room = cssVar("--room-id", "");
     const key = cssVar("--room-key", "");
 
-    if (!room || !key) { showDenied(); return; }
+    if (!room || !key) { 
+        showDenied(); 
+        return; 
+    }
 
-    // On demande au serveur de rejoindre avec le type "mot_magique"
+    // Envoi de la demande de connexion
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', showDenied);
@@ -32,7 +40,8 @@ function init() {
             estAutorise = true;
             participantsActifs = payload.room_count || 1;
             
-            syncConfig(); // Prépare le texte avant affichage
+            // On remplit les données AVANT d'afficher pour éviter le tressautement
+            syncConfig(); 
             
             securityEl.classList.add("hidden");
             containerEl.classList.remove("hidden");
@@ -50,20 +59,21 @@ function init() {
         
         if (vote === "RESET") { resetSession(); return; }
         
-        const trigger = cssVar("--trigger-chat", "GG").toUpperCase();
-        if (vote === trigger) {
+        // Comparaison avec le trigger du CSS
+        const triggerActuel = cssVar("--trigger-chat", "GG").toUpperCase();
+        if (vote === triggerActuel) {
             triggerCount++;
             updateLogic();
         }
     });
 
+    // Sync des styles toutes les 2 secondes
     setInterval(syncConfig, 2000);
 }
 
 function syncConfig() {
     if (!estAutorise) return;
     const newDisplay = cssVar("--display-word", "VICTOIRE");
-    // Mise à jour seulement si changement pour éviter le tressautement
     if (wordEl.innerText !== newDisplay) {
         wordEl.innerText = newDisplay;
     }
@@ -72,9 +82,8 @@ function syncConfig() {
 
 function updateLogic() {
     const total = Math.max(1, participantsActifs);
-    const clampedCount = Math.min(triggerCount, total);
-    const ratio = clampedCount / total;
-    const threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--threshold")) || 0.9;
+    const ratio = Math.min(triggerCount, total) / total;
+    const threshold = parseFloat(cssVar("--threshold", "0.9"));
 
     if (ratio >= threshold) {
         wordEl.classList.add("activated");
