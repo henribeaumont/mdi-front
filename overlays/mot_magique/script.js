@@ -3,31 +3,21 @@ const OVERLAY_TYPE = "mot_magique";
 
 let estAutorise = false;
 let triggerCount = 0;
-let participantsActifs = 1; // Dynamique via le serveur
-
-let CONFIG = {
-    display: "VICTOIRE",
-    trigger: "GG",
-    threshold: 0.9, // 90% par défaut
-    sticky: false,
-    showStats: false
-};
+let participantsActifs = 1;
 
 const wordEl = document.getElementById("golden-word");
-const statsEl = document.getElementById("stats");
 const containerEl = document.getElementById("container");
 const securityEl = document.getElementById("security-screen");
 
-function cssVar(name, fallback) {
-    let val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    if (!val) return fallback;
-    return val.replace(/^['"]+|['"]+$/g, "");
-}
-
 const socket = io(ADRESSE_SERVEUR, { transports: ["websocket", "polling"] });
 
-async function init() {
-    await new Promise(r => setTimeout(r, 800));
+function cssVar(name, fallback) {
+    let val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return val ? val.replace(/^['"]+|['"]+$/g, "") : fallback;
+}
+
+// Initialisation immédiate sans délai d'attente
+function init() {
     const room = cssVar("--room-id", "");
     const key = cssVar("--room-key", "");
 
@@ -40,15 +30,17 @@ async function init() {
     socket.on('overlay:state', (payload) => {
         if (payload?.overlay === OVERLAY_TYPE) {
             estAutorise = true;
+            participantsActifs = payload.room_count || 1;
+            
+            // On pré-remplit les valeurs AVANT d'afficher
+            syncConfig(); 
+            
+            // AFFICHAGE UNIQUE : Fini le tressautement
             securityEl.classList.add("hidden");
             containerEl.classList.remove("hidden");
-            // On récupère le nombre de gens connectés au lancement
-            participantsActifs = payload.room_count || 1;
-            syncConfig();
         }
     });
 
-    // Mise à jour du nombre de participants en temps réel
     socket.on('room:user_count', (count) => {
         participantsActifs = count;
         updateLogic();
@@ -58,64 +50,40 @@ async function init() {
         if (!estAutorise) return;
         const vote = String(data.vote || "").trim().toUpperCase();
         if (vote === "RESET") { resetSession(); return; }
-        if (vote === CONFIG.trigger) {
+        if (vote === cssVar("--trigger-chat", "GG").toUpperCase()) {
             triggerCount++;
             updateLogic();
         }
     });
 
-    setInterval(syncConfig, 2000); // Moins fréquent pour éviter le lag
+    setInterval(syncConfig, 2000);
 }
 
 function syncConfig() {
     if (!estAutorise) return;
     const newDisplay = cssVar("--display-word", "VICTOIRE");
-    // On ne met à jour le texte QUE s'il a changé pour éviter le tressautement
-    if (wordEl.innerText !== newDisplay) {
-        wordEl.innerText = newDisplay;
-    }
-    
-    CONFIG.trigger = cssVar("--trigger-chat", "GG").toUpperCase();
-    CONFIG.threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--threshold")) || 0.9;
-    
-    const stickyRaw = cssVar("--sticky", "false");
-    CONFIG.sticky = (stickyRaw === "true" || stickyRaw === "1");
-    
-    const statsRaw = cssVar("--show-stats", "false");
-    CONFIG.showStats = (statsRaw === "true" || statsRaw === "1");
-
+    if (wordEl.innerText !== newDisplay) wordEl.innerText = newDisplay;
     updateLogic();
 }
 
 function updateLogic() {
     const total = Math.max(1, participantsActifs);
-    const clampedCount = Math.min(triggerCount, total);
-    const ratio = clampedCount / total;
-    const percent = Math.round(ratio * 100);
+    const ratio = Math.min(triggerCount, total) / total;
+    const threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--threshold")) || 0.9;
 
-    if (CONFIG.showStats) {
-        statsEl.classList.remove("hidden");
-        statsEl.innerText = `${percent}% (${clampedCount}/${total})`;
-    } else {
-        statsEl.classList.add("hidden");
-    }
+    if (ratio >= threshold) wordEl.classList.add("activated");
+    else if (cssVar("--sticky", "false") !== "true") wordEl.classList.remove("activated");
+}
 
-    if (ratio >= CONFIG.threshold) {
-        wordEl.classList.add("activated");
-    } else {
-        if (!CONFIG.sticky) wordEl.classList.remove("activated");
-    }
+function showDenied() {
+    containerEl.classList.add("hidden");
+    securityEl.classList.remove("hidden");
 }
 
 function resetSession() {
     triggerCount = 0;
     wordEl.classList.remove("activated");
     updateLogic();
-}
-
-function showDenied() {
-    securityEl.classList.remove("hidden");
-    containerEl.classList.add("hidden");
 }
 
 init();
