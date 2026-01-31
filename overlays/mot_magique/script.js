@@ -1,5 +1,5 @@
 const ADRESSE_SERVEUR = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_TYPE = "mot_magique";
+const OVERLAY_TYPE = "mot_magique"; // <--- CE NOM DOIT ÊTRE DANS SUPABASE
 
 let estAutorise = false;
 let triggerCount = 0;
@@ -22,6 +22,7 @@ function init() {
 
     if (!room || !key) { showDenied(); return; }
 
+    // On demande au serveur de rejoindre avec le type "mot_magique"
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', showDenied);
@@ -31,8 +32,7 @@ function init() {
             estAutorise = true;
             participantsActifs = payload.room_count || 1;
             
-            // On synchronise le texte AVANT d'afficher le container
-            syncConfig(); 
+            syncConfig(); // Prépare le texte avant affichage
             
             securityEl.classList.add("hidden");
             containerEl.classList.remove("hidden");
@@ -47,6 +47,7 @@ function init() {
     socket.on('raw_vote', (data) => {
         if (!estAutorise) return;
         const vote = String(data.vote || "").trim().toUpperCase();
+        
         if (vote === "RESET") { resetSession(); return; }
         
         const trigger = cssVar("--trigger-chat", "GG").toUpperCase();
@@ -56,15 +57,13 @@ function init() {
         }
     });
 
-    // Synchronisation périodique des variables CSS OBS
     setInterval(syncConfig, 2000);
 }
 
 function syncConfig() {
     if (!estAutorise) return;
     const newDisplay = cssVar("--display-word", "VICTOIRE");
-    
-    // Évite le tressautement en ne mettant à jour que si nécessaire
+    // Mise à jour seulement si changement pour éviter le tressautement
     if (wordEl.innerText !== newDisplay) {
         wordEl.innerText = newDisplay;
     }
@@ -75,17 +74,7 @@ function updateLogic() {
     const total = Math.max(1, participantsActifs);
     const clampedCount = Math.min(triggerCount, total);
     const ratio = clampedCount / total;
-    
     const threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--threshold")) || 0.9;
-    const showStats = cssVar("--show-stats", "false") === "true";
-
-    const statsEl = document.getElementById("stats");
-    if (showStats) {
-        statsEl.classList.remove("hidden");
-        statsEl.innerText = `${Math.round(ratio * 100)}% (${clampedCount}/${total})`;
-    } else {
-        statsEl.classList.add("hidden");
-    }
 
     if (ratio >= threshold) {
         wordEl.classList.add("activated");
