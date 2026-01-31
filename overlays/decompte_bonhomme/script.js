@@ -1,8 +1,3 @@
-/**
- * MDI DECOMPTE BONHOMME - V5.5 SaaS
- * Écoute le canal universel 'raw_vote'
- */
-
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "decompte_bonhomme";
 
@@ -13,21 +8,19 @@ function cssVar(name, fallback = "") {
 let globalCount = 0;
 let estAutorise = false;
 const scoreEl = document.getElementById('hero-score');
+const diskEl = document.getElementById('score-disk');
 
-// --- CONNEXION SaaS ---
 const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
 
 async function init() {
-    await new Promise(r => setTimeout(r, 800)); // Attente OBS
+    await new Promise(r => setTimeout(r, 800));
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
 
     if (!room || !key) { showDenied(); return; }
-
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', showDenied);
-
     socket.on('overlay:state', (payload) => {
         if (payload?.overlay === OVERLAY_TYPE) {
             showScene();
@@ -61,10 +54,16 @@ function updateDisplay() {
     if (!scoreEl) return;
     scoreEl.innerText = globalCount;
     
-    // Animation Pop
-    scoreEl.classList.remove('bump-anim');
-    void scoreEl.offsetWidth; 
-    scoreEl.classList.add('bump-anim');
+    // RESPONSIVE TEXT (Reste dans le disque)
+    const len = String(globalCount).length;
+    if (len <= 2) scoreEl.style.fontSize = "60px";
+    else if (len === 3) scoreEl.style.fontSize = "45px";
+    else scoreEl.style.fontSize = "35px";
+
+    // Animation Pop sur le disque
+    diskEl.classList.remove('bump-anim');
+    void diskEl.offsetWidth; 
+    diskEl.classList.add('bump-anim');
 }
 
 function showDenied() {
