@@ -16,7 +16,6 @@ function cssVar(name, fallback) {
     return val ? val.replace(/^['"]+|['"]+$/g, "") : fallback;
 }
 
-// Initialisation immédiate sans délai d'attente
 function init() {
     const room = cssVar("--room-id", "");
     const key = cssVar("--room-key", "");
@@ -32,10 +31,9 @@ function init() {
             estAutorise = true;
             participantsActifs = payload.room_count || 1;
             
-            // On pré-remplit les valeurs AVANT d'afficher
+            // On synchronise le texte AVANT d'afficher le container
             syncConfig(); 
             
-            // AFFICHAGE UNIQUE : Fini le tressautement
             securityEl.classList.add("hidden");
             containerEl.classList.remove("hidden");
         }
@@ -50,29 +48,52 @@ function init() {
         if (!estAutorise) return;
         const vote = String(data.vote || "").trim().toUpperCase();
         if (vote === "RESET") { resetSession(); return; }
-        if (vote === cssVar("--trigger-chat", "GG").toUpperCase()) {
+        
+        const trigger = cssVar("--trigger-chat", "GG").toUpperCase();
+        if (vote === trigger) {
             triggerCount++;
             updateLogic();
         }
     });
 
+    // Synchronisation périodique des variables CSS OBS
     setInterval(syncConfig, 2000);
 }
 
 function syncConfig() {
     if (!estAutorise) return;
     const newDisplay = cssVar("--display-word", "VICTOIRE");
-    if (wordEl.innerText !== newDisplay) wordEl.innerText = newDisplay;
+    
+    // Évite le tressautement en ne mettant à jour que si nécessaire
+    if (wordEl.innerText !== newDisplay) {
+        wordEl.innerText = newDisplay;
+    }
     updateLogic();
 }
 
 function updateLogic() {
     const total = Math.max(1, participantsActifs);
-    const ratio = Math.min(triggerCount, total) / total;
+    const clampedCount = Math.min(triggerCount, total);
+    const ratio = clampedCount / total;
+    
     const threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--threshold")) || 0.9;
+    const showStats = cssVar("--show-stats", "false") === "true";
 
-    if (ratio >= threshold) wordEl.classList.add("activated");
-    else if (cssVar("--sticky", "false") !== "true") wordEl.classList.remove("activated");
+    const statsEl = document.getElementById("stats");
+    if (showStats) {
+        statsEl.classList.remove("hidden");
+        statsEl.innerText = `${Math.round(ratio * 100)}% (${clampedCount}/${total})`;
+    } else {
+        statsEl.classList.add("hidden");
+    }
+
+    if (ratio >= threshold) {
+        wordEl.classList.add("activated");
+    } else {
+        if (cssVar("--sticky", "false") !== "true") {
+            wordEl.classList.remove("activated");
+        }
+    }
 }
 
 function showDenied() {
