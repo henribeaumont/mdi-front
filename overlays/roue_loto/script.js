@@ -1,11 +1,11 @@
 /* ==========================================================
-   MDI • ROUE LOTO — V1.1 SaaS (ZERO FLICKER)
-   Overlay name: "roue_loto"
-   - Aiguille gauche/droite via CSS OBS: --pointer-side
-   - Trigger spin via CSS OBS: --spin-trigger (ex: "SPIN")
-   - Trigger reset via CSS OBS: --reset-trigger (ex: "RESET")
-   - Aucun texte UI sauf winner après spin
-   - Winner apparaît en fondu uniquement après spin
+   MDI • ROUE LOTO — V1.2 SaaS (ROBUSTE)
+   Overlay: "roue_loto"
+   Fixes:
+   - Déduplication forte (évite multi-ajouts pour 1 message)
+   - Mode inscription sécurisé via prefix (configurable)
+   - AUCUN spin déclenché par overlay:state (handshake only)
+   - Aiguille: flip 180° + overlap via CSS
    ========================================================== */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -30,13 +30,14 @@ function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 /* ---------------- Boot / Security ---------------- */
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
-const elWinner = document.getElementById("winner");
 const elWinnerName = document.getElementById("winnerName");
 
 function setBootTransparent(){
   elSecurity.style.display = "none";
   elApp.style.display = "none";
-  document.documentElement.classList.remove("mdi-ready", "mdi-denied", "mdi-confetti", "mdi-show-winner");
+  document.documentElement.classList.remove(
+    "mdi-ready","mdi-denied","mdi-confetti","mdi-show-winner","mdi-pointer-flip"
+  );
   document.documentElement.removeAttribute("data-pointer-side");
 }
 
@@ -61,6 +62,28 @@ function hideWinner(){
   elWinnerName.textContent = "";
 }
 
+/* ---------------- Config (read from CSS) ---------------- */
+let spinTrigger = "SPIN";
+let resetTrigger = "RESET";
+let nameMode = "prefix";     // ✅ par défaut plus robuste
+let namePrefix = "@";        // ✅ par défaut plus robuste
+let pointerSide = "right";
+
+function readConfig(){
+  spinTrigger = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
+  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim().toUpperCase();
+
+  nameMode = (cssVar("--name-mode","prefix") || "prefix").trim().toLowerCase();  // "free" | "prefix"
+  namePrefix = (cssVar("--name-prefix","@") || "@").trim();
+
+  pointerSide = (cssVar("--pointer-side","right") || "right").trim().toLowerCase();
+  pointerSide = (pointerSide === "left") ? "left" : "right";
+  document.documentElement.setAttribute("data-pointer-side", pointerSide);
+
+  const flip = cssOnOff("--pointer-rotate-180", true);
+  document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
+}
+
 /* ---------------- Canvas: Wheel ---------------- */
 const wheelCanvas = document.getElementById("wheel");
 const wheelCtx = wheelCanvas.getContext("2d");
@@ -73,9 +96,9 @@ let spinStartAngle = 0;
 let targetAngle = 0;
 
 const basePalette = [
-  "#2ecc71", "#e74c3c", "#3b82f6", "#f1c40f",
-  "#9b59b6", "#1abc9c", "#e67e22", "#ec4899",
-  "#22c55e", "#ef4444", "#60a5fa", "#f59e0b"
+  "#2ecc71","#e74c3c","#3b82f6","#f1c40f",
+  "#9b59b6","#1abc9c","#e67e22","#ec4899",
+  "#22c55e","#ef4444","#60a5fa","#f59e0b"
 ];
 
 let participants = []; // [{name, key}]
@@ -87,11 +110,9 @@ function resizeWheelCanvas(){
 
   wheelCanvas.style.width = cssSize + "px";
   wheelCanvas.style.height = cssSize + "px";
-
   wheelCanvas.width = Math.floor(cssSize * dpr);
   wheelCanvas.height = Math.floor(cssSize * dpr);
 
-  // draw in CSS pixels
   wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawWheel();
 }
@@ -113,16 +134,13 @@ function drawWheel(){
   wheelCtx.rotate(wheelAngle);
 
   if (participants.length === 0){
-    // roue "vide" sans texte UI (tu as demandé zéro texte hors prénoms)
     wheelCtx.beginPath();
     wheelCtx.arc(0,0,r,0,Math.PI*2);
     wheelCtx.fillStyle = "rgba(10,15,30,0.65)";
     wheelCtx.fill();
-
     wheelCtx.lineWidth = stroke;
     wheelCtx.strokeStyle = "rgba(255,255,255,0.18)";
     wheelCtx.stroke();
-
     wheelCtx.restore();
     return;
   }
@@ -142,7 +160,6 @@ function drawWheel(){
     wheelCtx.fillStyle = basePalette[i % basePalette.length];
     wheelCtx.fill();
 
-    // Highlight winner slice (discret)
     if (i === winnerIndex){
       wheelCtx.save();
       wheelCtx.shadowColor = "rgba(255,255,255,0.65)";
@@ -157,7 +174,6 @@ function drawWheel(){
       wheelCtx.stroke();
     }
 
-    // Text
     const label = participants[i].name;
     const mid = a0 + slice/2;
 
@@ -172,15 +188,15 @@ function drawWheel(){
     const maxChars = 14;
     const safeLabel = label.length > maxChars ? (label.slice(0, maxChars-1) + "…") : label;
 
+    const tx = Math.max(120, r*0.26);
     wheelCtx.lineWidth = 4;
     wheelCtx.strokeStyle = "rgba(0,0,0,0.35)";
-    wheelCtx.strokeText(safeLabel, Math.max(120, r*0.26), 0);
-    wheelCtx.fillText(safeLabel, Math.max(120, r*0.26), 0);
+    wheelCtx.strokeText(safeLabel, tx, 0);
+    wheelCtx.fillText(safeLabel, tx, 0);
 
     wheelCtx.restore();
   }
 
-  // Outer ring
   wheelCtx.beginPath();
   wheelCtx.arc(0,0,r,0,Math.PI*2);
   wheelCtx.lineWidth = stroke;
@@ -232,7 +248,6 @@ function startConfetti(){
     const col = basePalette[i % basePalette.length];
     confetti.push({x,y,s,vx,vy,rot,vr,col});
   }
-
   requestAnimationFrame(tickConfetti);
 }
 
@@ -265,23 +280,54 @@ function tickConfetti(ts){
   requestAnimationFrame(tickConfetti);
 }
 
+/* ---------------- Robust message dedupe ---------------- */
+/**
+ * Objectif: empêcher qu’un même message du chat (capté plusieurs fois)
+ * ajoute plusieurs fois un prénom OU déclenche plusieurs fois SPIN/RESET.
+ */
+const RECENT = new Map(); // key -> ts
+const DEDUPE_WINDOW_MS = 1200;
+
+function dedupeKey(user, text){
+  const u = (user && String(user).trim()) ? String(user).trim().toLowerCase() : "";
+  const t = String(text || "").trim().toLowerCase();
+  return u ? `${u}::${t}` : `::${t}`;
+}
+
+function isDuplicate(user, text){
+  const now = Date.now();
+  const key = dedupeKey(user, text);
+  const prev = RECENT.get(key) || 0;
+  if (now - prev < DEDUPE_WINDOW_MS) return true;
+  RECENT.set(key, now);
+
+  // nettoyage léger
+  if (RECENT.size > 800){
+    const limit = now - (DEDUPE_WINDOW_MS * 3);
+    for (const [k, ts] of RECENT.entries()){
+      if (ts < limit) RECENT.delete(k);
+    }
+  }
+  return false;
+}
+
 /* ---------------- Participants logic ---------------- */
 function normalizeName(raw){
   let t = String(raw || "").trim();
   t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
   return t;
 }
+
 function keyOf(name){
   return normalizeName(name).toLowerCase();
 }
+
 function isValidName(name){
   const minLen = clamp(cssNum("--min-name-length", 1), 1, 6);
   const maxLen = clamp(cssNum("--max-name-length", 18), 6, 40);
-
   const t = normalizeName(name);
   if (!t) return false;
 
-  // Commands reserved
   const up = t.toUpperCase();
   if (up === spinTrigger || up === resetTrigger) return false;
   if (/^[ABCD]$/.test(up)) return false;
@@ -289,10 +335,24 @@ function isValidName(name){
   if (t.length < minLen || t.length > maxLen) return false;
   if (t.split(" ").filter(Boolean).length > 2) return false;
 
-  // whitelist
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
-
   return true;
+}
+
+function extractNameFromMessage(msg){
+  const raw = String(msg || "").trim();
+  if (!raw) return null;
+
+  // Mode prefix recommandé: @Henri
+  if (nameMode === "prefix"){
+    if (!namePrefix) return null;
+    if (!raw.startsWith(namePrefix)) return null;
+    const candidate = raw.slice(namePrefix.length).trim();
+    return candidate || null;
+  }
+
+  // Mode free: tout texte valide devient un prénom (plus risqué)
+  return raw;
 }
 
 function addParticipant(name){
@@ -326,30 +386,17 @@ function pickRandomIndex(n){
   crypto.getRandomValues(u);
   return u[0] % n;
 }
-
 function normalizeAngle(a){
   let x = a % (Math.PI*2);
   if (x < 0) x += Math.PI*2;
   return x;
 }
 
-/* Pointer is always at 3 o’clock (right) or 9 o’clock (left).
-   We align the selected slice center to that pointer direction.
-*/
 function pointerTargetAngle(){
-  // right pointer aims leftwards to center, but the "hit point" is on the right edge.
-  // We treat pointer direction as angle 0 (east) for right, PI (west) for left.
-  const side = (cssVar("--pointer-side","right") || "right").toLowerCase();
-  document.documentElement.setAttribute("data-pointer-side", (side === "left") ? "left" : "right");
-  return (side === "left") ? Math.PI : 0;
-}
-
-let spinTrigger = "SPIN";
-let resetTrigger = "RESET";
-
-function readTriggers(){
-  spinTrigger = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
-  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim().toUpperCase();
+  // "hit point" (où l’aiguille désigne) :
+  // droite => angle 0 (est)
+  // gauche  => angle PI (ouest)
+  return (pointerSide === "left") ? Math.PI : 0;
 }
 
 function spin(){
@@ -365,7 +412,6 @@ function spin(){
     winnerIndex = 0;
     spinning = false;
     drawWheel();
-    // Winner only shows AFTER spin (here immediate end)
     elWinnerName.textContent = participants[0].name;
     document.documentElement.classList.add("mdi-show-winner");
     startConfetti();
@@ -378,15 +424,14 @@ function spin(){
 
   const pointerAngle = pointerTargetAngle();
 
-  // We want: wheelAngle_final + selectedCenter == pointerAngle
-  // => wheelAngle_final = pointerAngle - selectedCenter
+  // wheelAngle_final + selectedCenter == pointerAngle
   const desired = pointerAngle - selectedCenter;
 
-  const extraTurns = 5 + Math.floor(rand01()*4); // 5..8
+  const extraTurns = 5 + Math.floor(rand01()*4);
   const extra = extraTurns * Math.PI*2;
 
   spinStartAngle = wheelAngle;
-  targetAngle = desired - extra;     // backward multi turns
+  targetAngle = desired - extra;
   spinDurationMs = clamp(3600 + Math.floor(rand01()*2200), 3200, 6200);
   spinStartTs = performance.now();
 
@@ -394,7 +439,7 @@ function spin(){
 
   function tickSpin(ts){
     const t = clamp((ts - spinStartTs)/spinDurationMs, 0, 1);
-    const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const e = 1 - Math.pow(1 - t, 3);
 
     wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
     drawWheel();
@@ -406,14 +451,13 @@ function spin(){
 
     spinning = false;
 
-    // determine winner under pointer
     const ang = normalizeAngle(pointerAngle - wheelAngle);
     const idx = Math.floor(ang / slice) % n;
     winnerIndex = (idx + n) % n;
 
     drawWheel();
 
-    // Winner shows ONLY now (fade-in)
+    // winner en fondu uniquement maintenant
     elWinnerName.textContent = participants[winnerIndex]?.name || "";
     document.documentElement.classList.add("mdi-show-winner");
     startConfetti();
@@ -447,40 +491,39 @@ function initSocket(){
   socket.on("overlay:forbidden", () => showDenied());
 
   socket.on("overlay:state", (payload) => {
-    if (!payload) return;
-    if (payload.overlay !== OVERLAY_NAME) return;
-
-    // Authorization OK
+    // Handshake only. On ne déclenche aucune action automatique ici.
+    if (!payload || payload.overlay !== OVERLAY_NAME) return;
     showReady();
-
-    // Keep pointer side always up-to-date
-    pointerTargetAngle();
-    readTriggers();
-
-    // Optional auto reset on display
+    readConfig();
     if ((cssVar("--auto-reset","false") || "false") === "true"){
       resetParticipants();
     }
-
-    const st = String(payload.state || "").toLowerCase();
-    if (st === "spin") spin();
-    if (st === "reset" || st === "idle") resetParticipants();
   });
 
   socket.on("raw_vote", (data) => {
     if (!data) return;
+    readConfig();
+
     const msg = String(data.vote || "").trim();
     if (!msg) return;
 
-    readTriggers(); // in case OBS updated
-    pointerTargetAngle();
+    const user = data.user || ""; // souvent présent
+    if (isDuplicate(user, msg)) return;
 
     const up = msg.toUpperCase();
 
+    // Triggers robustes
     if (up === resetTrigger){ resetParticipants(); return; }
     if (up === spinTrigger){ spin(); return; }
 
-    addParticipant(msg);
+    // Inscription
+    const candidate = extractNameFromMessage(msg);
+    if (!candidate) return;
+
+    // Important: en mode prefix, on déduplique encore après extraction
+    if (nameMode === "prefix" && isDuplicate(user, candidate)) return;
+
+    addParticipant(candidate);
   });
 }
 
@@ -488,11 +531,9 @@ function initSocket(){
 function init(){
   setBootTransparent();
 
-  // Wait for OBS CSS injection
   const poll = setInterval(() => {
     readAuthVars();
-    readTriggers();
-    pointerTargetAngle();
+    readConfig();
 
     if (AUTH_MODE === "legacy"){
       if (!ROOM_ID) return;
@@ -511,7 +552,6 @@ function init(){
     }
   }, 200);
 
-  // If missing keys, show denied (strict)
   setTimeout(() => {
     readAuthVars();
     if (AUTH_MODE === "strict" && (!ROOM_ID || !ROOM_KEY)){
