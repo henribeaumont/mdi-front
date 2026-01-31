@@ -57,16 +57,20 @@ let collectStopTrigger  = "PRET?";
 let collectClearTrigger = "CLEAR INSCRIPTION";
 
 let cmdMatchMode = "exact"; // exact | startsWith | contains
-let preWindowMs = 15000;    // snapshot window before START (ms)
-
 let spinCooldownMs = 1800;
 let blockSpinWhileCollecting = true;
+let clearOnStart = true;
 
 let minNameLen = 1;
 let maxNameLen = 18;
 let maxParticipants = 48;
 
-let clearOnStart = true;
+/* Anti-reliquat robust: baseline index size */
+let baselineMaxMessages = 6000;
+
+/* Sens de rotation: cw (droite) / ccw (gauche) */
+let spinDirection = "cw"; // cw | ccw
+
 let pointerSide = "right";
 
 function readConfig(){
@@ -80,16 +84,18 @@ function readConfig(){
   cmdMatchMode = (cssVar("--cmd-match-mode","exact") || "exact").trim().toLowerCase();
   if (!["exact","startswith","contains"].includes(cmdMatchMode)) cmdMatchMode = "exact";
 
-  preWindowMs = clamp(cssNum("--prewindow-ms", 15000), 3000, 60000);
-
-  blockSpinWhileCollecting = cssOnOff("--block-spin-while-collecting", true);
   spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
+  blockSpinWhileCollecting = cssOnOff("--block-spin-while-collecting", true);
+  clearOnStart = cssOnOff("--clear-on-start", true);
 
   minNameLen = clamp(cssNum("--min-name-length", 1), 1, 6);
   maxNameLen = clamp(cssNum("--max-name-length", 18), 6, 40);
-  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 120);
+  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
 
-  clearOnStart = cssOnOff("--clear-on-start", true);
+  baselineMaxMessages = clamp(cssNum("--baseline-max-messages", 6000), 500, 20000);
+
+  spinDirection = (cssVar("--spin-direction","cw") || "cw").trim().toLowerCase();
+  spinDirection = (spinDirection === "ccw") ? "ccw" : "cw";
 
   pointerSide = (cssVar("--pointer-side","right") || "right").trim().toLowerCase();
   pointerSide = (pointerSide === "left") ? "left" : "right";
@@ -108,19 +114,15 @@ function normalizeText(raw){
 function normKey(raw){
   return normalizeText(raw).toUpperCase();
 }
-
-// Petit extract “après préfixe” si jamais on reçoit "Henri: PSEUDO"
 function extractPayload(text){
   const t = normalizeText(text);
-  const m = t.match(/^.{1,18}:\s*(.+)$/); // "Name: payload"
+  const m = t.match(/^.{1,24}:\s*(.+)$/); // "Name: payload"
   if (m && m[1]) return m[1].trim();
   return t;
 }
-
 function cmdMatch(message, trigger){
   const msg = normKey(extractPayload(message));
   const trg = normKey(trigger);
-
   if (!msg || !trg) return false;
 
   if (cmdMatchMode === "exact") return msg === trg;
@@ -128,43 +130,46 @@ function cmdMatch(message, trigger){
   return msg.includes(trg); // contains
 }
 
-/* ---------------- Recent buffer + snapshot (robuste anti-reliquat) ---------------- */
-const recent = new Map(); // key -> ts (ms)
-function bumpRecent(msg){
-  const k = normKey(extractPayload(msg));
-  const now = Date.now();
-  if (!k) return;
-
-  recent.set(k, now);
-
-  // purge
-  const limit = now - Math.max(preWindowMs, 10000);
-  if (recent.size > 2000){
-    for (const [key, ts] of recent.entries()){
-      if (ts < limit) recent.delete(key);
+/* ---------------- Robust anti-reliquat baseline ----------------
+   On indexe TOUS les messages vus avant START (pas juste 15s).
+   START => on "gèle" une baseline (ensemble des messages déjà vus).
+   COLLECTING => on ignore tout message qui appartient à baseline.
+--------------------------------------------------------------- */
+class LRUSet {
+  constructor(max = 5000){
+    this.max = max;
+    this.map = new Map(); // key -> true (in insertion order)
+  }
+  has(key){ return this.map.has(key); }
+  add(key){
+    if (!key) return;
+    if (this.map.has(key)) {
+      // refresh order
+      this.map.delete(key);
+      this.map.set(key, true);
+      return;
+    }
+    this.map.set(key, true);
+    while (this.map.size > this.max){
+      const oldest = this.map.keys().next().value;
+      this.map.delete(oldest);
+    }
+  }
+  clear(){ this.map.clear(); }
+  snapshotSet(){
+    return new Set(this.map.keys());
+  }
+  setMax(n){
+    this.max = n;
+    while (this.map.size > this.max){
+      const oldest = this.map.keys().next().value;
+      this.map.delete(oldest);
     }
   }
 }
 
-let phase = "IDLE"; // IDLE | COLLECTING | READY
-let collectEpoch = 0;
-let snapshotBeforeStart = new Map(); // key -> ts taken at START time
-
-function takeSnapshot(){
-  const now = Date.now();
-  const limit = now - preWindowMs;
-  const snap = new Map();
-  for (const [k, ts] of recent.entries()){
-    if (ts >= limit) snap.set(k, ts);
-  }
-  snapshotBeforeStart = snap;
-}
-
-function isInSnapshot(msg){
-  const k = normKey(extractPayload(msg));
-  if (!k) return true;
-  return snapshotBeforeStart.has(k);
-}
+const preStartIndex = new LRUSet(6000);
+let baselineSet = new Set();
 
 /* ---------------- Names ---------------- */
 function keyOfName(name){ return normalizeText(name).toLowerCase(); }
@@ -173,7 +178,7 @@ function isValidName(raw){
   const t = normalizeText(extractPayload(raw));
   if (!t) return false;
 
-  // Interdit si c'est une commande
+  // Interdit si commande
   if (cmdMatch(t, collectStartTrigger)) return false;
   if (cmdMatch(t, collectStopTrigger))  return false;
   if (cmdMatch(t, spinTrigger))         return false;
@@ -183,7 +188,6 @@ function isValidName(raw){
   if (t.length < minNameLen || t.length > maxNameLen) return false;
   if (t.split(" ").filter(Boolean).length > 2) return false;
 
-  // Lettres/chiffres/espaces/accents + apostrophes
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
 
   return true;
@@ -396,8 +400,12 @@ function addParticipant(message){
   const payload = extractPayload(message);
   if (!isValidName(payload)) return;
 
-  // Anti-reliquat: si c'était visible "avant START", on ignore
-  if (isInSnapshot(payload)) return;
+  const msgKey = normKey(payload);
+
+  // ✅ NOUVEL ANTI-RELIQUAT ROBUSTE :
+  // si ce texte a déjà été vu AVANT START, on l’ignore,
+  // même s’il est renvoyé après (re-render chat).
+  if (baselineSet.has(msgKey)) return;
 
   const clean = normalizeText(payload);
   const k = keyOfName(clean);
@@ -411,6 +419,7 @@ function addParticipant(message){
 }
 
 /* ---------------- Spin (blindé) ---------------- */
+let phase = "IDLE"; // IDLE | COLLECTING | READY
 let lastSpinAt = 0;
 
 function normalizeAngle(a){
@@ -429,7 +438,6 @@ function pointerTargetAngle(){
 
 function spin(){
   const now = Date.now();
-
   if (spinning) return;
   if (phase !== "READY") return;
   if (participants.length < 2) return;
@@ -450,8 +458,13 @@ function spin(){
   const extraTurns = 6 + Math.floor(rand01()*4);
   const extra = extraTurns * Math.PI*2;
 
+  // ✅ sens de rotation :
+  // cw = horaire => angle diminue
+  // ccw = anti-horaire => angle augmente
+  const dir = (spinDirection === "ccw") ? +1 : -1;
+
   spinStartAngle = wheelAngle;
-  targetAngle = desired - extra;
+  targetAngle = desired + dir * extra;
   spinDurationMs = clamp(3800 + Math.floor(rand01()*2200), 3400, 6500);
   spinStartTs = performance.now();
 
@@ -513,48 +526,56 @@ function initSocket(){
 
     showReady();
     readConfig();
+    preStartIndex.setMax(baselineMaxMessages);
 
     if ((cssVar("--auto-reset","false") || "false") === "true"){
       clearAllForNewSession();
+      preStartIndex.clear();
     } else {
       hideWinner();
       drawWheel();
     }
 
-    // Reset state machine
     phase = "IDLE";
-    collectEpoch = 0;
-    snapshotBeforeStart = new Map();
+    baselineSet = new Set();
   });
 
   socket.on("raw_vote", (data) => {
     if (!data) return;
 
     readConfig();
+    preStartIndex.setMax(baselineMaxMessages);
+
     const raw = String(data.vote || "");
     const msg = normalizeText(raw);
     if (!msg) return;
 
-    // Toujours alimenter le buffer récent (sert au snapshot)
-    bumpRecent(msg);
+    const msgKey = normKey(extractPayload(msg));
 
-    // --- Commandes (robustes, indépendantes du user)
+    // En IDLE, on indexe tout ce qui passe (anti-reliquat)
+    if (phase === "IDLE") {
+      preStartIndex.add(msgKey);
+    }
+
+    // --- Commandes
     if (cmdMatch(msg, collectClearTrigger) || cmdMatch(msg, resetTrigger)) {
       clearAllForNewSession();
+      preStartIndex.clear();
+      baselineSet = new Set();
       phase = "IDLE";
-      collectEpoch++;
-      snapshotBeforeStart = new Map();
       return;
     }
 
     if (cmdMatch(msg, collectStartTrigger)) {
       if (clearOnStart) clearAllForNewSession();
 
-      // SNAPSHOT: on capture les messages récents AVANT de collecter
-      takeSnapshot();
+      // ✅ Baseline = tous les messages vus AVANT START (LRU)
+      baselineSet = preStartIndex.snapshotSet();
+
+      // On indexe aussi le START lui-même pour éviter que ça pollue
+      baselineSet.add(msgKey);
 
       phase = "COLLECTING";
-      collectEpoch++;
       hideWinner();
       return;
     }
