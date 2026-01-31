@@ -5,7 +5,6 @@ function cssVar(name, fallback = "") {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace(/^['"]+|['"]+$/g, "") || fallback;
 }
 
-// --- CONFIGURATION ---
 let globalCount = 0;
 let estAutorise = false;
 const container = document.getElementById('stacks-container');
@@ -15,11 +14,13 @@ const gameScene = document.getElementById('game-scene');
 const socket = io(ADRESSE_SERVEUR, { transports: ['websocket', 'polling'] });
 
 async function init() {
-    await new Promise(r => setTimeout(r, 800)); // Attente OBS
+    await new Promise(r => setTimeout(r, 800)); 
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
 
     if (!room || !key) { showDenied(); return; }
+
+    // Demande d'accès SaaS V5.5
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', showDenied);
@@ -53,12 +54,13 @@ function ajouterJeton() {
     void scoreEl.offsetWidth; 
     scoreEl.classList.add('bump');
 
-    const stackLimit = parseInt(cssVar("--poker-stack-limit", "15"));
-    const maxStacks = parseInt(cssVar("--poker-max-stacks", "8"));
-    let stackIndex = Math.floor((globalCount - 1) / stackLimit);
+    const STACK_LIMIT = parseInt(cssVar("--poker-stack-limit", "15"));
+    const MAX_STACKS = parseInt(cssVar("--poker-max-stacks", "10"));
+    
+    let stackIndex = Math.floor((globalCount - 1) / STACK_LIMIT);
 
-    if (stackIndex >= maxStacks) {
-        const lastStack = document.getElementById(`stack-${maxStacks - 1}`);
+    if (stackIndex >= MAX_STACKS) {
+        const lastStack = document.getElementById(`stack-${MAX_STACKS - 1}`);
         if (lastStack) updateScorePosition(lastStack);
         return; 
     }
