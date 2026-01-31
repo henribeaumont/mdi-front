@@ -1,13 +1,3 @@
-/* ==========================================================
-   MDI • ROUE LOTO — V1.2 SaaS (ROBUSTE)
-   Overlay: "roue_loto"
-   Fixes:
-   - Déduplication forte (évite multi-ajouts pour 1 message)
-   - Mode inscription sécurisé via prefix (configurable)
-   - AUCUN spin déclenché par overlay:state (handshake only)
-   - Aiguille: flip 180° + overlap via CSS
-   ========================================================== */
-
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_NAME = "roue_loto";
 
@@ -40,7 +30,6 @@ function setBootTransparent(){
   );
   document.documentElement.removeAttribute("data-pointer-side");
 }
-
 function showDenied(){
   document.documentElement.classList.remove("mdi-ready");
   document.documentElement.classList.add("mdi-denied");
@@ -48,7 +37,6 @@ function showDenied(){
   elSecurity.style.display = "flex";
   document.body.style.backgroundColor = "black";
 }
-
 function showReady(){
   document.documentElement.classList.remove("mdi-denied");
   document.documentElement.classList.add("mdi-ready");
@@ -56,7 +44,6 @@ function showReady(){
   elApp.style.display = "grid";
   document.body.style.backgroundColor = "transparent";
 }
-
 function hideWinner(){
   document.documentElement.classList.remove("mdi-show-winner");
   elWinnerName.textContent = "";
@@ -65,16 +52,18 @@ function hideWinner(){
 /* ---------------- Config (read from CSS) ---------------- */
 let spinTrigger = "SPIN";
 let resetTrigger = "RESET";
-let nameMode = "prefix";     // ✅ par défaut plus robuste
-let namePrefix = "@";        // ✅ par défaut plus robuste
 let pointerSide = "right";
+
+/* ✅ NEW: robust anti-replay controls (defaults safe) */
+let collectWarmupMs = 1500;      // ignore first N ms (DOM replay)
+let replayTtlMs = 180000;        // 3 min: ignore duplicates for this time
+let minNameLen = 1;
+let maxNameLen = 18;
+let maxParticipants = 48;
 
 function readConfig(){
   spinTrigger = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
   resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim().toUpperCase();
-
-  nameMode = (cssVar("--name-mode","prefix") || "prefix").trim().toLowerCase();  // "free" | "prefix"
-  namePrefix = (cssVar("--name-prefix","@") || "@").trim();
 
   pointerSide = (cssVar("--pointer-side","right") || "right").trim().toLowerCase();
   pointerSide = (pointerSide === "left") ? "left" : "right";
@@ -82,6 +71,14 @@ function readConfig(){
 
   const flip = cssOnOff("--pointer-rotate-180", true);
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
+
+  /* robust knobs (optional in CSS; safe defaults here) */
+  collectWarmupMs = clamp(cssNum("--collect-warmup-ms", 1500), 0, 8000);
+  replayTtlMs = clamp(cssNum("--replay-ttl-ms", 180000), 30000, 900000);
+
+  minNameLen = clamp(cssNum("--min-name-length", 1), 1, 6);
+  maxNameLen = clamp(cssNum("--max-name-length", 18), 6, 40);
+  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 120);
 }
 
 /* ---------------- Canvas: Wheel ---------------- */
@@ -101,7 +98,7 @@ const basePalette = [
   "#22c55e","#ef4444","#60a5fa","#f59e0b"
 ];
 
-let participants = []; // [{name, key}]
+let participants = [];
 let winnerIndex = -1;
 
 function resizeWheelCanvas(){
@@ -218,13 +215,11 @@ function resizeConfetti(){
   confettiCanvas.height = Math.floor(window.innerHeight * dpr);
   confettiCtx.setTransform(dpr,0,0,dpr,0,0);
 }
-
 function rand01(){
   const u = new Uint32Array(1);
   crypto.getRandomValues(u);
   return u[0] / 0xFFFFFFFF;
 }
-
 function startConfetti(){
   if (!cssOnOff("--winner-confetti", true)) return;
 
@@ -250,24 +245,19 @@ function startConfetti(){
   }
   requestAnimationFrame(tickConfetti);
 }
-
 function tickConfetti(ts){
   confettiCtx.clearRect(0,0,window.innerWidth, window.innerHeight);
-
   if (ts >= confettiEndTs){
     document.documentElement.classList.remove("mdi-confetti");
     confetti = [];
     return;
   }
-
   for (const p of confetti){
     p.x += p.vx * 3.2;
     p.y += p.vy * 3.6;
     p.rot += p.vr;
-
     const t = (confettiEndTs - ts) / 500;
     const alpha = clamp(t, 0, 1);
-
     confettiCtx.save();
     confettiCtx.translate(p.x, p.y);
     confettiCtx.rotate(p.rot);
@@ -276,55 +266,50 @@ function tickConfetti(ts){
     confettiCtx.fillRect(-p.s/2, -p.s/2, p.s, p.s*0.7);
     confettiCtx.restore();
   }
-
   requestAnimationFrame(tickConfetti);
 }
 
-/* ---------------- Robust message dedupe ---------------- */
+/* ---------------- Robust anti-replay for names ---------------- */
 /**
- * Objectif: empêcher qu’un même message du chat (capté plusieurs fois)
- * ajoute plusieurs fois un prénom OU déclenche plusieurs fois SPIN/RESET.
+ * On ne veut PAS que l’extension “rejoue” des messages déjà présents.
+ * -> warmup: ignore toute entrée pendant X ms après le ready
+ * -> fingerprint TTL: si même empreinte revient pendant 3min => ignore
  */
-const RECENT = new Map(); // key -> ts
-const DEDUPE_WINDOW_MS = 1200;
+let readyAt = 0;
 
-function dedupeKey(user, text){
+const FINGERPRINTS = new Map(); // fp -> ts
+
+function stableFingerprint(user, text){
   const u = (user && String(user).trim()) ? String(user).trim().toLowerCase() : "";
   const t = String(text || "").trim().toLowerCase();
   return u ? `${u}::${t}` : `::${t}`;
 }
 
-function isDuplicate(user, text){
+function isReplay(user, text){
   const now = Date.now();
-  const key = dedupeKey(user, text);
-  const prev = RECENT.get(key) || 0;
-  if (now - prev < DEDUPE_WINDOW_MS) return true;
-  RECENT.set(key, now);
+  const fp = stableFingerprint(user, text);
+  const prev = FINGERPRINTS.get(fp) || 0;
+  if (prev && (now - prev) < replayTtlMs) return true;
+  FINGERPRINTS.set(fp, now);
 
-  // nettoyage léger
-  if (RECENT.size > 800){
-    const limit = now - (DEDUPE_WINDOW_MS * 3);
-    for (const [k, ts] of RECENT.entries()){
-      if (ts < limit) RECENT.delete(k);
+  // purge
+  if (FINGERPRINTS.size > 1200){
+    const limit = now - replayTtlMs;
+    for (const [k, ts] of FINGERPRINTS.entries()){
+      if (ts < limit) FINGERPRINTS.delete(k);
     }
   }
   return false;
 }
 
-/* ---------------- Participants logic ---------------- */
 function normalizeName(raw){
   let t = String(raw || "").trim();
   t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
   return t;
 }
-
-function keyOf(name){
-  return normalizeName(name).toLowerCase();
-}
+function keyOf(name){ return normalizeName(name).toLowerCase(); }
 
 function isValidName(name){
-  const minLen = clamp(cssNum("--min-name-length", 1), 1, 6);
-  const maxLen = clamp(cssNum("--max-name-length", 18), 6, 40);
   const t = normalizeName(name);
   if (!t) return false;
 
@@ -332,37 +317,20 @@ function isValidName(name){
   if (up === spinTrigger || up === resetTrigger) return false;
   if (/^[ABCD]$/.test(up)) return false;
 
-  if (t.length < minLen || t.length > maxLen) return false;
+  if (t.length < minNameLen || t.length > maxNameLen) return false;
   if (t.split(" ").filter(Boolean).length > 2) return false;
 
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
   return true;
 }
 
-function extractNameFromMessage(msg){
-  const raw = String(msg || "").trim();
-  if (!raw) return null;
-
-  // Mode prefix recommandé: @Henri
-  if (nameMode === "prefix"){
-    if (!namePrefix) return null;
-    if (!raw.startsWith(namePrefix)) return null;
-    const candidate = raw.slice(namePrefix.length).trim();
-    return candidate || null;
-  }
-
-  // Mode free: tout texte valide devient un prénom (plus risqué)
-  return raw;
-}
-
-function addParticipant(name){
-  const maxP = clamp(cssNum("--max-participants", 48), 4, 120);
-  const clean = normalizeName(name);
+function addParticipantFromChat(message){
+  const clean = normalizeName(message);
   if (!isValidName(clean)) return;
 
   const k = keyOf(clean);
   if (participants.some(p => p.key === k)) return;
-  if (participants.length >= maxP) return;
+  if (participants.length >= maxParticipants) return;
 
   participants.push({ name: clean, key: k });
   winnerIndex = -1;
@@ -391,17 +359,11 @@ function normalizeAngle(a){
   if (x < 0) x += Math.PI*2;
   return x;
 }
-
 function pointerTargetAngle(){
-  // "hit point" (où l’aiguille désigne) :
-  // droite => angle 0 (est)
-  // gauche  => angle PI (ouest)
   return (pointerSide === "left") ? Math.PI : 0;
 }
-
 function spin(){
   if (spinning) return;
-
   const n = participants.length;
   if (n < 1) return;
 
@@ -421,10 +383,7 @@ function spin(){
   const selected = pickRandomIndex(n);
   const slice = (Math.PI*2)/n;
   const selectedCenter = selected*slice + slice/2;
-
   const pointerAngle = pointerTargetAngle();
-
-  // wheelAngle_final + selectedCenter == pointerAngle
   const desired = pointerAngle - selectedCenter;
 
   const extraTurns = 5 + Math.floor(rand01()*4);
@@ -440,7 +399,6 @@ function spin(){
   function tickSpin(ts){
     const t = clamp((ts - spinStartTs)/spinDurationMs, 0, 1);
     const e = 1 - Math.pow(1 - t, 3);
-
     wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
     drawWheel();
 
@@ -457,7 +415,6 @@ function spin(){
 
     drawWheel();
 
-    // winner en fondu uniquement maintenant
     elWinnerName.textContent = participants[winnerIndex]?.name || "";
     document.documentElement.classList.add("mdi-show-winner");
     startConfetti();
@@ -491,10 +448,10 @@ function initSocket(){
   socket.on("overlay:forbidden", () => showDenied());
 
   socket.on("overlay:state", (payload) => {
-    // Handshake only. On ne déclenche aucune action automatique ici.
     if (!payload || payload.overlay !== OVERLAY_NAME) return;
     showReady();
     readConfig();
+    readyAt = Date.now();           // ✅ start warmup window
     if ((cssVar("--auto-reset","false") || "false") === "true"){
       resetParticipants();
     }
@@ -507,23 +464,19 @@ function initSocket(){
     const msg = String(data.vote || "").trim();
     if (!msg) return;
 
-    const user = data.user || ""; // souvent présent
-    if (isDuplicate(user, msg)) return;
+    const user = data.user || "";
+
+    // ✅ Warmup: ignore “DOM replay” right after overlay becomes ready
+    if (readyAt && (Date.now() - readyAt) < collectWarmupMs) return;
+
+    // ✅ Anti-replay TTL: ignore if same (user,msg) seen recently
+    if (isReplay(user, msg)) return;
 
     const up = msg.toUpperCase();
-
-    // Triggers robustes
     if (up === resetTrigger){ resetParticipants(); return; }
     if (up === spinTrigger){ spin(); return; }
 
-    // Inscription
-    const candidate = extractNameFromMessage(msg);
-    if (!candidate) return;
-
-    // Important: en mode prefix, on déduplique encore après extraction
-    if (nameMode === "prefix" && isDuplicate(user, candidate)) return;
-
-    addParticipant(candidate);
+    addParticipantFromChat(msg);
   });
 }
 
