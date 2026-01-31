@@ -1,14 +1,11 @@
 /* ==========================================================
-   MDI • ROUE LOTO — V1.0 SaaS (ZERO FLICKER)
-   - Overlay name: "roue_loto"
-   - Auth strict/legacy via CSS OBS
-   - Collecte participants via raw_vote (prénom/pseudo)
-   - Tirage au sort déclenchable par:
-       A) overlay:state state="spin" (pilotage serveur/telecommande)
-       B) chat: "SPIN" (fallback)
-   - Reset par:
-       A) overlay:state state="reset" / "idle"
-       B) chat: "RESET"
+   MDI • ROUE LOTO — V1.1 SaaS (ZERO FLICKER)
+   Overlay name: "roue_loto"
+   - Aiguille gauche/droite via CSS OBS: --pointer-side
+   - Trigger spin via CSS OBS: --spin-trigger (ex: "SPIN")
+   - Trigger reset via CSS OBS: --reset-trigger (ex: "RESET")
+   - Aucun texte UI sauf winner après spin
+   - Winner apparaît en fondu uniquement après spin
    ========================================================== */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -20,13 +17,8 @@ function cssVar(name, fallback = "") {
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
 }
 function cssNum(name, fallback) {
-  const v = cssVar(name, "");
-  const n = Number(v);
+  const n = Number(cssVar(name, ""));
   return Number.isFinite(n) ? n : fallback;
-}
-function cssStr(name, fallback) {
-  const v = cssVar(name, "");
-  return v ? v : fallback;
 }
 function cssOnOff(name, fallbackOn = true) {
   const v = (cssVar(name, "") || "").toLowerCase();
@@ -38,13 +30,14 @@ function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 /* ---------------- Boot / Security ---------------- */
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
-const elCenterLabel = document.getElementById("centerLabel");
-const elCenterSub = document.getElementById("centerSub");
+const elWinner = document.getElementById("winner");
+const elWinnerName = document.getElementById("winnerName");
 
 function setBootTransparent(){
   elSecurity.style.display = "none";
   elApp.style.display = "none";
-  document.documentElement.classList.remove("mdi-ready", "mdi-denied", "mdi-confetti");
+  document.documentElement.classList.remove("mdi-ready", "mdi-denied", "mdi-confetti", "mdi-show-winner");
+  document.documentElement.removeAttribute("data-pointer-side");
 }
 
 function showDenied(){
@@ -63,16 +56,21 @@ function showReady(){
   document.body.style.backgroundColor = "transparent";
 }
 
+function hideWinner(){
+  document.documentElement.classList.remove("mdi-show-winner");
+  elWinnerName.textContent = "";
+}
+
 /* ---------------- Canvas: Wheel ---------------- */
 const wheelCanvas = document.getElementById("wheel");
 const wheelCtx = wheelCanvas.getContext("2d");
 
-let wheelAngle = 0;           // radians (rotation actuelle)
-let targetAngle = 0;
+let wheelAngle = 0;
 let spinning = false;
 let spinStartTs = 0;
 let spinDurationMs = 4200;
 let spinStartAngle = 0;
+let targetAngle = 0;
 
 const basePalette = [
   "#2ecc71", "#e74c3c", "#3b82f6", "#f1c40f",
@@ -83,7 +81,6 @@ const basePalette = [
 let participants = []; // [{name, key}]
 let winnerIndex = -1;
 
-/* HiDPI sizing */
 function resizeWheelCanvas(){
   const cssSize = cssNum("--wheel-size", 820);
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -94,7 +91,8 @@ function resizeWheelCanvas(){
   wheelCanvas.width = Math.floor(cssSize * dpr);
   wheelCanvas.height = Math.floor(cssSize * dpr);
 
-  wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+  // draw in CSS pixels
+  wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawWheel();
 }
 
@@ -104,37 +102,26 @@ function drawWheel(){
   const textSize = cssNum("--wheel-text-size", 30);
   const textWeight = cssNum("--wheel-text-weight", 900);
 
-  const W = cssSize;
-  const H = cssSize;
+  const W = cssSize, H = cssSize;
   const cx = W/2, cy = H/2;
   const r = (W/2) - stroke - 6;
 
-  // clear
   wheelCtx.clearRect(0,0,W,H);
 
-  // background circle
   wheelCtx.save();
   wheelCtx.translate(cx, cy);
   wheelCtx.rotate(wheelAngle);
 
-  // no participants
   if (participants.length === 0){
+    // roue "vide" sans texte UI (tu as demandé zéro texte hors prénoms)
     wheelCtx.beginPath();
     wheelCtx.arc(0,0,r,0,Math.PI*2);
-    wheelCtx.fillStyle = "#0A0F1E";
+    wheelCtx.fillStyle = "rgba(10,15,30,0.65)";
     wheelCtx.fill();
 
     wheelCtx.lineWidth = stroke;
     wheelCtx.strokeStyle = "rgba(255,255,255,0.18)";
     wheelCtx.stroke();
-
-    wheelCtx.fillStyle = "rgba(255,255,255,0.92)";
-    wheelCtx.font = `900 ${Math.max(22, textSize)}px Montserrat, sans-serif`;
-    wheelCtx.textAlign = "center";
-    wheelCtx.textBaseline = "middle";
-    wheelCtx.fillText("Aucun participant", 0, -10);
-    wheelCtx.font = `800 ${Math.max(18, textSize-8)}px Montserrat, sans-serif`;
-    wheelCtx.fillText("Tapez votre prénom", 0, 26);
 
     wheelCtx.restore();
     return;
@@ -147,21 +134,19 @@ function drawWheel(){
     const a0 = i*slice;
     const a1 = a0 + slice;
 
-    // Slice fill
     wheelCtx.beginPath();
     wheelCtx.moveTo(0,0);
     wheelCtx.arc(0,0,r,a0,a1);
     wheelCtx.closePath();
 
-    const color = basePalette[i % basePalette.length];
-    wheelCtx.fillStyle = color;
+    wheelCtx.fillStyle = basePalette[i % basePalette.length];
     wheelCtx.fill();
 
-    // Highlight winner slice (slight glow)
+    // Highlight winner slice (discret)
     if (i === winnerIndex){
       wheelCtx.save();
       wheelCtx.shadowColor = "rgba(255,255,255,0.65)";
-      wheelCtx.shadowBlur = 26;
+      wheelCtx.shadowBlur = 22;
       wheelCtx.lineWidth = 10;
       wheelCtx.strokeStyle = "rgba(255,255,255,0.85)";
       wheelCtx.stroke();
@@ -179,23 +164,18 @@ function drawWheel(){
     wheelCtx.save();
     wheelCtx.rotate(mid);
 
-    // Text color contrast (simple)
     wheelCtx.fillStyle = "rgba(255,255,255,0.96)";
     wheelCtx.font = `${textWeight} ${textSize}px Montserrat, sans-serif`;
     wheelCtx.textAlign = "left";
     wheelCtx.textBaseline = "middle";
 
-    // Place text along radius
-    const tx = Math.max(120, r*0.26);
-    // Fit if long
     const maxChars = 14;
     const safeLabel = label.length > maxChars ? (label.slice(0, maxChars-1) + "…") : label;
 
-    // small stroke for readability
     wheelCtx.lineWidth = 4;
     wheelCtx.strokeStyle = "rgba(0,0,0,0.35)";
-    wheelCtx.strokeText(safeLabel, tx, 0);
-    wheelCtx.fillText(safeLabel, tx, 0);
+    wheelCtx.strokeText(safeLabel, Math.max(120, r*0.26), 0);
+    wheelCtx.fillText(safeLabel, Math.max(120, r*0.26), 0);
 
     wheelCtx.restore();
   }
@@ -207,30 +187,7 @@ function drawWheel(){
   wheelCtx.strokeStyle = "rgba(255,255,255,0.22)";
   wheelCtx.stroke();
 
-  // Inner circle
-  wheelCtx.beginPath();
-  wheelCtx.arc(0,0,r*0.18,0,Math.PI*2);
-  wheelCtx.fillStyle = "rgba(10,15,30,0.55)";
-  wheelCtx.fill();
-  wheelCtx.lineWidth = 6;
-  wheelCtx.strokeStyle = "rgba(255,255,255,0.18)";
-  wheelCtx.stroke();
-
   wheelCtx.restore();
-}
-
-function updateCenter(){
-  const n = participants.length;
-  elCenterSub.textContent = `${n} participant${n>1?"s":""}`;
-  if (spinning){
-    elCenterLabel.textContent = "TIRAGE…";
-    return;
-  }
-  if (winnerIndex >= 0 && participants[winnerIndex]){
-    elCenterLabel.textContent = participants[winnerIndex].name;
-  } else {
-    elCenterLabel.textContent = n ? "PRÊT" : "EN ATTENTE…";
-  }
 }
 
 /* ---------------- Confetti ---------------- */
@@ -253,8 +210,7 @@ function rand01(){
 }
 
 function startConfetti(){
-  const enabled = cssOnOff("--winner-confetti", true);
-  if (!enabled) return;
+  if (!cssOnOff("--winner-confetti", true)) return;
 
   document.documentElement.classList.add("mdi-confetti");
   resizeConfetti();
@@ -274,7 +230,7 @@ function startConfetti(){
     const rot = rand01()*Math.PI*2;
     const vr = (rand01()-0.5)*0.25;
     const col = basePalette[i % basePalette.length];
-    confetti.push({x,y,s,vx,vy,rot,vr,col,life: 1});
+    confetti.push({x,y,s,vx,vy,rot,vr,col});
   }
 
   requestAnimationFrame(tickConfetti);
@@ -283,19 +239,17 @@ function startConfetti(){
 function tickConfetti(ts){
   confettiCtx.clearRect(0,0,window.innerWidth, window.innerHeight);
 
-  // stop
   if (ts >= confettiEndTs){
     document.documentElement.classList.remove("mdi-confetti");
     confetti = [];
     return;
   }
 
-  // draw/update
   for (const p of confetti){
     p.x += p.vx * 3.2;
     p.y += p.vy * 3.6;
     p.rot += p.vr;
-    // fade near end
+
     const t = (confettiEndTs - ts) / 500;
     const alpha = clamp(t, 0, 1);
 
@@ -317,7 +271,9 @@ function normalizeName(raw){
   t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
   return t;
 }
-
+function keyOf(name){
+  return normalizeName(name).toLowerCase();
+}
 function isValidName(name){
   const minLen = clamp(cssNum("--min-name-length", 1), 1, 6);
   const maxLen = clamp(cssNum("--max-name-length", 18), 6, 40);
@@ -325,31 +281,22 @@ function isValidName(name){
   const t = normalizeName(name);
   if (!t) return false;
 
-  // Commands / reserved
+  // Commands reserved
   const up = t.toUpperCase();
-  if (up === "RESET" || up === "SPIN") return false;
-  if (/^[ABCD]$/.test(up)) return false; // ignore quiz tokens
+  if (up === spinTrigger || up === resetTrigger) return false;
+  if (/^[ABCD]$/.test(up)) return false;
 
-  // Length
   if (t.length < minLen || t.length > maxLen) return false;
-
-  // Limit to 2 words
   if (t.split(" ").filter(Boolean).length > 2) return false;
 
-  // Whitelist basic chars (letters incl accents, digits, space, underscore, dash, apostrophe)
-  // keeps it readable & avoids UI injections
+  // whitelist
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
 
   return true;
 }
 
-function keyOf(name){
-  return normalizeName(name).toLowerCase();
-}
-
 function addParticipant(name){
   const maxP = clamp(cssNum("--max-participants", 48), 4, 120);
-
   const clean = normalizeName(name);
   if (!isValidName(clean)) return;
 
@@ -359,8 +306,8 @@ function addParticipant(name){
 
   participants.push({ name: clean, key: k });
   winnerIndex = -1;
+  hideWinner();
   drawWheel();
-  updateCenter();
 }
 
 function resetParticipants(){
@@ -368,53 +315,78 @@ function resetParticipants(){
   winnerIndex = -1;
   spinning = false;
   wheelAngle = 0;
+  hideWinner();
   drawWheel();
-  updateCenter();
 }
 
 /* ---------------- Spin logic ---------------- */
 function pickRandomIndex(n){
   if (n <= 0) return -1;
-  // crypto random int
   const u = new Uint32Array(1);
   crypto.getRandomValues(u);
   return u[0] % n;
 }
 
-// pointer is at "top" (0 angle). Our wheel rotates; winner is slice under pointer.
-// We compute final wheelAngle so that the selected slice center aligns to -PI/2 (top).
+function normalizeAngle(a){
+  let x = a % (Math.PI*2);
+  if (x < 0) x += Math.PI*2;
+  return x;
+}
+
+/* Pointer is always at 3 o’clock (right) or 9 o’clock (left).
+   We align the selected slice center to that pointer direction.
+*/
+function pointerTargetAngle(){
+  // right pointer aims leftwards to center, but the "hit point" is on the right edge.
+  // We treat pointer direction as angle 0 (east) for right, PI (west) for left.
+  const side = (cssVar("--pointer-side","right") || "right").toLowerCase();
+  document.documentElement.setAttribute("data-pointer-side", (side === "left") ? "left" : "right");
+  return (side === "left") ? Math.PI : 0;
+}
+
+let spinTrigger = "SPIN";
+let resetTrigger = "RESET";
+
+function readTriggers(){
+  spinTrigger = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
+  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim().toUpperCase();
+}
+
 function spin(){
   if (spinning) return;
 
   const n = participants.length;
-  if (n < 2){
-    winnerIndex = (n === 1) ? 0 : -1;
+  if (n < 1) return;
+
+  hideWinner();
+  spinning = true;
+
+  if (n === 1){
+    winnerIndex = 0;
+    spinning = false;
     drawWheel();
-    updateCenter();
-    if (winnerIndex === 0) startConfetti();
+    // Winner only shows AFTER spin (here immediate end)
+    elWinnerName.textContent = participants[0].name;
+    document.documentElement.classList.add("mdi-show-winner");
+    startConfetti();
     return;
   }
-
-  spinning = true;
-  winnerIndex = -1;
-  updateCenter();
 
   const selected = pickRandomIndex(n);
   const slice = (Math.PI*2)/n;
   const selectedCenter = selected*slice + slice/2;
 
-  // We want: wheelAngle_final + selectedCenter == -PI/2 (top)
-  // => wheelAngle_final = -PI/2 - selectedCenter
-  const desired = (-Math.PI/2) - selectedCenter;
+  const pointerAngle = pointerTargetAngle();
 
-  // add extra turns for animation
+  // We want: wheelAngle_final + selectedCenter == pointerAngle
+  // => wheelAngle_final = pointerAngle - selectedCenter
+  const desired = pointerAngle - selectedCenter;
+
   const extraTurns = 5 + Math.floor(rand01()*4); // 5..8
   const extra = extraTurns * Math.PI*2;
 
   spinStartAngle = wheelAngle;
-  targetAngle = desired - extra; // rotate backwards multiple turns (looks natural)
-
-  // duration slightly random
+  targetAngle = desired - extra;     // backward multi turns
   spinDurationMs = clamp(3600 + Math.floor(rand01()*2200), 3200, 6200);
   spinStartTs = performance.now();
 
@@ -422,9 +394,7 @@ function spin(){
 
   function tickSpin(ts){
     const t = clamp((ts - spinStartTs)/spinDurationMs, 0, 1);
-
-    // easeOutCubic
-    const e = 1 - Math.pow(1 - t, 3);
+    const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
 
     wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
     drawWheel();
@@ -434,24 +404,20 @@ function spin(){
       return;
     }
 
-    // Finalize: determine winner from final angle
     spinning = false;
 
-    // Compute winner slice under pointer
-    const ang = normalizeAngle((-wheelAngle - Math.PI/2)); // convert to wheel-local angle under pointer
+    // determine winner under pointer
+    const ang = normalizeAngle(pointerAngle - wheelAngle);
     const idx = Math.floor(ang / slice) % n;
     winnerIndex = (idx + n) % n;
 
     drawWheel();
-    updateCenter();
+
+    // Winner shows ONLY now (fade-in)
+    elWinnerName.textContent = participants[winnerIndex]?.name || "";
+    document.documentElement.classList.add("mdi-show-winner");
     startConfetti();
   }
-}
-
-function normalizeAngle(a){
-  let x = a % (Math.PI*2);
-  if (x < 0) x += Math.PI*2;
-  return x;
 }
 
 /* ---------------- Socket / Auth ---------------- */
@@ -460,7 +426,7 @@ let AUTH_MODE = "strict";
 let ROOM_ID = "";
 let ROOM_KEY = "";
 
-function readCssVars(){
+function readAuthVars(){
   const s = getComputedStyle(document.documentElement);
   AUTH_MODE = (s.getPropertyValue("--auth-mode").trim().replace(/"/g,"") || "strict").toLowerCase();
   ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g,"") || "";
@@ -482,42 +448,38 @@ function initSocket(){
 
   socket.on("overlay:state", (payload) => {
     if (!payload) return;
+    if (payload.overlay !== OVERLAY_NAME) return;
 
-    // If this is our overlay => authorization OK
-    if (payload.overlay === OVERLAY_NAME){
-      showReady();
+    // Authorization OK
+    showReady();
 
-      // Optional auto-reset on display
-      if (cssStr("--auto-reset", "false") === "true"){
-        resetParticipants();
-      }
+    // Keep pointer side always up-to-date
+    pointerTargetAngle();
+    readTriggers();
 
-      // Control by server state
-      const st = String(payload.state || "").toLowerCase();
-      if (st === "spin"){
-        spin();
-      } else if (st === "reset" || st === "idle"){
-        resetParticipants();
-      }
-      return;
+    // Optional auto reset on display
+    if ((cssVar("--auto-reset","false") || "false") === "true"){
+      resetParticipants();
     }
 
-    // ignore other overlays
+    const st = String(payload.state || "").toLowerCase();
+    if (st === "spin") spin();
+    if (st === "reset" || st === "idle") resetParticipants();
   });
 
-  // Universal raw_vote
   socket.on("raw_vote", (data) => {
     if (!data) return;
     const msg = String(data.vote || "").trim();
     if (!msg) return;
 
+    readTriggers(); // in case OBS updated
+    pointerTargetAngle();
+
     const up = msg.toUpperCase();
 
-    // Fallback controls via chat
-    if (up === "RESET"){ resetParticipants(); return; }
-    if (up === "SPIN"){ spin(); return; }
+    if (up === resetTrigger){ resetParticipants(); return; }
+    if (up === spinTrigger){ spin(); return; }
 
-    // otherwise treat as name
     addParticipant(msg);
   });
 }
@@ -528,10 +490,12 @@ function init(){
 
   // Wait for OBS CSS injection
   const poll = setInterval(() => {
-    readCssVars();
+    readAuthVars();
+    readTriggers();
+    pointerTargetAngle();
 
     if (AUTH_MODE === "legacy"){
-      if (!ROOM_ID){ return; }
+      if (!ROOM_ID) return;
       clearInterval(poll);
       resizeWheelCanvas();
       resizeConfetti();
@@ -539,7 +503,6 @@ function init(){
       return;
     }
 
-    // strict
     if (ROOM_ID && ROOM_KEY){
       clearInterval(poll);
       resizeWheelCanvas();
@@ -548,9 +511,9 @@ function init(){
     }
   }, 200);
 
-  // If missing keys, after a small grace period => denied (strict)
+  // If missing keys, show denied (strict)
   setTimeout(() => {
-    readCssVars();
+    readAuthVars();
     if (AUTH_MODE === "strict" && (!ROOM_ID || !ROOM_KEY)){
       showDenied();
     }
@@ -561,8 +524,9 @@ function init(){
     resizeConfetti();
   });
 
-  updateCenter();
   resizeWheelCanvas();
+  hideWinner();
+  drawWheel();
 }
 
 init();
