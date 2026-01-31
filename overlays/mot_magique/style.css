@@ -9,7 +9,6 @@ body {
 
 .hidden { display: none !important; }
 
-/* Ecran Sécurité */
 .mdi-security {
     width: 100%; height: 100%; display: flex; align-items: center; 
     justify-content: center; flex-direction: column; background: #000; 
@@ -22,10 +21,8 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    text-align: center;
     padding: var(--panel-padding-y, 30px) var(--panel-padding-x, 50px);
     transition: all 0.5s ease;
-    /* Apparition fluide */
     animation: fadeIn 0.5s ease-out;
 }
 
@@ -52,7 +49,7 @@ body {
     color: var(--start-color, #6b6b6b);
     font-size: var(--start-size, 72px);
     letter-spacing: 2px;
-    transition: color 0.8s ease, font-size 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), text-shadow 0.8s ease;
+    transition: all 0.8s ease;
 }
 
 #golden-word.activated {
