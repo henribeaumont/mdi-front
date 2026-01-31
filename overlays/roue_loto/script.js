@@ -52,28 +52,19 @@ function hideWinner(){
 /* ---------------- Config ---------------- */
 let spinTrigger = "SPIN";
 let resetTrigger = "RESET";
-
 let collectStartTrigger = "INSCRIVEZ UN PSEUDO";
 let collectStopTrigger  = "STOP INSCRIPTION";
 let collectClearTrigger = "CLEAR INSCRIPTION";
 
-/* IMPORTANT : si true, on bloque SPIN tant que collecte ON */
 let blockSpinWhileCollecting = true;
-
-/* Sécurité SPIN */
 let spinCooldownMs = 1800;
-
-/* TTL anti-replay générique */
 let replayTtlMs = 300000;
 
-/* Limites prénoms */
 let minNameLen = 1;
 let maxNameLen = 18;
 let maxParticipants = 48;
 
-/* Comportement au START */
 let clearOnStart = true;
-
 let pointerSide = "right";
 
 function readConfig(){
@@ -103,17 +94,10 @@ function readConfig(){
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
 }
 
-/* ---------------- Anti replay & PRESTART barrier ---------------- */
-/**
- * On tient 2 mécanismes complémentaires :
- * 1) REPLAY TTL: ignore les doublons identiques sur une fenêtre de temps.
- * 2) PRESTART BARRIER: tout ce qui a été vu AVANT "START" est blacklisté
- *    et restera blacklisté même si ça revient plus tard (reliquats).
- */
-
-const TTL_SEEN = new Map();     // fp -> ts
-const PRESTART = new Set();     // fp vus avant START (et donc à ignorer en collecte)
-const PRESTART_CMD = new Set(); // fp commandes vues avant START (protection SPIN fantôme)
+/* ---------------- PRESTART barrier + TTL anti replay ---------------- */
+const TTL_SEEN = new Map();     // fp -> ts (anti spam)
+const PRESTART = new Set();     // fp vus avant START (à ignorer pendant collecte)
+const PRESTART_CMD = new Set(); // commandes vues avant START (anti spin fantôme)
 
 function fingerprint(user, text){
   const u = (user && String(user).trim()) ? String(user).trim().toLowerCase() : "";
@@ -140,18 +124,18 @@ function isReplayTTL(user, text){
 function notePrestart(user, text){
   const fp = fingerprint(user, text);
   PRESTART.add(fp);
-  // commandes uniquement
+
   const up = String(text || "").trim().toUpperCase();
-  if (up) PRESTART_CMD.add(fp);
+  if (up === collectStartTrigger || up === collectStopTrigger || up === collectClearTrigger || up === spinTrigger || up === resetTrigger) {
+    PRESTART_CMD.add(fp);
+  }
 }
 
 function wasSeenPrestart(user, text){
-  const fp = fingerprint(user, text);
-  return PRESTART.has(fp);
+  return PRESTART.has(fingerprint(user, text));
 }
 function wasCommandSeenPrestart(user, text){
-  const fp = fingerprint(user, text);
-  return PRESTART_CMD.has(fp);
+  return PRESTART_CMD.has(fingerprint(user, text));
 }
 
 /* ---------------- Names ---------------- */
@@ -178,7 +162,7 @@ function isValidName(name){
   return true;
 }
 
-/* ---------------- Canvas: Wheel ---------------- */
+/* ---------------- Wheel render ---------------- */
 const wheelCanvas = document.getElementById("wheel");
 const wheelCtx = wheelCanvas.getContext("2d");
 
@@ -370,12 +354,7 @@ function tickConfetti(ts){
   requestAnimationFrame(tickConfetti);
 }
 
-/* ---------------- State machine (robuste) ---------------- */
-/**
- * IDLE:   collecte OFF, ignore noms, ignore SPIN
- * COLLECTING: collecte ON, accepte noms, ignore SPIN si blockSpinWhileCollecting
- * READY:  collecte OFF, liste figée, SPIN autorisé
- */
+/* ---------------- State machine ---------------- */
 let phase = "IDLE"; // "IDLE" | "COLLECTING" | "READY"
 
 function clearAllForNewSession(){
@@ -423,8 +402,8 @@ function spin(){
   const now = Date.now();
 
   if (spinning) return;
-  if (phase !== "READY") return;               // ✅ SPIN uniquement en READY
-  if (participants.length < 2) return;         // ✅ pas assez de joueurs
+  if (phase !== "READY") return;
+  if (participants.length < 2) return;
   if (now - lastSpinAt < spinCooldownMs) return;
 
   lastSpinAt = now;
@@ -471,8 +450,6 @@ function spin(){
     elWinnerName.textContent = participants[winnerIndex]?.name || "";
     document.documentElement.classList.add("mdi-show-winner");
     startConfetti();
-
-    // on reste en READY pour pouvoir re-spin sans recollect si tu veux
   }
 }
 
@@ -508,7 +485,6 @@ function initSocket(){
     showReady();
     readConfig();
 
-    // reset visuel optionnel
     if ((cssVar("--auto-reset","false") || "false") === "true"){
       clearAllForNewSession();
     } else {
@@ -516,8 +492,9 @@ function initSocket(){
       drawWheel();
     }
 
-    // ✅ point clé : au chargement, on est en IDLE et on blackliste tout avant START
     phase = "IDLE";
+    // On repart avec des sets qui peuvent grossir avec la session : OK.
+    // PRESTART est volontairement conservé pour empêcher les reliquats d'historique.
   });
 
   socket.on("raw_vote", (data) => {
@@ -530,69 +507,77 @@ function initSocket(){
     const user = data.user || "";
     const up = msg.toUpperCase();
 
-    // 1) TTL anti replay (très utile)
+    // TTL anti-spam
     if (isReplayTTL(user, msg)) return;
 
-    // 2) Tant qu’on n’a pas démarré la collecte, on stocke en PRESTART et on ignore
-    //    (c’est ce qui élimine les reliquats, même s’ils reviennent en retard)
+    /* ==========================================================
+       ✅ FIX CRITIQUE :
+       En IDLE, on traite les commandes AVANT notePrestart()
+       Sinon START est auto-bloqué.
+    ========================================================== */
     if (phase === "IDLE") {
-      notePrestart(user, msg);
-
-      // START est la seule commande active en IDLE (mais protégée contre reliquat)
+      // START
       if (up === collectStartTrigger) {
-        // Si ce START est un reliquat (déjà vu en prestart), on ignore
+        // si ce START était déjà vu préstart (reliquat), on ignore
         if (wasCommandSeenPrestart(user, msg)) return;
 
         if (clearOnStart) clearAllForNewSession();
-        phase = "COLLECTING";
         hideWinner();
+        phase = "COLLECTING";
+        // maintenant seulement on peut l'enregistrer (optionnel)
+        return;
       }
 
-      // CLEAR / RESET aussi autorisés en IDLE (mais idem : pas depuis reliquats)
+      // CLEAR / RESET
       if (up === collectClearTrigger || up === resetTrigger) {
         if (wasCommandSeenPrestart(user, msg)) return;
         clearAllForNewSession();
         phase = "IDLE";
+        return;
       }
 
+      // Tout le reste en IDLE = prestart blacklist
+      notePrestart(user, msg);
       return;
     }
 
-    // 3) COLLECTING / READY : on ignore tout message qui était vu avant START
-    //    -> c’est le “verrou” robuste anti-historique
+    /* ==========================================================
+       Après START :
+       - on ignore tout ce qui existait avant START (reliquat/historique)
+    ========================================================== */
     if (wasSeenPrestart(user, msg)) return;
 
-    // --- COMMANDES ---
+    // CLEAR/RESET -> retour IDLE
     if (up === collectClearTrigger || up === resetTrigger) {
       clearAllForNewSession();
       phase = "IDLE";
       return;
     }
 
+    // STOP -> READY
     if (up === collectStopTrigger) {
-      // Stop la collecte et fige la liste
       phase = "READY";
       return;
     }
 
+    // START pendant session -> relance collecte nouvelle session
     if (up === collectStartTrigger) {
-      // relance une collecte (nouvelle session)
       if (clearOnStart) clearAllForNewSession();
-      phase = "COLLECTING";
       hideWinner();
+      phase = "COLLECTING";
       return;
     }
 
+    // SPIN
     if (up === spinTrigger) {
-      // ✅ SPIN ne fonctionne que si READY
       if (blockSpinWhileCollecting && phase === "COLLECTING") return;
       if (phase !== "READY") return;
       spin();
       return;
     }
 
-    // --- INSCRIPTION ---
-    if (phase !== "COLLECTING") return; // en READY on n'ajoute plus de prénoms
+    // Inscription
+    if (phase !== "COLLECTING") return;
     addParticipant(msg);
   });
 }
