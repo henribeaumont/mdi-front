@@ -66,6 +66,7 @@ let maxParticipants = 48;
 
 let clearOnStart = true;
 let pointerSide = "right";
+let collectWarmupMs = 1200;
 
 function readConfig(){
   spinTrigger  = (cssVar("--spin-trigger","SPIN") || "SPIN").trim().toUpperCase();
@@ -92,50 +93,49 @@ function readConfig(){
 
   const flip = cssOnOff("--pointer-rotate-180", true);
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
+
+  collectWarmupMs = clamp(cssNum("--collect-warmup-ms", 1200), 0, 6000);
 }
 
-/* ---------------- PRESTART barrier + TTL anti replay ---------------- */
-const TTL_SEEN = new Map();     // fp -> ts (anti spam)
-const PRESTART = new Set();     // fp vus avant START (à ignorer pendant collecte)
-const PRESTART_CMD = new Set(); // commandes vues avant START (anti spin fantôme)
-
-function fingerprint(user, text){
-  const u = (user && String(user).trim()) ? String(user).trim().toLowerCase() : "";
-  const t = String(text || "").trim().toLowerCase();
-  return u ? `${u}::${t}` : `::${t}`;
+/* ---------------- TEXT-ONLY Anti replay (robuste avec user aléatoire) ---------------- */
+function normTextKey(text){
+  return String(text || "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
-function isReplayTTL(user, text){
+const TTL_TEXT = new Map(); // textKey -> ts
+function isReplayTTL_textOnly(text){
   const now = Date.now();
-  const fp = fingerprint(user, text);
-  const prev = TTL_SEEN.get(fp) || 0;
-  if (prev && (now - prev) < replayTtlMs) return true;
-  TTL_SEEN.set(fp, now);
+  const k = normTextKey(text);
+  if (!k) return true;
 
-  if (TTL_SEEN.size > 2000){
+  const prev = TTL_TEXT.get(k) || 0;
+  if (prev && (now - prev) < replayTtlMs) return true;
+  TTL_TEXT.set(k, now);
+
+  if (TTL_TEXT.size > 1500){
     const limit = now - replayTtlMs;
-    for (const [k, ts] of TTL_SEEN.entries()){
-      if (ts < limit) TTL_SEEN.delete(k);
+    for (const [key, ts] of TTL_TEXT.entries()){
+      if (ts < limit) TTL_TEXT.delete(key);
     }
   }
   return false;
 }
 
-function notePrestart(user, text){
-  const fp = fingerprint(user, text);
-  PRESTART.add(fp);
+/* ---------------- Barrier anti-reliquat ----------------
+   Avant START : on ignore tout.
+   Au START : on active COLLECTING mais on ignore aussi pendant warmupMs
+              (reflush des vieux messages du chat).
+*/
+let phase = "IDLE"; // IDLE | COLLECTING | READY
+let barrierUntilTs = 0;
+const seenBeforeStart = new Set(); // textKey vu avant START (blacklist hard)
 
-  const up = String(text || "").trim().toUpperCase();
-  if (up === collectStartTrigger || up === collectStopTrigger || up === collectClearTrigger || up === spinTrigger || up === resetTrigger) {
-    PRESTART_CMD.add(fp);
-  }
+function noteBeforeStart(text){
+  const k = normTextKey(text);
+  if (k) seenBeforeStart.add(k);
 }
-
-function wasSeenPrestart(user, text){
-  return PRESTART.has(fingerprint(user, text));
-}
-function wasCommandSeenPrestart(user, text){
-  return PRESTART_CMD.has(fingerprint(user, text));
+function isBeforeStartText(text){
+  return seenBeforeStart.has(normTextKey(text));
 }
 
 /* ---------------- Names ---------------- */
@@ -354,9 +354,7 @@ function tickConfetti(ts){
   requestAnimationFrame(tickConfetti);
 }
 
-/* ---------------- State machine ---------------- */
-let phase = "IDLE"; // "IDLE" | "COLLECTING" | "READY"
-
+/* ---------------- Session helpers ---------------- */
 function clearAllForNewSession(){
   participants = [];
   winnerIndex = -1;
@@ -492,9 +490,11 @@ function initSocket(){
       drawWheel();
     }
 
+    // Reset logique de session
     phase = "IDLE";
-    // On repart avec des sets qui peuvent grossir avec la session : OK.
-    // PRESTART est volontairement conservé pour empêcher les reliquats d'historique.
+    barrierUntilTs = 0;
+    // seenBeforeStart: volontairement conservé pendant la vie de la page,
+    // car il sert à blacklister l'historique du chat déjà relu.
   });
 
   socket.on("raw_vote", (data) => {
@@ -504,71 +504,70 @@ function initSocket(){
     const msg = String(data.vote || "").trim();
     if (!msg) return;
 
-    const user = data.user || "";
-    const up = msg.toUpperCase();
+    // Anti-spam robuste: texte-only (user est aléatoire côté extension)
+    if (isReplayTTL_textOnly(msg)) return;
 
-    // TTL anti-spam
-    if (isReplayTTL(user, msg)) return;
+    const up = normTextKey(msg);
 
-    /* ==========================================================
-       ✅ FIX CRITIQUE :
-       En IDLE, on traite les commandes AVANT notePrestart()
-       Sinon START est auto-bloqué.
-    ========================================================== */
+    // ---- IDLE : on ignore tout, sauf les commandes START / CLEAR / RESET
     if (phase === "IDLE") {
-      // START
       if (up === collectStartTrigger) {
-        // si ce START était déjà vu préstart (reliquat), on ignore
-        if (wasCommandSeenPrestart(user, msg)) return;
-
         if (clearOnStart) clearAllForNewSession();
         hideWinner();
         phase = "COLLECTING";
-        // maintenant seulement on peut l'enregistrer (optionnel)
+
+        // barrière anti-reliquat : on ignore les "flush" de vieux messages
+        barrierUntilTs = Date.now() + collectWarmupMs;
+
+        // IMPORTANT: on ne “blackliste” pas le START lui-même,
+        // sinon tu peux te bloquer sur un second START.
         return;
       }
 
-      // CLEAR / RESET
       if (up === collectClearTrigger || up === resetTrigger) {
-        if (wasCommandSeenPrestart(user, msg)) return;
         clearAllForNewSession();
         phase = "IDLE";
+        barrierUntilTs = 0;
         return;
       }
 
-      // Tout le reste en IDLE = prestart blacklist
-      notePrestart(user, msg);
+      // tout ce qu'on voit en IDLE = historisé comme reliquat
+      noteBeforeStart(msg);
       return;
     }
 
-    /* ==========================================================
-       Après START :
-       - on ignore tout ce qui existait avant START (reliquat/historique)
-    ========================================================== */
-    if (wasSeenPrestart(user, msg)) return;
+    // ---- Après START : on ignore TOUT ce qui appartenait à l'historique
+    // et on ignore aussi pendant la fenêtre warmup
+    if (Date.now() < barrierUntilTs) {
+      noteBeforeStart(msg);
+      return;
+    }
+    if (isBeforeStartText(msg)) return;
 
-    // CLEAR/RESET -> retour IDLE
+    // ---- CLEAR / RESET : revient en IDLE (re-collect possible)
     if (up === collectClearTrigger || up === resetTrigger) {
       clearAllForNewSession();
       phase = "IDLE";
+      barrierUntilTs = 0;
       return;
     }
 
-    // STOP -> READY
+    // ---- STOP : fige (READY)
     if (up === collectStopTrigger) {
       phase = "READY";
       return;
     }
 
-    // START pendant session -> relance collecte nouvelle session
+    // ---- START pendant session : relance une nouvelle collecte
     if (up === collectStartTrigger) {
       if (clearOnStart) clearAllForNewSession();
       hideWinner();
       phase = "COLLECTING";
+      barrierUntilTs = Date.now() + collectWarmupMs;
       return;
     }
 
-    // SPIN
+    // ---- SPIN : uniquement READY, jamais en auto
     if (up === spinTrigger) {
       if (blockSpinWhileCollecting && phase === "COLLECTING") return;
       if (phase !== "READY") return;
@@ -576,7 +575,7 @@ function initSocket(){
       return;
     }
 
-    // Inscription
+    // ---- Inscription : uniquement COLLECTING
     if (phase !== "COLLECTING") return;
     addParticipant(msg);
   });
