@@ -1,35 +1,25 @@
-/* ==========================================================
-   MDI EMOJIS TORNADO - V6.2 SaaS (TRUE TORNADO + PROPORTIONS)
-   Overlay code : emojis_tornado
-   - ZERO FLICKER : visible seulement après overlay:state
-   - Sécurité : --room-id / --room-key via CSS OBS
-   ========================================================== */
-
 :root{
-  /* --- 🔐 ACCÈS / MODE --- */
-  --auth-mode: "strict";     /* "strict" | "legacy" */
+  --auth-mode: "strict";
 
-  /* --- 🌪️ TORNADO : PARAMÈTRES PILOTES (OBS) --- */
-  --tornado-density: 0.30;   /* 0.05 faible → 0.90 très dense */
-  --tornado-width: 0.40;     /* 0.10 étroit → 1.0 très large */
-  --tornado-rise-speed: 1.00;/* 0.4 lent → 2.5 rapide */
-  --emoji-opacity: 0.90;     /* 0.1 → 1 */
+  --tornado-density: 0.30;
+  --tornado-width: 0.40;
+  --tornado-rise-speed: 1.00;
+  --emoji-opacity: 0.90;
 
-  /* --- 🎛️ LIMITES PROTECTION --- */
-  --particle-max: 220;       /* max emojis simultanés */
-  --history-window: 220;     /* fenêtre glissante (en "occurrences d'emojis") */
+  --particle-max: 220;
+  --history-window: 220;
 
-  /* --- 🧠 COMPORTEMENT --- */
-  --only-emoji-messages: "on"; /* "on" ignore les messages sans emoji */
+  --only-emoji-messages: "on";
   --auto-reset: "false";
 
-  /* --- ⭐ SEED (EMOJIS PAR DÉFAUT AU DÉMARRAGE) --- */
-  --seed-enabled: "on";                 /* "on" | "off" */
-  --seed-emojis: "✨,🔥,❤️,😂";          /* liste séparée par virgules */
-  --seed-mode: "blend";                 /* "seed-only" | "blend" | "chat-only" */
+  --seed-enabled: "on";
+  --seed-emojis: "✨,🔥,❤️,😂";
+  --seed-mode: "blend";
+
+  /* ✅ NOUVEAU : hauteur de tornade (1.0 = plein écran) */
+  --tornado-height: 1.00; /* 0.5 → 1.0 */
 }
 
-/* base */
 html, body{
   margin:0; padding:0;
   width:100vw; height:100vh;
@@ -38,24 +28,17 @@ html, body{
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
-.hidden{
-  display:none !important;
-  opacity:0 !important;
-}
+.hidden{ display:none !important; opacity:0 !important; }
 
-/* Écran sécurité */
 .mdi-security{
   width:100%; height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  display:flex; align-items:center; justify-content:center;
   flex-direction:column;
   background:#000;
   color:#ff2d2d;
   z-index:100;
 }
 
-/* Croix rouge fiable (2 barres) */
 .mdi-x{
   width: 86px;
   height: 86px;
@@ -63,8 +46,7 @@ html, body{
   margin-bottom: 14px;
   filter: drop-shadow(0 6px 18px rgba(255,45,45,0.35));
 }
-.mdi-x::before,
-.mdi-x::after{
+.mdi-x::before, .mdi-x::after{
   content:"";
   position:absolute;
   top: 50%;
@@ -86,7 +68,6 @@ html, body{
   color:#ff2d2d;
 }
 
-/* Container */
 .mdi-container{
   position:absolute;
   inset:0;
@@ -94,7 +75,6 @@ html, body{
   height:100%;
   background: transparent;
 }
-
 #stage{
   position:absolute;
   inset:0;
