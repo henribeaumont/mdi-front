@@ -1,20 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');
 
 body {
-    background: transparent;
-    margin: 0;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    background: transparent; margin: 0;
+    width: 100vw; height: 100vh; overflow: hidden;
+    display: flex; justify-content: center; align-items: center;
     font-family: var(--font-family, 'Montserrat', sans-serif);
 }
 
 .hidden { display: none !important; }
 
-/* Écran sécurité standard MDI */
 .mdi-security {
     width: 100%; height: 100%; display: flex; align-items: center; 
     justify-content: center; flex-direction: column; background: #000; 
@@ -23,12 +17,15 @@ body {
 
 #container {
     position: relative;
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: var(--panel-padding-y, 18px) var(--panel-padding-x, 26px);
-    border-radius: var(--panel-radius, 22px);
+    justify-content: center; /* Centrage vertical */
+    text-align: center;      /* Centrage horizontal */
+    padding: var(--panel-padding-y, 30px) var(--panel-padding-x, 50px);
+    min-width: 200px;
+    /* On évite les changements de taille brutaux */
+    transition: all 0.5s ease;
 }
 
 #container::before {
@@ -38,38 +35,30 @@ body {
     background: var(--panel-bg-color, #0A0F1E);
     opacity: var(--panel-bg-opacity, 0.75);
     border-radius: var(--panel-radius, 22px);
-    z-index: 0;
+    z-index: -1;
 }
-
-#container > * { position: relative; z-index: 1; }
 
 #golden-word {
     font-weight: 900;
     text-transform: uppercase;
     white-space: nowrap;
-    line-height: 1.05;
+    line-height: 1;
     color: var(--start-color, #6b6b6b);
     font-size: var(--start-size, 72px);
-    letter-spacing: 5px;
-    transition: all 0.7s ease;
+    letter-spacing: 2px;
+    /* Transitions douces pour éviter le tressautement */
+    transition: color 0.8s ease, font-size 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), text-shadow 0.8s ease;
 }
 
 #golden-word.activated {
     color: var(--end-color, #ffd700);
     font-size: var(--end-size, 140px);
-    letter-spacing: 10px;
-    text-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700, 0 0 40px #FF8C00;
-    animation: pulseOr 2s infinite;
-}
-
-@keyframes pulseOr {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.9; }
+    text-shadow: 0 0 15px var(--end-color);
 }
 
 #stats {
-    font-size: 14px;
+    margin-top: 10px;
+    font-size: 16px;
     color: white;
-    opacity: 0.5;
-    font-weight: bold;
+    opacity: 0.6;
 }
