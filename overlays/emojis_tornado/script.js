@@ -1,12 +1,12 @@
 /**
- * MDI EMOJIS TORNADO - V6.1 SaaS (TRUE TORNADO)
+ * MDI EMOJIS TORNADO - V6.2 SaaS (TRUE TORNADO + PROPORTIONS + SEED)
  * Overlay : emojis_tornado
  *
- * Objectifs :
- * - Tornade continue (pas un spawn ponctuel)
- * - Répartition proportionnelle selon les emojis vus dans le chat (fenêtre glissante)
- * - Profondeur 3D : taille + parallax + variation de taille à l'ascension
- * - CSS OBS : vitesse ascension / largeur / transparence / densité
+ * Ajouts V6.2 :
+ * - Seed emojis configurables via CSS OBS (démarrage non vide si voulu)
+ * - Proportionnalité plus fidèle (zéro fallback polluant)
+ * - Turnover plus rapide => proportions visibles plus proches du chat
+ * - Croix rouge gérée en CSS (fiable)
  *
  * Sécurité :
  * - auth via CSS OBS --room-id / --room-key
@@ -18,7 +18,7 @@ const SERVER_URL   = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "emojis_tornado";
 
 /* =========================
-   UTILITAIRES CSS VAR
+   CSS VARS
 ========================= */
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -53,7 +53,7 @@ function showOverlay() {
 }
 
 /* =========================
-   EMOJI EXTRACTION ROBUSTE
+   EMOJI EXTRACTION
 ========================= */
 function isProbablyEmojiSegment(seg) {
   if (!seg) return false;
@@ -70,7 +70,6 @@ function extractEmojisFromText(text) {
   if (!text) return [];
   const s = String(text);
 
-  // Grapheme segmentation = meilleur pour ZWJ/variations
   if (typeof Intl !== "undefined" && Intl.Segmenter) {
     const seg = new Intl.Segmenter("fr", { granularity: "grapheme" });
     const out = [];
@@ -81,7 +80,6 @@ function extractEmojisFromText(text) {
     return out;
   }
 
-  // fallback regex
   try {
     const re = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/gu;
     return Array.from(s.matchAll(re)).map(m => m[0]);
@@ -92,76 +90,112 @@ function extractEmojisFromText(text) {
 }
 
 /* =========================
-   CONFIG (depuis CSS OBS)
+   CONFIG
 ========================= */
+function parseEmojiCSV(csv) {
+  const raw = String(csv || "").split(",").map(x => x.trim()).filter(Boolean);
+  // On ne conserve que les segments emojis
+  const out = [];
+  for (const item of raw) {
+    const ems = extractEmojisFromText(item);
+    if (ems.length) out.push(ems[0]); // un emoji par item
+  }
+  return out;
+}
+
 function readConfig() {
   const density = clamp(cssNum("--tornado-density", 0.30), 0.05, 1.0);
   const width   = clamp(cssNum("--tornado-width", 0.40), 0.10, 1.0);
   const rise    = clamp(cssNum("--tornado-rise-speed", 1.00), 0.30, 3.0);
   const op      = clamp(cssNum("--emoji-opacity", 0.90), 0.05, 1.0);
 
-  const maxP    = clamp(cssNum("--particle-max", 220), 40, 600);
-  const histW   = clamp(cssNum("--history-window", 220), 30, 1000);
+  const maxP    = clamp(cssNum("--particle-max", 220), 40, 700);
+  const histW   = clamp(cssNum("--history-window", 220), 20, 2000);
 
   const onlyEmoji = cssBool("--only-emoji-messages", true);
   const autoReset = cssBool("--auto-reset", false);
 
-  return { density, width, rise, op, maxP, histW, onlyEmoji, autoReset };
+  const seedEnabled = cssBool("--seed-enabled", true);
+  const seedEmojis  = parseEmojiCSV(cssVar("--seed-emojis", "✨,🔥,❤️,😂"));
+  const seedMode    = (cssVar("--seed-mode", "blend") || "blend").toLowerCase(); 
+  // "seed-only" | "blend" | "chat-only"
+
+  return { density, width, rise, op, maxP, histW, onlyEmoji, autoReset, seedEnabled, seedEmojis, seedMode };
 }
 
 let CONFIG = readConfig();
 
 /* =========================
-   DISTRIBUTION PROPORTIONNELLE
-   - on maintient une fenêtre glissante des emojis reçus
-   - on tire au hasard pondéré selon les occurrences
-========================= */
-const emojiCounts = new Map();   // emoji => count
-let totalEmojiCount = 0;
-const emojiHistoryQueue = [];    // liste des emojis vus (fenêtre glissante)
+   DISTRIBUTIONS
+   A) chatDistribution : fenêtre glissante d'emojis vus dans le chat
+   B) seedDistribution : liste fixe au démarrage (optionnelle)
 
-/**
- * Ajoute une liste d'emojis à la distribution (fenêtre glissante)
- */
-function feedEmojiStats(emojis) {
+   Pick strategy :
+   - seed-only : on tire uniquement dans la seed
+   - chat-only : uniquement chat (tornade vide tant que chat vide)
+   - blend     : chat prioritaire, seed en secours si chat vide
+========================= */
+const chatCounts = new Map();
+let chatTotal = 0;
+const chatQueue = [];
+
+function chatAddEmojis(emojis) {
   CONFIG = readConfig();
   const limit = CONFIG.histW;
 
   for (const e of emojis) {
-    // add
-    emojiHistoryQueue.push(e);
-    emojiCounts.set(e, (emojiCounts.get(e) || 0) + 1);
-    totalEmojiCount++;
+    chatQueue.push(e);
+    chatCounts.set(e, (chatCounts.get(e) || 0) + 1);
+    chatTotal++;
 
-    // trim window
-    while (emojiHistoryQueue.length > limit) {
-      const old = emojiHistoryQueue.shift();
-      const prev = emojiCounts.get(old) || 0;
-      if (prev <= 1) emojiCounts.delete(old);
-      else emojiCounts.set(old, prev - 1);
-      totalEmojiCount = Math.max(0, totalEmojiCount - 1);
+    while (chatQueue.length > limit) {
+      const old = chatQueue.shift();
+      const prev = chatCounts.get(old) || 0;
+      if (prev <= 1) chatCounts.delete(old);
+      else chatCounts.set(old, prev - 1);
+      chatTotal = Math.max(0, chatTotal - 1);
     }
   }
 }
 
-/**
- * Tirage pondéré : respecte les proportions
- * Fallback : si pas de stats => étincelle par défaut
- */
-function pickEmojiWeighted() {
-  if (totalEmojiCount <= 0 || emojiCounts.size === 0) return "✨";
-  const r = Math.random() * totalEmojiCount;
+function pickWeightedFromMap(map, total) {
+  if (total <= 0) return null;
+  const r = Math.random() * total;
   let acc = 0;
-  for (const [emoji, c] of emojiCounts.entries()) {
+  for (const [emoji, c] of map.entries()) {
     acc += c;
     if (r <= acc) return emoji;
   }
   // fallback de sécurité
-  return emojiCounts.keys().next().value || "✨";
+  return map.keys().next().value || null;
+}
+
+function pickFromSeedList(seedList) {
+  if (!seedList || seedList.length === 0) return null;
+  return seedList[Math.floor(Math.random() * seedList.length)];
+}
+
+function pickEmoji() {
+  CONFIG = readConfig();
+
+  const hasChat = chatTotal > 0 && chatCounts.size > 0;
+  const hasSeed = CONFIG.seedEnabled && CONFIG.seedEmojis.length > 0;
+
+  if (CONFIG.seedMode === "seed-only") {
+    return hasSeed ? pickFromSeedList(CONFIG.seedEmojis) : null;
+  }
+
+  if (CONFIG.seedMode === "chat-only") {
+    return hasChat ? pickWeightedFromMap(chatCounts, chatTotal) : null;
+  }
+
+  // blend (par défaut) : chat si dispo, seed sinon
+  if (hasChat) return pickWeightedFromMap(chatCounts, chatTotal);
+  return hasSeed ? pickFromSeedList(CONFIG.seedEmojis) : null;
 }
 
 /* =========================
-   MOTEUR "TORNADE CONTINUE" + "PROFONDEUR"
+   RENDER / PHYSIQUE TORNADO
 ========================= */
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d", { alpha: true });
@@ -182,66 +216,71 @@ window.addEventListener("resize", resize);
 resize();
 
 /**
- * Particule (pseudo 3D):
- * - y monte de bas -> haut
- * - angle tourne autour de l'axe (vortex)
- * - radius dépend de width + "z" (profondeur)
- * - z (0..1) : 0 = loin (petit, bouge moins), 1 = proche (grand, bouge plus)
- * - size évolue pendant l'ascension (donne de la profondeur)
+ * Particule pseudo-3D :
+ * - y monte
+ * - angle tourne
+ * - z profondeur : taille, vitesse, alpha, parallax
+ * - taille varie en fonction de la progression (donne du relief)
  */
 const particles = [];
 
-function spawnContinuous(count) {
+function spawnBatch(count) {
   CONFIG = readConfig();
   const { width, rise, maxP } = CONFIG;
 
   const cx = W * 0.5;
-  const baseY = H * 1.05;          // un peu sous l’écran
-  const topY  = H * -0.15;         // un peu au-dessus
+  const baseY = H * 1.05;
+  const topY  = H * -0.15;
+
+  const radiusMax = (W * 0.28) * width;
 
   for (let i = 0; i < count; i++) {
     if (particles.length >= maxP) break;
 
-    const emoji = pickEmojiWeighted();
+    const emoji = pickEmoji();
+    if (!emoji) break; // rien à spawn (chat vide + seed off)
 
-    const z = Math.random();                // profondeur
+    const z = Math.random();
     const angle = rand(0, Math.PI * 2);
     const y = baseY + rand(0, H * 0.25);
 
-    const radiusMax = (W * 0.28) * width;
     const radius = rand(radiusMax * 0.20, radiusMax) * (0.35 + 0.65 * z);
 
-    // vitesse : plus proche => plus rapide légèrement
-    const vy = (H * 0.10) * rise * (0.65 + 0.55 * z); // px/sec
-    const spin = rand(1.4, 3.2) * (0.55 + 0.9 * z);   // rad/sec
+    // montée : plus proche => un peu plus rapide
+    const vy = (H * 0.13) * rise * (0.65 + 0.55 * z); // px/sec
 
-    // taille base: varie selon profondeur
-    const baseSize = (18 + z * 42) * (0.85 + 0.3 * rise); // px
+    // rotation : plus proche => plus de “vortex”
+    const spin = rand(1.6, 3.6) * (0.55 + 0.9 * z);
 
+    // turnover (important pour proportions visibles)
+    // plus rise est grand, plus la vie est courte pour renouveler vite
+    const life = clamp(rand(2.2, 3.4) / (0.75 + 0.35 * rise), 1.2, 4.0);
+
+    const baseSize = (18 + z * 44); // px
     particles.push({
       emoji,
       y, baseY, topY,
-      cx,
       angle,
       radius,
       vy,
       spin,
       z,
       baseSize,
-      wobble: rand(0.6, 1.6),
-      wobbleSpeed: rand(0.6, 1.5),
-      life: rand(3.0, 5.0)
+      wobble: rand(0.7, 1.9),
+      wobbleSpeed: rand(0.7, 1.7),
+      age: 0,
+      life
     });
   }
 }
 
 function step(dt) {
   CONFIG = readConfig();
-  const { op, width, rise } = CONFIG;
+  const { op, width, rise, density } = CONFIG;
 
   ctx.clearRect(0, 0, W, H);
 
-  // tri par profondeur : loin d’abord, proche ensuite (effet 3D)
+  // tri profondeur (loin => proche)
   particles.sort((a, b) => a.z - b.z);
 
   const cx = W * 0.5;
@@ -249,59 +288,60 @@ function step(dt) {
 
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
+    p.age += dt;
 
-    // montée
+    // monte
     p.y -= p.vy * dt;
-
-    // rotation vortex
     p.angle += p.spin * dt;
 
-    // petit wobble (tremblement latéral)
-    const wob = Math.sin((p.y * 0.008) + performance.now() * 0.0015 * p.wobbleSpeed) * (10 * p.wobble);
-
-    // recalcul radius selon profondeur (et légère variation)
-    const r = clamp(p.radius + wob, radiusMax * 0.12, radiusMax);
-
-    // position 2D projetée
-    const x = cx + Math.cos(p.angle) * r * (0.65 + 0.35 * p.z);
-    const y = p.y;
-
-    // alpha : loin => plus transparent, proche => plus opaque
-    const depthAlpha = 0.35 + 0.65 * p.z;
-
-    // variation de taille pendant l'ascension :
-    // en bas -> un peu plus gros, en haut -> un peu plus petit (effet perspective)
-    const progress = clamp((p.baseY - p.y) / (p.baseY - p.topY), 0, 1);
-    const sizePulse = 0.85 + 0.25 * Math.sin(progress * Math.PI); // grossit au milieu
-    const size = p.baseSize * sizePulse;
-
-    // culling : hors écran haut
-    if (p.y < p.topY) {
+    // expire par âge ou hors champ
+    if (p.age >= p.life || p.y < p.topY) {
       particles.splice(i, 1);
       continue;
     }
 
-    // draw
+    // wobble
+    const wob = Math.sin((p.y * 0.008) + performance.now() * 0.0015 * p.wobbleSpeed) * (10 * p.wobble);
+
+    // radius dynamique (borné)
+    const r = clamp(p.radius + wob, radiusMax * 0.12, radiusMax);
+
+    // projection 2D + parallax
+    const x = cx + Math.cos(p.angle) * r * (0.65 + 0.35 * p.z);
+    const y = p.y;
+
+    // alpha profondeur
+    const depthAlpha = 0.35 + 0.65 * p.z;
+
+    // taille varie pendant ascension (grossit puis rétrécit)
+    const progress = clamp((p.baseY - p.y) / (p.baseY - p.topY), 0, 1);
+    const sizePulse = 0.82 + 0.30 * Math.sin(progress * Math.PI);
+    const size = p.baseSize * sizePulse;
+
     ctx.save();
     ctx.globalAlpha = op * depthAlpha;
+
     ctx.translate(x, y);
-    // rotation légère pour “vivant”
     ctx.rotate(Math.sin(p.angle) * 0.08);
+
     ctx.font = `${Math.floor(size)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji", ui-sans-serif, system-ui`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(p.emoji, 0, 0);
+
     ctx.restore();
   }
 
-  // maintien d'une tornade continue :
-  // target = densité * surface (adaptatif à la taille écran) + rise (plus vite => plus d’émission)
-  const target = Math.floor((W * H) / 45000 * CONFIG.density * (0.9 + 0.4 * rise));
-  const missing = Math.max(0, target - particles.length);
+  // Tornade continue : cible adaptative
+  // NOTE: si pas d’emojis (chat vide + seed off), target = 0 => overlay vide (volontaire)
+  const canSpawn = !!pickEmoji();
+  const baseTarget = Math.floor((W * H) / 45000 * density * (0.95 + 0.45 * rise));
+  const target = canSpawn ? baseTarget : 0;
 
-  // spawn par petits paquets pour lisser
+  const missing = Math.max(0, target - particles.length);
   if (missing > 0) {
-    spawnContinuous(Math.min(18, missing));
+    // spawn lissé
+    spawnBatch(Math.min(22, missing));
   }
 }
 
@@ -322,11 +362,6 @@ function start() {
   lastT = performance.now();
   rafId = requestAnimationFrame(loop);
 }
-function stop() {
-  running = false;
-  if (rafId) cancelAnimationFrame(rafId);
-  rafId = null;
-}
 
 /* =========================
    SOCKET + AUTH
@@ -334,7 +369,7 @@ function stop() {
 const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
 async function init() {
-  await new Promise(r => setTimeout(r, 600)); // injection CSS OBS
+  await new Promise(r => setTimeout(r, 650)); // injection CSS OBS
 
   const authMode = (cssVar("--auth-mode", "strict") || "strict").toLowerCase();
   const room = cssVar("--room-id", "");
@@ -356,14 +391,15 @@ async function init() {
     if (payload?.overlay !== OVERLAY_TYPE) return;
 
     CONFIG = readConfig();
+
     if (CONFIG.autoReset) {
       particles.length = 0;
-      emojiCounts.clear();
-      emojiHistoryQueue.length = 0;
-      totalEmojiCount = 0;
+      chatCounts.clear();
+      chatQueue.length = 0;
+      chatTotal = 0;
     }
 
-    // ✅ Anti-flicker : apparition seulement après validation serveur
+    // apparition après validation serveur
     showOverlay();
     start();
   });
@@ -377,19 +413,20 @@ async function init() {
     CONFIG = readConfig();
     if (CONFIG.onlyEmoji && emojis.length === 0) return;
 
-    // Alimente la distribution => modifie la tornade en temps réel (proportions)
     if (emojis.length > 0) {
-      feedEmojiStats(emojis);
-      // Petit boost instantané quand un message emoji arrive
-      spawnContinuous(Math.min(10, emojis.length * 3));
+      // 🔥 Alimente la distribution chat => proportions
+      chatAddEmojis(emojis);
+
+      // boost immédiat (sans casser proportions : ça ne modifie pas les stats, juste l'affichage rapide)
+      spawnBatch(Math.min(14, emojis.length * 4));
     }
   });
 
   socket.on("overlay:reset", () => {
     particles.length = 0;
-    emojiCounts.clear();
-    emojiHistoryQueue.length = 0;
-    totalEmojiCount = 0;
+    chatCounts.clear();
+    chatQueue.length = 0;
+    chatTotal = 0;
   });
 }
 
