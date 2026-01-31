@@ -1,29 +1,27 @@
 /* ==========================================================
-   MDI EMOJIS TORNADO - V6 SaaS (ZERO FLICKER)
+   MDI EMOJIS TORNADO - V6.1 SaaS (TRUE TORNADO)
    Overlay code : emojis_tornado
-   Sécurité : --room-id / --room-key via CSS OBS
+   - ZERO FLICKER : visible seulement après overlay:state
+   - Sécurité : --room-id / --room-key via CSS OBS
    ========================================================== */
 
 :root{
   /* --- 🔐 ACCÈS / MODE --- */
   --auth-mode: "strict";     /* "strict" | "legacy" */
 
-  /* --- 🌪️ RÉGLAGES TORNADE --- */
-  --particle-density: 0.15;  /* Intensité : 0.01 (calme) → 0.5 (tempête) */
-  --particle-max: 80;        /* Max emojis simultanés à l'écran */
+  /* --- 🌪️ TORNADO : PARAMÈTRES PILOTES (OBS) --- */
+  --tornado-density: 0.30;   /* 0.05 faible → 0.90 très dense */
+  --tornado-width: 0.40;     /* 0.10 étroit → 1.0 très large */
+  --tornado-rise-speed: 1.00;/* 0.4 lent → 2.5 rapide */
+  --emoji-opacity: 0.90;     /* 0.1 → 1 */
 
-  /* --- ✨ APPARENCE --- */
-  --particle-opacity: 0.85;  /* 0.1 → 1.0 */
-  --particle-size-min: 25;   /* px */
-  --particle-size-max: 55;   /* px */
-
-  /* --- ⚙️ PHYSIQUE --- */
-  --particle-spread: 0.40;   /* 0.10 étroit → 1.0 large */
-  --velocity-base: 2.5;      /* vitesse de montée */
+  /* --- 🎛️ LIMITES PROTECTION --- */
+  --particle-max: 220;       /* max emojis simultanés */
+  --history-window: 220;     /* taille de la fenêtre de stats (messages emojis) */
 
   /* --- 🧠 COMPORTEMENT --- */
-  --only-emoji-messages: "on"; /* "on" : ignore les messages sans emoji */
-  --auto-reset: "false";       /* "true" : vide à chaque affichage */
+  --only-emoji-messages: "on"; /* "on" ignore les messages sans emoji */
+  --auto-reset: "false";
 }
 
 /* base */
@@ -40,7 +38,7 @@ html, body{
   opacity:0 !important;
 }
 
-/* Écran sécurité (immuable) */
+/* Écran sécurité */
 .mdi-security{
   width:100%; height:100%;
   display:flex;
