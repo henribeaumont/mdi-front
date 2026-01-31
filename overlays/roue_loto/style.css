@@ -1,28 +1,39 @@
 /* ==========================================================
-   MDI • ROUE LOTO — V1.1 SaaS (ZERO FLICKER)
-   - Panel transparent
-   - Aucun texte hors prénoms sur la roue
-   - Winner en fondu uniquement après spin
-   - Aiguille gauche/droite via CSS OBS
+   MDI • ROUE LOTO — V1.2 SaaS (ROBUSTE)
+   - Déduplication côté JS (voir script.js)
+   - Mode inscription sécurisé via prefix (recommandé)
+   - Aiguille : flip 180° + chevauchement configurable
+   - Winner : panel + responsive
    ========================================================== */
 
 :root{
-  --wheel-size: 820px;          /* taille roue */
-  --wheel-stroke: 16px;         /* contour */
-  --wheel-text-size: 30px;      /* taille prénoms */
+  --wheel-size: 820px;
+  --wheel-stroke: 16px;
+  --wheel-text-size: 30px;
   --wheel-text-weight: 900;
 
   /* Aiguille */
-  --pointer-side: "right";      /* "right" | "left" */
+  --pointer-side: "right";         /* "right" | "left" */
   --pointer-size: 34px;
   --pointer-color: #ffffff;
 
+  /* ✅ Ajustements demandés */
+  --pointer-rotate-180: "on";      /* "on" = rotation 180° */
+  --pointer-overlap: 0.50;         /* 0..1  (0 = dehors / 0.5 = moitié sur la roue) */
+
   /* Winner */
-  --winner-font-size: 140px;
+  --winner-panel-bg: rgba(10,15,30,0.78);
+  --winner-panel-border: rgba(255,255,255,0.18);
+  --winner-panel-radius: 999px;
+  --winner-panel-pad-y: 22px;
+  --winner-panel-pad-x: 38px;
+
+  --winner-font-min: 44px;
+  --winner-font-max: 140px;
   --winner-shadow: 0 14px 45px rgba(0,0,0,0.85);
 
   /* Confetti */
-  --winner-confetti: "on";      /* "on" | "off" */
+  --winner-confetti: "on";
   --confetti-density: 180;
   --confetti-duration-ms: 2200;
 }
@@ -67,7 +78,6 @@ html.mdi-denied #security-screen { display: flex; }
   font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-/* IMPORTANT : pas de panel, fond transparent */
 .stage{
   position: relative;
   display: grid;
@@ -86,9 +96,10 @@ html.mdi-denied #security-screen { display: flex; }
 
 /* =========================
    AIGUILLE (pointe vers centre)
+   + rotation 180° (option)
+   + chevauchement
    ========================= */
 
-/* Par défaut on place l'aiguille au milieu vertical */
 .pointer{
   position: absolute;
   top: 50%;
@@ -98,26 +109,34 @@ html.mdi-denied #security-screen { display: flex; }
   filter: drop-shadow(0 12px 18px rgba(0,0,0,0.45));
 }
 
-/* Aiguille à DROITE -> pointe vers la GAUCHE (centre) */
 html[data-pointer-side="right"] .pointer{
-  left: calc(50% + (var(--wheel-size) / 2) + (var(--pointer-size) * 0.15));
+  /* position: bord droit de la roue - overlap */
+  left: calc(
+    50% + (var(--wheel-size) / 2) - (var(--pointer-size) * 1.6 * var(--pointer-overlap))
+  );
   border-top: var(--pointer-size) solid transparent;
   border-bottom: var(--pointer-size) solid transparent;
   border-left: calc(var(--pointer-size) * 1.6) solid var(--pointer-color);
 }
 
-/* Aiguille à GAUCHE -> pointe vers la DROITE (centre) */
 html[data-pointer-side="left"] .pointer{
-  left: calc(50% - (var(--wheel-size) / 2) - (var(--pointer-size) * 1.75));
+  left: calc(
+    50% - (var(--wheel-size) / 2) - (var(--pointer-size) * 1.6) + (var(--pointer-size) * 1.6 * var(--pointer-overlap))
+  );
   border-top: var(--pointer-size) solid transparent;
   border-bottom: var(--pointer-size) solid transparent;
   border-right: calc(var(--pointer-size) * 1.6) solid var(--pointer-color);
 }
 
-/* =========================
-   WINNER (apparition après spin)
-   ========================= */
+/* Rotation 180° (demandée) */
+html.mdi-pointer-flip .pointer{
+  transform: translateY(-50%) rotate(180deg);
+}
 
+/* =========================
+   WINNER (fondu après spin)
+   + panel responsive
+   ========================= */
 .winner{
   position: absolute;
   inset: 0;
@@ -125,7 +144,7 @@ html[data-pointer-side="left"] .pointer{
   place-items: center;
   z-index: 30;
   opacity: 0;
-  transform: scale(0.96);
+  transform: scale(0.98);
   transition: opacity 420ms ease, transform 420ms ease;
   pointer-events: none;
 }
@@ -135,20 +154,31 @@ html.mdi-show-winner .winner{
   transform: scale(1);
 }
 
+.winner-panel{
+  max-width: 86%;
+  background: var(--winner-panel-bg);
+  border: 4px solid var(--winner-panel-border);
+  border-radius: var(--winner-panel-radius);
+  padding: var(--winner-panel-pad-y) var(--winner-panel-pad-x);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+  text-align: center;
+}
+
 .winner-name{
+  display: block;
   font-weight: 900;
-  font-size: var(--winner-font-size);
+  /* responsive: reste contenu */
+  font-size: clamp(var(--winner-font-min), 7vw, var(--winner-font-max));
+  line-height: 1.05;
   color: #fff;
   text-shadow: var(--winner-shadow);
-  padding: 0 40px;
-  text-align: center;
-  max-width: 92%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Confetti canvas overlay */
+/* Confetti */
 .confetti{
   position: fixed;
   inset: 0;
