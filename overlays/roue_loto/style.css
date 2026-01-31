@@ -9,8 +9,8 @@
   --pointer-color: #ffffff;
 
   --pointer-rotate-180: "on";
-  /* ✅ PLUS PROCHE : 0.62 = chevauchement plus marqué */
-  --pointer-overlap: 0.62;
+  /* ✅ encore plus proche par défaut */
+  --pointer-overlap: 0.78;
 
   --winner-panel-bg: rgba(10,15,30,0.78);
   --winner-panel-border: rgba(255,255,255,0.18);
@@ -35,8 +35,7 @@ html.mdi-denied #security-screen { display: flex; }
 
 #security-screen{
   position: fixed; inset: 0;
-  display: flex;
-  justify-content: center; align-items: center;
+  display: flex; justify-content: center; align-items: center;
   flex-direction: column;
   background: #000;
   text-align: center;
@@ -111,11 +110,7 @@ html.mdi-pointer-flip .pointer{
   transition: opacity 420ms ease, transform 420ms ease;
   pointer-events: none;
 }
-
-html.mdi-show-winner .winner{
-  opacity: 1;
-  transform: scale(1);
-}
+html.mdi-show-winner .winner{ opacity: 1; transform: scale(1); }
 
 .winner-panel{
   max-width: 86%;
@@ -127,7 +122,6 @@ html.mdi-show-winner .winner{
   box-shadow: 0 18px 45px rgba(0,0,0,0.35);
   text-align: center;
 }
-
 .winner-name{
   display: block;
   font-weight: 900;
