@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MDI • Roue Loto</title>
+
+  <!-- Montserrat (fallback system si offline) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap" rel="stylesheet">
+
+  <!-- socket.io-client (CDN) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- Écran sécurité (uniquement si REFUS) -->
+  <div id="security-screen" aria-hidden="true">
+    <div class="security-x">✖</div>
+    <div class="security-text">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  </div>
+
+  <!-- Conteneur overlay -->
+  <div id="app" aria-hidden="true">
+    <div class="panel">
+      <div class="header">
+        <div class="title" id="title">ROUE LOTO</div>
+        <div class="subtitle" id="subtitle">Tapez votre prénom dans le chat</div>
+      </div>
+
+      <div class="stage">
+        <canvas id="wheel" width="1200" height="1200"></canvas>
+
+        <!-- Aiguille -->
+        <div class="pointer" aria-hidden="true"></div>
+
+        <!-- Centre / Winner -->
+        <div class="center">
+          <div class="center-label" id="centerLabel">EN ATTENTE…</div>
+          <div class="center-sub" id="centerSub">0 participant</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="hint" id="hint">
+          Ajout auto : <span class="kbd">prénom</span> • Lancer : <span class="kbd">SPIN</span> • Reset : <span class="kbd">RESET</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confetti layer -->
+    <canvas id="confetti" class="confetti" width="1920" height="1080"></canvas>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
