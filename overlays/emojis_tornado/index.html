@@ -6,14 +6,13 @@
   <title>MDI - Emojis Tornado SaaS</title>
 
   <link rel="stylesheet" href="style.css">
-  <!-- socket.io servi par TON serveur (pas de CDN) -->
   <script src="https://magic-digital-impact-live.onrender.com/socket.io/socket.io.js"></script>
 </head>
 
 <body>
   <!-- Écran sécurité (immuable) -->
   <div id="security-screen" class="mdi-security hidden">
-    <div class="mdi-x">✖</div>
+    <div class="mdi-x" aria-hidden="true"></div>
     <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
 
