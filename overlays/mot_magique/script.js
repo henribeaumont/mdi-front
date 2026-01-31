@@ -1,5 +1,5 @@
 const ADRESSE_SERVEUR = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_TYPE = "mot_magique"; // Vérifie bien ce nom dans Supabase !
+const OVERLAY_TYPE = "mot_magique";
 
 let estAutorise = false;
 let triggerCount = 0;
@@ -12,39 +12,38 @@ const securityEl = document.getElementById("security-screen");
 const socket = io(ADRESSE_SERVEUR, { transports: ["websocket", "polling"] });
 
 function cssVar(name, fallback) {
-    // Nettoyage rigoureux des variables CSS d'OBS
     let val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    if (!val) return fallback;
-    return val.replace(/^['"]+|['"]+$/g, "");
+    return val ? val.replace(/^['"]+|['"]+$/g, "") : fallback;
 }
 
 async function init() {
-    // PAUSE CRITIQUE : Laisse le temps à OBS d'injecter le CSS personnalisé
-    await new Promise(r => setTimeout(r, 500));
+    // Petit délai pour laisser OBS injecter le CSS
+    await new Promise(r => setTimeout(r, 400));
 
     const room = cssVar("--room-id", "");
     const key = cssVar("--room-key", "");
 
     if (!room || !key) { 
-        showDenied(); 
+        securityEl.classList.remove("hidden");
         return; 
     }
 
-    // Envoi de la demande de connexion
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
-    socket.on('overlay:forbidden', showDenied);
+    socket.on('overlay:forbidden', () => {
+        securityEl.classList.remove("hidden");
+    });
     
     socket.on('overlay:state', (payload) => {
         if (payload?.overlay === OVERLAY_TYPE) {
             estAutorise = true;
             participantsActifs = payload.room_count || 1;
             
-            // On remplit les données AVANT d'afficher pour éviter le tressautement
+            // 1. Appliquer les textes et config
             syncConfig(); 
             
-            securityEl.classList.add("hidden");
-            containerEl.classList.remove("hidden");
+            // 2. Afficher d'un seul coup
+            containerEl.classList.add("ready");
         }
     });
 
@@ -56,18 +55,15 @@ async function init() {
     socket.on('raw_vote', (data) => {
         if (!estAutorise) return;
         const vote = String(data.vote || "").trim().toUpperCase();
-        
         if (vote === "RESET") { resetSession(); return; }
         
-        // Comparaison avec le trigger du CSS
-        const triggerActuel = cssVar("--trigger-chat", "GG").toUpperCase();
-        if (vote === triggerActuel) {
+        const trigger = cssVar("--trigger-chat", "GG").toUpperCase();
+        if (vote === trigger) {
             triggerCount++;
             updateLogic();
         }
     });
 
-    // Sync des styles toutes les 2 secondes
     setInterval(syncConfig, 2000);
 }
 
@@ -92,11 +88,6 @@ function updateLogic() {
             wordEl.classList.remove("activated");
         }
     }
-}
-
-function showDenied() {
-    containerEl.classList.add("hidden");
-    securityEl.classList.remove("hidden");
 }
 
 function resetSession() {
