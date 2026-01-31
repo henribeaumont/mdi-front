@@ -4,12 +4,11 @@
   --wheel-text-size: 30px;
   --wheel-text-weight: 900;
 
-  --pointer-side: "right";
+  --pointer-side: "left";
   --pointer-size: 34px;
   --pointer-color: #ffffff;
-
   --pointer-rotate-180: "on";
-  --pointer-overlap: 0.82;
+  --pointer-overlap: 0.86;
 
   --winner-panel-bg: rgba(10,15,30,0.78);
   --winner-panel-border: rgba(255,255,255,0.18);
