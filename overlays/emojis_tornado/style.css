@@ -1,5 +1,5 @@
 /* ==========================================================
-   MDI EMOJIS TORNADO - V6.1 SaaS (TRUE TORNADO)
+   MDI EMOJIS TORNADO - V6.2 SaaS (TRUE TORNADO + PROPORTIONS)
    Overlay code : emojis_tornado
    - ZERO FLICKER : visible seulement après overlay:state
    - Sécurité : --room-id / --room-key via CSS OBS
@@ -17,11 +17,16 @@
 
   /* --- 🎛️ LIMITES PROTECTION --- */
   --particle-max: 220;       /* max emojis simultanés */
-  --history-window: 220;     /* taille de la fenêtre de stats (messages emojis) */
+  --history-window: 220;     /* fenêtre glissante (en "occurrences d'emojis") */
 
   /* --- 🧠 COMPORTEMENT --- */
   --only-emoji-messages: "on"; /* "on" ignore les messages sans emoji */
   --auto-reset: "false";
+
+  /* --- ⭐ SEED (EMOJIS PAR DÉFAUT AU DÉMARRAGE) --- */
+  --seed-enabled: "on";                 /* "on" | "off" */
+  --seed-emojis: "✨,🔥,❤️,😂";          /* liste séparée par virgules */
+  --seed-mode: "blend";                 /* "seed-only" | "blend" | "chat-only" */
 }
 
 /* base */
@@ -46,23 +51,42 @@ html, body{
   justify-content:center;
   flex-direction:column;
   background:#000;
-  color:#ff3b30;
+  color:#ff2d2d;
   z-index:100;
 }
-.mdi-security .mdi-x{
-  font-size:84px;
-  font-weight:900;
-  line-height:1;
+
+/* Croix rouge fiable (2 barres) */
+.mdi-x{
+  width: 86px;
+  height: 86px;
+  position: relative;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 6px 18px rgba(255,45,45,0.35));
 }
-.mdi-security .mdi-msg{
-  margin-top:10px;
+.mdi-x::before,
+.mdi-x::after{
+  content:"";
+  position:absolute;
+  top: 50%;
+  left: 50%;
+  width: 92px;
+  height: 14px;
+  background: #ff2d2d;
+  border-radius: 999px;
+  transform-origin: center;
+}
+.mdi-x::before{ transform: translate(-50%,-50%) rotate(45deg); }
+.mdi-x::after { transform: translate(-50%,-50%) rotate(-45deg); }
+
+.mdi-msg{
   font-size:34px;
   font-weight:900;
   text-align:center;
   letter-spacing:0.5px;
+  color:#ff2d2d;
 }
 
-/* Container (canvas plein écran) */
+/* Container */
 .mdi-container{
   position:absolute;
   inset:0;
