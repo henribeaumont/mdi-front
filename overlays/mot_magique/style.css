@@ -9,7 +9,7 @@ body {
 
 .hidden { display: none !important; }
 
-/* Écran sécurité standardisé */
+/* Ecran Sécurité */
 .mdi-security {
     width: 100%; height: 100%; display: flex; align-items: center; 
     justify-content: center; flex-direction: column; background: #000; 
@@ -25,6 +25,7 @@ body {
     text-align: center;
     padding: var(--panel-padding-y, 30px) var(--panel-padding-x, 50px);
     transition: all 0.5s ease;
+    /* Apparition fluide */
     animation: fadeIn 0.5s ease-out;
 }
 
@@ -58,12 +59,4 @@ body {
     color: var(--end-color, #ffd700);
     font-size: var(--end-size, 140px);
     text-shadow: 0 0 15px var(--end-color), 0 0 30px #ffffff;
-}
-
-#stats {
-    margin-top: 10px;
-    font-size: 16px;
-    color: white;
-    opacity: 0.6;
-    font-weight: bold;
 }
