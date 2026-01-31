@@ -3,13 +3,12 @@ const OVERLAY_TYPE = "mot_magique";
 
 let estAutorise = false;
 let triggerCount = 0;
+let participantsActifs = 1; // Dynamique via le serveur
 
-// Config par défaut
 let CONFIG = {
     display: "VICTOIRE",
     trigger: "GG",
-    threshold: 0.8,
-    participantsTotal: 10,
+    threshold: 0.9, // 90% par défaut
     sticky: false,
     showStats: false
 };
@@ -28,7 +27,7 @@ function cssVar(name, fallback) {
 const socket = io(ADRESSE_SERVEUR, { transports: ["websocket", "polling"] });
 
 async function init() {
-    await new Promise(r => setTimeout(r, 800)); // Attente OBS
+    await new Promise(r => setTimeout(r, 800));
     const room = cssVar("--room-id", "");
     const key = cssVar("--room-key", "");
 
@@ -37,19 +36,27 @@ async function init() {
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', showDenied);
+    
     socket.on('overlay:state', (payload) => {
         if (payload?.overlay === OVERLAY_TYPE) {
             estAutorise = true;
             securityEl.classList.add("hidden");
             containerEl.classList.remove("hidden");
+            // On récupère le nombre de gens connectés au lancement
+            participantsActifs = payload.room_count || 1;
             syncConfig();
         }
+    });
+
+    // Mise à jour du nombre de participants en temps réel
+    socket.on('room:user_count', (count) => {
+        participantsActifs = count;
+        updateLogic();
     });
 
     socket.on('raw_vote', (data) => {
         if (!estAutorise) return;
         const vote = String(data.vote || "").trim().toUpperCase();
-        
         if (vote === "RESET") { resetSession(); return; }
         if (vote === CONFIG.trigger) {
             triggerCount++;
@@ -57,18 +64,19 @@ async function init() {
         }
     });
 
-    // Sync continue de la config (pour changements en direct dans OBS)
-    setInterval(syncConfig, 1000);
+    setInterval(syncConfig, 2000); // Moins fréquent pour éviter le lag
 }
 
 function syncConfig() {
     if (!estAutorise) return;
-    const styles = getComputedStyle(document.documentElement);
+    const newDisplay = cssVar("--display-word", "VICTOIRE");
+    // On ne met à jour le texte QUE s'il a changé pour éviter le tressautement
+    if (wordEl.innerText !== newDisplay) {
+        wordEl.innerText = newDisplay;
+    }
     
-    CONFIG.display = cssVar("--display-word", "VICTOIRE");
     CONFIG.trigger = cssVar("--trigger-chat", "GG").toUpperCase();
-    CONFIG.threshold = parseFloat(styles.getPropertyValue("--threshold")) || 0.8;
-    CONFIG.participantsTotal = parseInt(styles.getPropertyValue("--participants-total")) || 10;
+    CONFIG.threshold = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--threshold")) || 0.9;
     
     const stickyRaw = cssVar("--sticky", "false");
     CONFIG.sticky = (stickyRaw === "true" || stickyRaw === "1");
@@ -76,12 +84,11 @@ function syncConfig() {
     const statsRaw = cssVar("--show-stats", "false");
     CONFIG.showStats = (statsRaw === "true" || statsRaw === "1");
 
-    if (wordEl.innerText !== CONFIG.display) wordEl.innerText = CONFIG.display;
     updateLogic();
 }
 
 function updateLogic() {
-    const total = Math.max(1, CONFIG.participantsTotal);
+    const total = Math.max(1, participantsActifs);
     const clampedCount = Math.min(triggerCount, total);
     const ratio = clampedCount / total;
     const percent = Math.round(ratio * 100);
