@@ -1,34 +1,31 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI Live — Word Cloud (Test)</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MDI Nuage - V5.7 SaaS</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
-  <div id="boot" class="boot hidden">
-    <div id="denied" class="denied hidden">❌ ACCÈS REFUSÉ / ACCESS DENIED</div>
-
-    <div id="app" class="app hidden">
-      <header class="top">
-        <div class="title">Word Cloud — Test</div>
-        <div class="meta" id="meta">—</div>
-      </header>
-
-      <main class="cloud">
-        <div class="chips" id="chips"></div>
-      </main>
-
-      <footer class="controls">
-        <button id="start">START</button>
-        <button id="stop" disabled>STOP</button>
-        <button id="clear">CLEAR</button>
-      </footer>
-    </div>
+  <!-- Écran sécurité (uniquement si REFUS) -->
+  <div id="security-screen" class="mdi-security hidden" aria-hidden="true">
+    <div class="mdi-x">✖</div>
+    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
 
-  <script src="https://magic-digital-impact-live.onrender.com/socket.io/socket.io.js"></script>
-  <script src="./script.js"></script>
+  <!-- Conteneur nuage -->
+  <div id="cloud-container" class="hidden" aria-hidden="true">
+    <div id="word-zone"></div>
+  </div>
+
+  <div id="measure-zone"></div>
+
+  <script src="script.js"></script>
 </body>
 </html>
