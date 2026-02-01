@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MDI • Remote Commentaires</title>
+  <link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <div id="dot" class="dot"></div>
+        <div>
+          <div class="title">MDI • Remote Commentaires</div>
+          <div id="status" class="status">Déconnecté</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input id="room" class="input" placeholder="room-id (ex: H_Perso)" />
+        <input id="key" class="input" placeholder="room-key (ex: H2208)" />
+        <button id="connect" class="btn">Connecter</button>
+        <button id="disconnect" class="btn ghost" disabled>Déconnecter</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="row">
+        <div class="left">
+          <div class="label">Filtre</div>
+          <input id="filter" class="input wide" placeholder="contient… (ex: merci)" />
+        </div>
+        <div class="right">
+          <button id="hide" class="btn ghost" disabled>Hide</button>
+          <button id="clear" class="btn ghost" disabled>Clear liste</button>
+        </div>
+      </div>
+
+      <div class="hint">
+        Clique un message pour l’afficher. Shift+clic = épingler.
+      </div>
+
+      <div id="list" class="list"></div>
+    </section>
+  </div>
+
+  <!-- ✅ Socket.io client via CDN (PAS de fichier local à copier) -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
