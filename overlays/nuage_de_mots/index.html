@@ -9,7 +9,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css">
+  <!-- Cache-bust CSS via ?v=... -->
+  <script>
+    (function() {
+      const v = new URLSearchParams(window.location.search).get("v") || String(Date.now());
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "style.css?v=" + encodeURIComponent(v);
+      document.head.appendChild(link);
+    })();
+  </script>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
@@ -26,6 +36,14 @@
 
   <div id="measure-zone"></div>
 
-  <script src="script.js"></script>
+  <!-- Cache-bust JS via ?v=... -->
+  <script>
+    (function() {
+      const v = new URLSearchParams(window.location.search).get("v") || String(Date.now());
+      const s = document.createElement("script");
+      s.src = "script.js?v=" + encodeURIComponent(v);
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>
