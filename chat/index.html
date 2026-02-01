@@ -14,6 +14,7 @@
       --text:rgba(255,255,255,0.92);
       --accent:#2ecc71;
       --danger:#ff3b30;
+      --warn:#F9AD48;
       --font:ui-sans-serif,system-ui,sans-serif;
     }
     *{ box-sizing:border-box }
@@ -53,7 +54,7 @@
       color:#fff;
       margin-bottom:8px;
     }
-    label{ font-size:12px; color:#aaa; }
+    label{ font-size:12px; color:#aaa; display:block; margin-bottom:4px; }
 
     .chat{
       max-height:360px;
@@ -66,13 +67,25 @@
       border-radius:10px;
       border:1px solid rgba(255,255,255,0.08);
       cursor:pointer;
-      transition:background .2s,border .2s;
+      transition:background .15s,border .15s, transform .05s;
+      user-select:none;
+      line-height:1.25;
+      word-break:break-word;
     }
+    .msg:active{ transform:scale(0.99); }
     .msg:hover{ background:rgba(255,255,255,0.06); }
 
-    .msg.active{
+    /* sélection simple (pas encore "affiché") */
+    .msg.selected{
+      background:rgba(249,173,72,0.14);
+      border-color:rgba(249,173,72,0.45);
+    }
+
+    /* celui qui est réellement affiché sur l'overlay */
+    .msg.displayed{
       background:rgba(46,204,113,0.22);
-      border-color:rgba(46,204,113,0.6);
+      border-color:rgba(46,204,113,0.70);
+      box-shadow:0 0 0 4px rgba(46,204,113,0.10) inset;
     }
 
     .btn{
@@ -80,15 +93,27 @@
       padding:12px;
       border-radius:12px;
       border:none;
-      font-weight:700;
+      font-weight:800;
       cursor:pointer;
       background:rgba(255,255,255,0.1);
       color:#fff;
       margin-top:8px;
     }
-    .btn.show{ background:rgba(46,204,113,0.25); color:#7CFFB2; }
-    .btn.hide{ background:rgba(255,59,48,0.25); color:#ff9b94; }
+    .btn.show{
+      background:rgba(46,204,113,0.25);
+      color:#7CFFB2;
+    }
+    .btn.hide{
+      background:rgba(255,59,48,0.25);
+      color:#ff9b94;
+    }
     .btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+    .hint{
+      margin-top:8px;
+      font-size:12px;
+      color:rgba(255,255,255,0.55);
+    }
   </style>
 </head>
 
@@ -102,10 +127,11 @@
 
   <div class="card">
     <label>ID_SALLE</label>
-    <input id="room" placeholder="ID_SALLE" />
+    <input id="room" placeholder="ID_SALLE" autocomplete="off" />
     <label>ROOM_KEY</label>
-    <input id="key" placeholder="ROOM_KEY" />
+    <input id="key" placeholder="ROOM_KEY" autocomplete="off" />
     <button id="connect" class="btn">Connexion</button>
+    <div class="hint">Astuce : clique un message pour le sélectionner, puis affiche/masque avec le bouton.</div>
   </div>
 
   <div class="card">
@@ -120,8 +146,14 @@ const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY = "commentaires";
 
 let socket = null;
-let selected = null;
-let displayed = false;
+
+// message sélectionné (cliqué), et message affiché (réellement envoyé en show)
+let selectedText = null;
+let displayedText = null;
+
+// anti-doublons pour raw_vote (évite 50 copies dans la télécommande)
+const seen = new Map(); // hash -> lastSeenTs
+const DEDUPE_WINDOW_MS = 2500;
 
 const $ = id => document.getElementById(id);
 const dot = $("dot");
@@ -132,13 +164,87 @@ function setStatus(ok){
   dot.className = "dot " + (ok ? "ok" : "bad");
 }
 
+function cleanText(t){
+  return String(t ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hashText(t){
+  // hash simple, suffisant pour dédupliquer UI
+  let s = cleanText(t).toLowerCase();
+  let h = 0;
+  for(let i=0;i<s.length;i++){
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return String(h);
+}
+
+function pruneSeen(now){
+  for(const [k, ts] of seen.entries()){
+    if(now - ts > DEDUPE_WINDOW_MS) seen.delete(k);
+  }
+}
+
+function setButtonMode(){
+  const isDisplayed = !!displayedText;
+  if(!selectedText){
+    btn.disabled = true;
+    btn.textContent = "Afficher le commentaire";
+    btn.className = "btn show";
+    return;
+  }
+  btn.disabled = false;
+  if(isDisplayed){
+    btn.textContent = "Masquer le commentaire";
+    btn.className = "btn hide";
+  }else{
+    btn.textContent = "Afficher le commentaire";
+    btn.className = "btn show";
+  }
+}
+
+function markSelectionAndDisplay(){
+  // reset classes
+  chat.querySelectorAll(".msg").forEach(m => {
+    m.classList.remove("selected");
+    m.classList.remove("displayed");
+    if(m.dataset.text === selectedText) m.classList.add("selected");
+    if(displayedText && m.dataset.text === displayedText) m.classList.add("displayed");
+  });
+}
+
+function emitShow(text){
+  if(!socket || !socket.connected) return;
+  const room = $("room").value.trim();
+  const key  = $("key").value.trim();
+
+  socket.emit("control:set_state", {
+    room, key, overlay: OVERLAY,
+    state: "show",
+    data: { text }
+  });
+}
+
+function emitHide(){
+  if(!socket || !socket.connected) return;
+  const room = $("room").value.trim();
+  const key  = $("key").value.trim();
+
+  socket.emit("control:set_state", {
+    room, key, overlay: OVERLAY,
+    state: "hide"
+  });
+}
+
 $("connect").onclick = () => {
   const room = $("room").value.trim();
   const key  = $("key").value.trim();
   if(!room || !key) return;
 
   if(socket) socket.disconnect();
-  socket = io(SERVER_URL);
+  socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
   socket.on("connect", () => {
     setStatus(true);
@@ -153,8 +259,21 @@ $("connect").onclick = () => {
   socket.on("disconnect", () => setStatus(false));
 
   socket.on("raw_vote", data => {
-    if(!data?.vote) return;
-    addMessage(data.vote);
+    const txt = cleanText(data?.vote);
+    if(!txt) return;
+
+    const now = Date.now();
+    pruneSeen(now);
+
+    const h = hashText(txt);
+    const last = seen.get(h);
+    if(last && (now - last) < DEDUPE_WINDOW_MS){
+      // doublon : on ignore pour ne pas remplir la télécommande de 50 copies
+      return;
+    }
+    seen.set(h, now);
+
+    addMessage(txt);
   });
 };
 
@@ -162,42 +281,50 @@ function addMessage(text){
   const div = document.createElement("div");
   div.className = "msg";
   div.textContent = text;
+  div.dataset.text = text;
 
   div.onclick = () => {
-    document.querySelectorAll(".msg").forEach(m => m.classList.remove("active"));
-    div.classList.add("active");
-    selected = text;
-    btn.disabled = false;
+    selectedText = text;
+
+    // Si un commentaire est déjà affiché, cliquer un autre message => switch direct
+    if(displayedText){
+      displayedText = text;
+      emitShow(displayedText);
+    }
+
+    markSelectionAndDisplay();
+    setButtonMode();
   };
 
   chat.prepend(div);
+  // si c'est le tout premier message reçu, on peut le sélectionner automatiquement ? (non)
+  markSelectionAndDisplay();
 }
 
 btn.onclick = () => {
-  if(!selected || !socket) return;
+  if(!selectedText || !socket || !socket.connected) return;
 
-  const room = $("room").value.trim();
-  const key  = $("key").value.trim();
-
-  if(!displayed){
-    socket.emit("control:set_state", {
-      room, key, overlay: OVERLAY,
-      state: "show",
-      data: { text: selected }
-    });
-    btn.textContent = "Masquer le commentaire";
-    btn.className = "btn hide";
-    displayed = true;
+  // Si rien n'est affiché => show du selected
+  if(!displayedText){
+    displayedText = selectedText;
+    emitShow(displayedText);
   } else {
-    socket.emit("control:set_state", {
-      room, key, overlay: OVERLAY,
-      state: "hide"
-    });
-    btn.textContent = "Afficher le commentaire";
-    btn.className = "btn show";
-    displayed = false;
+    // Si déjà affiché => hide
+    emitHide();
+    displayedText = null;
   }
+
+  markSelectionAndDisplay();
+  setButtonMode();
 };
+
+// init bouton
+setButtonMode();
+
+// Préremplissage URL optionnel (si tu utilises ?room=...&key=...)
+const u = new URL(location.href);
+if(u.searchParams.get("room")) $("room").value = u.searchParams.get("room");
+if(u.searchParams.get("key")) $("key").value = u.searchParams.get("key");
 </script>
 </body>
 </html>
