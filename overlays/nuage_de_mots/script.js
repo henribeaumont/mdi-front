@@ -1,12 +1,16 @@
 /**
- * MDI WORD CLOUD - V5.7 SaaS
- * BUILD: WC-PREFIX-DEBUG-001
- * Objectif: prouver visuellement que le bon script est chargé + filtrer par préfixe.
+ * MDI WORD CLOUD - V5.7 SaaS (URL FALLBACK + PREFIX FILTER + DEDUP TTL)
+ * - ZÉRO FLICKER (hidden tant que state OK)
+ * - Auth strict/legacy
+ * - Accès refusé: ✖ ACCÈS REFUSÉ / ACCESS DENIED sur fond transparent
+ * - Filtre préfixe (#) optionnel
+ * - Anti-doublons TTL (anti "fantômes Zoom")
+ * - Fallback URL params (POUR TEST NAVIGATEUR UNIQUEMENT si CSS OBS absent)
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "word_cloud";
-const BUILD_ID = "WC-PREFIX-DEBUG-001";
+const BUILD_ID = "WC-URLFALLBACK-002";
 
 /* --- UTILS --- */
 function cssVar(name, fallback = "") {
@@ -22,6 +26,14 @@ function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 function isQuizToken(txt) {
   return /^[ABCD]$/.test(String(txt || "").trim().toUpperCase());
 }
+function urlParam(name, fallback = "") {
+  try {
+    const v = new URLSearchParams(window.location.search).get(name);
+    return v == null ? fallback : String(v);
+  } catch {
+    return fallback;
+  }
+}
 
 /* --- UI --- */
 const elSecurity = document.getElementById("security-screen");
@@ -35,7 +47,7 @@ function setBootHidden() {
 function showDenied() {
   elCloud.classList.add("hidden");
   elSecurity.classList.remove("hidden");
-  document.body.style.backgroundColor = "transparent"; // pas d'écran noir
+  document.body.style.backgroundColor = "transparent"; // IMPORTANT: pas d'écran noir
 }
 function showCloud() {
   elSecurity.classList.add("hidden");
@@ -43,31 +55,30 @@ function showCloud() {
   document.body.style.backgroundColor = "transparent";
 }
 
-/* --- BADGE DEBUG (pour prouver le bon build + valeurs CSS lues) --- */
+/* --- BADGE DEBUG (facultatif mais utile) --- */
 function ensureBadge() {
-  let badge = document.getElementById("mdi-wc-badge");
-  if (!badge) {
-    badge = document.createElement("div");
-    badge.id = "mdi-wc-badge";
-    badge.style.position = "fixed";
-    badge.style.left = "10px";
-    badge.style.top = "10px";
-    badge.style.zIndex = "99999";
-    badge.style.padding = "6px 10px";
-    badge.style.borderRadius = "10px";
-    badge.style.font = "700 12px ui-sans-serif, system-ui, sans-serif";
-    badge.style.background = "rgba(0,0,0,0.55)";
-    badge.style.color = "rgba(255,255,255,0.95)";
-    badge.style.backdropFilter = "blur(6px)";
-    badge.style.pointerEvents = "none";
-    document.body.appendChild(badge);
+  let b = document.getElementById("mdi-wc-badge");
+  if (!b) {
+    b = document.createElement("div");
+    b.id = "mdi-wc-badge";
+    b.style.position = "fixed";
+    b.style.left = "10px";
+    b.style.top = "10px";
+    b.style.zIndex = "99999";
+    b.style.padding = "6px 10px";
+    b.style.borderRadius = "10px";
+    b.style.font = "700 12px ui-sans-serif,system-ui,sans-serif";
+    b.style.background = "rgba(0,0,0,0.50)";
+    b.style.color = "rgba(255,255,255,0.95)";
+    b.style.backdropFilter = "blur(6px)";
+    b.style.pointerEvents = "none";
+    document.body.appendChild(b);
   }
-  return badge;
+  return b;
 }
-
-function updateBadge(extraLine) {
-  const badge = ensureBadge();
-  badge.innerHTML = `<div>MDI WC • ${BUILD_ID}</div>${extraLine ? `<div style="opacity:.9">${extraLine}</div>` : ""}`;
+function setBadge(line1, line2 = "") {
+  const b = ensureBadge();
+  b.innerHTML = `<div>${line1}</div>${line2 ? `<div style="opacity:.9">${line2}</div>` : ""}`;
 }
 
 /* --- MOTEUR VISUEL --- */
@@ -107,7 +118,7 @@ function getPrefixConfig() {
   return { enabled: mode !== "off", prefix: String(prefix) };
 }
 
-const dedupMap = new Map();
+const dedupMap = new Map(); // key => lastSeenMs
 function getDedupConfig() {
   const ttlMs = parseInt(cssVar("--wc-dedup-ttl-ms", "600000"), 10);
   const maxSize = parseInt(cssVar("--wc-dedup-max", "1200"), 10);
@@ -116,6 +127,7 @@ function getDedupConfig() {
     maxSize: clamp(Number.isFinite(maxSize) ? maxSize : 1200, 50, 20000),
   };
 }
+
 function dedupShouldDrop(tokenUpper) {
   const { ttlMs, maxSize } = getDedupConfig();
   if (ttlMs <= 0) return false;
@@ -139,8 +151,7 @@ function dedupShouldDrop(tokenUpper) {
 
 function extractIfPrefixed(inputText) {
   const { enabled, prefix } = getPrefixConfig();
-  const raw = String(inputText || "");
-  const trimmed = raw.trim();
+  const trimmed = String(inputText || "").trim();
   if (!trimmed) return null;
 
   if (enabled) {
@@ -156,7 +167,6 @@ function extractIfPrefixed(inputText) {
 /* ✅ traitement message */
 function traiterMessage(texteBrut) {
   if (!texteBrut) return;
-
   if (isQuizToken(texteBrut)) return;
 
   let texte = extractIfPrefixed(texteBrut);
@@ -177,7 +187,12 @@ function traiterMessage(texteBrut) {
     dbMots[key].count++;
   } else {
     const palette = getPalette();
-    dbMots[key] = { text: key, count: 1, color: palette[globalColorIndex], _isNew: true };
+    dbMots[key] = {
+      text: key,
+      count: 1,
+      color: palette[globalColorIndex],
+      _isNew: true
+    };
     globalColorIndex = (globalColorIndex + 1) % palette.length;
   }
 
@@ -265,6 +280,7 @@ function trouverPlaceSpirale(w, h, cx, cy, containerW, containerH, obstacles) {
   return null;
 }
 
+/* ✅ DOM apply + fade-in nouveaux mots */
 function appliquerAuDom(liste) {
   liste.forEach(mot => {
     if (!mot.tempRenderInfo) return;
@@ -309,22 +325,31 @@ function appliquerAuDom(liste) {
   });
 }
 
-/* --- CONNEXION --- */
+/* --- CONNEXION SaaS --- */
 const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
 async function init() {
   setBootHidden();
 
-  // attente injection CSS OBS
+  // Attente OBS injection CSS (quand on est dans OBS)
   await new Promise(r => setTimeout(r, 650));
 
+  // 1) Lire d'abord le CSS (source de vérité en OBS)
+  let authMode = (cssVar("--auth-mode", "strict") || "strict").toLowerCase();
+  let room = cssVar("--room-id", "");
+  let key  = cssVar("--room-key", "");
+
+  // 2) Fallback URL (uniquement si CSS absent)
+  //    => permet de tester dans Chrome avec ?room_id=...&room_key=...
+  if (!room) room = urlParam("room_id", "");
+  if (!key)  key  = urlParam("room_key", "");
+  const urlAuth = urlParam("auth_mode", "");
+  if (urlAuth) authMode = urlAuth.toLowerCase();
+
   const pcfg = getPrefixConfig();
-  updateBadge(`prefix=${pcfg.enabled ? "ON" : "OFF"} • prefix=${JSON.stringify(pcfg.prefix)}`);
+  setBadge(`MDI WC • ${BUILD_ID}`, `auth=${authMode} • room=${room || "∅"} • prefix=${pcfg.enabled ? "ON" : "OFF"} ${pcfg.prefix}`);
 
-  const authMode = (cssVar("--auth-mode", "strict") || "strict").toLowerCase();
-  const room = cssVar("--room-id", "");
-  const key  = cssVar("--room-key", "");
-
+  // Strict: room+key obligatoires
   if (authMode === "strict") {
     if (!room || !key) { showDenied(); return; }
   } else {
@@ -341,10 +366,6 @@ async function init() {
     if (cssBool("--auto-reset", false) === true || cssVar("--auto-reset") === "true") {
       resetEcran();
     }
-
-    // refresh badge (au cas où CSS arrive après)
-    const pcfg2 = getPrefixConfig();
-    updateBadge(`prefix=${pcfg2.enabled ? "ON" : "OFF"} • prefix=${JSON.stringify(pcfg2.prefix)}`);
 
     showCloud();
   });
