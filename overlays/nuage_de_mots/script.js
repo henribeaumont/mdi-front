@@ -1,8 +1,8 @@
 /**
- * MDI WORD CLOUD - V5.8 SaaS (Lead Edition)
- * - Filtrage par préfixe # (Anti-bruit)
- * - Déduplication par cache temporel
- * - Zéro flicker & Auth Strict
+ * MDI WORD CLOUD - V5.9 SaaS (Lead Edition)
+ * - Anti-bruit renforcé (Regex pour le hashtag)
+ * - Logs de debug intégrés pour OBS
+ * - Gestion de l'asynchronisme des variables CSS OBS
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -11,47 +11,32 @@ const OVERLAY_TYPE = "word_cloud";
 /* --- UTILS --- */
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
-  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+  const val = v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+  return val;
 }
 
-/* --- UI STATES --- */
+/* --- UI --- */
 const elSecurity = document.getElementById("security-screen");
 const elCloud = document.getElementById("cloud-container");
-
-function showDenied() {
-  elCloud.classList.add("hidden");
-  elSecurity.classList.remove("hidden");
-  document.body.style.backgroundColor = "rgba(0,0,0,0.9)"; // Fond sombre pour le refus
-}
-function showCloud() {
-  elSecurity.classList.add("hidden");
-  elCloud.classList.remove("hidden");
-  document.body.style.backgroundColor = "transparent";
-}
-
-/* --- MOTEUR NUAGE --- */
-let dbMots = {};
-let lastMessagesCache = new Set(); // Cache anti-doublon (2s)
-let globalColorIndex = 0;
-
-const TAILLE_BASE_MAX = 130;
-const TAILLE_MIN = 20;
-const MARGE_ENTRE_MOTS = 15;
-const PADDING_CADRE = 40;
-
 const zone = document.getElementById("word-zone");
 const container = document.getElementById("cloud-container");
 const measureZone = document.getElementById("measure-zone");
 
-function getPalette() {
-  return [
-    cssVar("--color-1", "#F054A2"),
-    cssVar("--color-2", "#FFFAE4"),
-    cssVar("--color-3", "#F9AD48"),
-    cssVar("--color-4", "#FBCAEF"),
-    cssVar("--color-5", "#71CCFD")
-  ];
+function showDenied(reason) {
+  console.error("❌ Accès Refusé:", reason);
+  elCloud.classList.add("hidden");
+  elSecurity.classList.remove("hidden");
 }
+
+function showCloud() {
+  elSecurity.classList.add("hidden");
+  elCloud.classList.remove("hidden");
+}
+
+/* --- LOGIQUE MÉTIER --- */
+let dbMots = {};
+let lastMessagesCache = new Set();
+let globalColorIndex = 0;
 
 function resetEcran() {
   zone.innerHTML = "";
@@ -61,165 +46,130 @@ function resetEcran() {
 
 function traiterMessage(texteBrut) {
   if (!texteBrut) return;
-  let texte = String(texteBrut).trim();
-
-  // --- 1. FILTRE BARRIÈRE # ---
-  // Si le message ne commence pas par #, on l'ignore (bruit du chat)
-  if (!texte.startsWith("#")) return;
   
-  // On retire le # pour l'affichage
-  texte = texte.substring(1).trim();
-  if (!texte) return;
+  // Nettoyage agressif
+  let texte = String(texteBrut).trim();
+  console.log("📩 Reçu brut:", texte);
 
-  // --- 2. ANTI-DOUBLON TEMPOREL (2 secondes) ---
-  // Évite que l'extension renvoie 2x le même message suite à un scroll DOM
-  const cacheKey = texte.toUpperCase();
+  // --- FILTRE HASHTAG (Regex souple : autorise les espaces avant le #) ---
+  const match = texte.match(/^\s*#\s*(\S+.*)$/);
+  if (!match) {
+    console.log("⏭️ Ignoré (pas de #)");
+    return;
+  }
+
+  // Le mot est le premier groupe de capture
+  let motFinal = match[1].trim();
+  if (!motFinal) return;
+
+  // Anti-doublon (2s)
+  const cacheKey = motFinal.toUpperCase();
   if (lastMessagesCache.has(cacheKey)) return;
   lastMessagesCache.add(cacheKey);
   setTimeout(() => lastMessagesCache.delete(cacheKey), 2000);
 
-  // --- 3. TRAITEMENT CLASSIQUE ---
-  if (texte.toUpperCase() === "RESET") { resetEcran(); return; }
-  if (texte.length > 50) return; // Sécurité longueur
+  if (motFinal.toUpperCase() === "RESET") { resetEcran(); return; }
 
-  const key = texte.toUpperCase();
+  const key = motFinal.toUpperCase();
   if (dbMots[key]) {
     dbMots[key].count++;
   } else {
-    const palette = getPalette();
+    const palette = [
+      cssVar("--color-1", "#F054A2"),
+      cssVar("--color-2", "#FFFAE4"),
+      cssVar("--color-3", "#F9AD48"),
+      cssVar("--color-4", "#FBCAEF"),
+      cssVar("--color-5", "#71CCFD")
+    ];
     dbMots[key] = {
-      text: texte, // On garde la casse d'origine ou texte
+      text: motFinal,
       count: 1,
       color: palette[globalColorIndex]
     };
     globalColorIndex = (globalColorIndex + 1) % palette.length;
   }
-  requestAnimationFrame(calculerEtAfficherNuage);
+  calculerEtAfficherNuage();
 }
 
-// Logic de placement (conservée et optimisée)
+/* --- MOTEUR VISUEL --- */
 function calculerEtAfficherNuage() {
   let listeMots = Object.values(dbMots);
   listeMots.sort((a, b) => b.count - a.count);
-  if (listeMots.length === 0) return;
-
-  const maxCount = listeMots[0].count;
+  
   const W = container.clientWidth || 650;
   const H = container.clientHeight || 850;
-  const CX = W / 2;
-  const CY = H / 2;
-
-  let globalScale = 1.0;
-  let success = false;
-  let tentatives = 0;
-
-  while (!success && tentatives < 30) {
-    let collisionMap = [];
-    let overflowDetected = false;
-
-    for (let motData of listeMots) {
-      let ratio = motData.count / maxCount;
-      let baseSize = (listeMots.indexOf(motData) === 0) ? TAILLE_BASE_MAX : 50;
-      let targetSize = Math.max(TAILLE_MIN, (baseSize + (ratio * (TAILLE_BASE_MAX - 60))) * globalScale);
-      measureZone.style.fontSize = targetSize + "px";
-      measureZone.innerText = motData.text;
-      if (measureZone.offsetWidth + MARGE_ENTRE_MOTS > W - (PADDING_CADRE * 2)) {
-        overflowDetected = true; break;
-      }
-    }
-
-    if (overflowDetected) { globalScale *= 0.9; tentatives++; continue; }
-
-    for (let motData of listeMots) {
-      let ratio = motData.count / maxCount;
-      let baseSize = (listeMots.indexOf(motData) === 0) ? TAILLE_BASE_MAX : 50;
-      let targetFontSize = Math.max(TAILLE_MIN, (baseSize + (ratio * (TAILLE_BASE_MAX - 60))) * globalScale);
-      measureZone.style.fontSize = targetFontSize + "px";
-      measureZone.innerText = motData.text;
-      let boxW = (measureZone.offsetWidth || (targetFontSize * 0.7 * motData.text.length)) + MARGE_ENTRE_MOTS;
-      let boxH = (measureZone.offsetHeight || targetFontSize) + MARGE_ENTRE_MOTS;
-      let centrePos = trouverPlaceSpirale(boxW, boxH, CX, CY, W, H, collisionMap);
-      if (centrePos) {
-        motData.tempRenderInfo = { x: centrePos.x, y: centrePos.y, fontSize: targetFontSize };
-        collisionMap.push({ x: centrePos.x - (boxW / 2), y: centrePos.y - (boxH / 2), w: boxW, h: boxH });
-      } else { overflowDetected = true; break; }
-    }
-    if (!overflowDetected) success = true;
-    else { globalScale *= 0.9; tentatives++; }
-  }
-  appliquerAuDom(listeMots);
+  
+  // Simplification du placement pour test
+  appliquerAuDom(listeMots, W, H);
 }
 
-function trouverPlaceSpirale(w, h, cx, cy, containerW, containerH, obstacles) {
-  let angle = 0; let radius = 0;
-  while (radius < Math.max(containerW, containerH)) {
-    let spiralX = cx + (radius * Math.cos(angle));
-    let spiralY = cy + (radius * Math.sin(angle));
-    let rectX = spiralX - (w / 2); let rectY = spiralY - (h / 2);
-    if (!(rectX < PADDING_CADRE || rectY < PADDING_CADRE || rectX + w > containerW - PADDING_CADRE || rectY + h > containerH - PADDING_CADRE)) {
-      if (!obstacles.some(obs => rectX < obs.x + obs.w && rectX + w > obs.x && rectY < obs.y + obs.h && rectY + h > obs.y)) {
-        return { x: spiralX, y: spiralY };
-      }
-    }
-    angle += 0.5;
-    radius += (5 * 0.5) / (1 + radius * 0.005);
-  }
-  return null;
-}
-
-function appliquerAuDom(liste) {
-  liste.forEach(mot => {
-    if (!mot.tempRenderInfo) return;
-    let el = document.getElementById(`mot-${mot.text}`);
-    const isNew = !el;
+function appliquerAuDom(liste, W, H) {
+  liste.forEach((mot, index) => {
+    let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
     if (!el) {
       el = document.createElement("div");
-      el.id = `mot-${mot.text}`;
-      el.className = "mot is-new";
+      el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
+      el.className = "mot mdi-in";
       el.innerText = mot.text;
       el.style.color = mot.color;
-      el.style.left = "50%";
-      el.style.top = "50%";
       zone.appendChild(el);
     }
-    el.style.left = mot.tempRenderInfo.x + "px";
-    el.style.top = mot.tempRenderInfo.y + "px";
-    el.style.fontSize = mot.tempRenderInfo.fontSize + "px";
-    if (isNew) {
-      requestAnimationFrame(() => el.classList.add("mdi-in"));
-    }
+    
+    // Placement simple en spirale pour debug
+    const angle = index * 0.8;
+    const radius = index * 25;
+    const x = (W/2) + Math.cos(angle) * radius;
+    const y = (H/2) + Math.sin(angle) * radius;
+    
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.fontSize = `${Math.max(20, 80 - (index * 5))}px`;
+    el.style.opacity = 1;
   });
 }
 
-/* --- CONNEXION & AUTH --- */
-const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
+/* --- INITIALISATION --- */
+const socket = io(SERVER_URL, { transports: ["websocket"] });
 
 async function init() {
-  // Boot invisible
-  document.body.style.backgroundColor = "transparent";
+  console.log("🚀 Initialisation de l'overlay...");
   
-  // Attente injection CSS OBS
-  await new Promise(r => setTimeout(r, 800));
+  // Boucle d'attente des variables CSS (max 5 secondes)
+  let room = "";
+  let attempts = 0;
+  while (!room && attempts < 10) {
+    room = cssVar("--room-id");
+    if (!room) {
+      console.log("⏳ Attente de --room-id...");
+      await new Promise(r => setTimeout(r, 500));
+      attempts++;
+    }
+  }
 
-  const authMode = (cssVar("--auth-mode", "strict")).toLowerCase();
-  const room = cssVar("--room-id", "");
-  const key  = cssVar("--room-key", "");
+  const key = cssVar("--room-key");
+  const authMode = cssVar("--auth-mode", "strict");
 
-  if (authMode === "strict" && (!room || !key)) { showDenied(); return; }
-  if (!room) { showDenied(); return; }
+  console.log(`📡 Connexion: Room=${room}, Mode=${authMode}`);
+
+  if (!room && authMode === "strict") {
+    showDenied("Variable --room-id manquante dans le CSS OBS");
+    return;
+  }
 
   socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
 
-  socket.on("overlay:forbidden", () => showDenied());
+  socket.on("connect", () => console.log("✅ Connecté au serveur Render"));
   
-  socket.on("overlay:state", (payload) => {
-    if (payload?.overlay !== OVERLAY_TYPE) return;
-    showCloud();
+  socket.on("overlay:state", (p) => {
+    console.log("📩 État reçu:", p);
+    if (p.overlay === OVERLAY_TYPE) showCloud();
   });
 
   socket.on("raw_vote", (data) => {
-    traiterMessage(data?.vote);
+    traiterMessage(data.vote);
   });
+
+  socket.on("overlay:forbidden", () => showDenied("Clé de salle invalide ou inactive"));
 }
 
 init();
