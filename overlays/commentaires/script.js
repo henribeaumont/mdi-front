@@ -1,195 +1,148 @@
-/* commentaires.js — OVERLAY: "commentaires"
-   - Auth/join : overlay:join { room, key, overlay:"commentaires" }
-   - Collecte : raw_vote => AUTO SHOW (pour test mécanique collecte)
-   - Pilotage optionnel : control:set_state show/hide (si télécommande plus tard)
-*/
+/* globals io */
+(() => {
+  const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+  const OVERLAY = "commentaires"; // IMPORTANT: doit rester EXACTEMENT "commentaires"
 
-const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_NAME = "commentaires";
+  const $ = (id) => document.getElementById(id);
 
-// ===== Utils =====
-const clean = (t) =>
-  String(t ?? "")
-    .replace(/\u00A0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const elText = $("text");
+  const elMeta = $("meta");
 
-function getParamAny(names){
-  try{
+  const dbgRoom = $("dbgRoom");
+  const dbgSock = $("dbgSock");
+  const dbgJoin = $("dbgJoin");
+  const dbgLast = $("dbgLast");
+
+  let socket = null;
+
+  function setBodyState(state){
+    // state: "idle" | "show"
+    document.body.classList.remove("is-idle","is-show");
+    document.body.classList.add(state === "show" ? "is-show" : "is-idle");
+  }
+
+  function setDebug({ room, sock, join, last }){
+    if(room != null) dbgRoom.textContent = room || "—";
+    if(sock != null) dbgSock.textContent = sock || "—";
+    if(join != null) dbgJoin.textContent = join || "—";
+    if(last != null) dbgLast.textContent = last || "—";
+  }
+
+  function clean(t){
+    return String(t ?? "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function parseAuth(){
+    // Priorité à l'URL (?room=...&key=...)
     const u = new URL(location.href);
-    for(const n of names){
-      const v = clean(u.searchParams.get(n));
-      if(v) return v;
+    const room = clean(u.searchParams.get("room"));
+    const key  = clean(u.searchParams.get("key"));
+    return { room, key };
+  }
+
+  function showText({ text, user }){
+    const t = clean(text);
+    if(!t){
+      hideText();
+      return;
     }
-  }catch(_){}
-  return "";
-}
-
-function safeJsonParse(x){
-  try{ return JSON.parse(x); }catch(_){ return null; }
-}
-
-// ===== DOM =====
-const elCard = document.getElementById("card");
-const elText = document.getElementById("text");
-const elAuthor = document.getElementById("author");
-const elSep = document.getElementById("sep");
-
-// ===== State =====
-let socket = null;
-
-// ⚠️ IMPORTANT: on accepte plusieurs noms de params pour éviter les pièges
-let room = "";
-let key  = "";
-
-// Auto-hide timer
-let hideTimer = null;
-const AUTO_HIDE_MS = 8000; // ajuste si tu veux
-
-// Anti-doublons (évite rafales identiques)
-const seen = new Map(); // sig -> ts
-const DEDUPE_WINDOW_MS = 1200;
-
-function sigOf(text, user){
-  return (clean(user) + "|" + clean(text)).toLowerCase();
-}
-
-function pruneSeen(now){
-  for(const [k, ts] of seen.entries()){
-    if(now - ts > DEDUPE_WINDOW_MS) seen.delete(k);
-  }
-}
-
-// ===== UI =====
-function setLoadingDone(){
-  document.body.classList.remove("is-loading");
-}
-
-function showCard(text, user){
-  const t = clean(text);
-  const u = clean(user);
-
-  if(!t){
-    hideCard();
-    return;
+    elText.textContent = t;
+    elMeta.textContent = user ? `— ${clean(user)}` : "";
+    setBodyState("show");
   }
 
-  elText.textContent = t;
-
-  if(u){
-    elAuthor.textContent = u;
-    elAuthor.style.display = "";
-    elSep.style.display = "";
-  }else{
-    elAuthor.textContent = "";
-    elAuthor.style.display = "none";
-    elSep.style.display = "none";
+  function hideText(){
+    setBodyState("idle");
   }
 
-  elCard.classList.remove("hidden");
-  elCard.classList.add("show");
+  // Supporte plusieurs formats d'events serveur (robuste)
+  function handleStatePayload(payload){
+    // payload attendu (souple) :
+    // { state:"show"/"hide", data:{text, user} }
+    // OU { state:"show", text:"...", user:"..." }
+    // OU { action:"show"/"hide", text:"..." } etc.
 
-  // auto-hide
-  if(hideTimer) clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => {
-    hideCard();
-  }, AUTO_HIDE_MS);
-}
+    const p = payload || {};
+    const state = clean(p.state || p.action).toLowerCase();
 
-function hideCard(){
-  elCard.classList.remove("show");
-  if(hideTimer){
-    clearTimeout(hideTimer);
-    hideTimer = null;
-  }
-}
+    if(state === "hide" || state === "idle" || state === "off"){
+      setDebug({ last: "state=hide" });
+      hideText();
+      return;
+    }
 
-// ===== Connect =====
-function connect(){
-  // ✅ récup params depuis URL
-  // Tu peux utiliser : ?room=ID_SALLE&key=ROOM_KEY
-  // ou ?ID_SALLE=...&ROOM_KEY=... etc.
-  room = getParamAny(["room","ID_SALLE","id_salle","idsalle","id"]);
-  key  = getParamAny(["key","ROOM_KEY","room_key","roomKey","k"]);
+    if(state === "show" || state === "on"){
+      const d = p.data || p.payload || {};
+      const text = p.text ?? d.text;
+      const user = p.user ?? d.user;
+      setDebug({ last: "state=show" });
+      showText({ text, user });
+      return;
+    }
 
-  // Fallback possible via hash JSON
-  // ex: ...#{"room":"...","key":"..."}
-  if((!room || !key) && location.hash && location.hash.length > 2){
-    const maybe = safeJsonParse(decodeURIComponent(location.hash.slice(1)));
-    if(maybe && typeof maybe === "object"){
-      room = room || clean(maybe.room || maybe.ID_SALLE);
-      key  = key  || clean(maybe.key  || maybe.ROOM_KEY);
+    // parfois le serveur envoie directement {text:"..."}
+    const directText = p.text ?? (p.data && p.data.text);
+    if(clean(directText)){
+      setDebug({ last: "direct text" });
+      showText({ text: directText, user: p.user ?? (p.data && p.data.user) });
     }
   }
 
-  socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
+  function connect(){
+    const { room, key } = parseAuth();
 
-  socket.on("connect", () => {
-    // IMPORTANT: join AVEC key
-    if(room && key){
-      socket.emit("overlay:join", { room, key, overlay: OVERLAY_NAME });
-      console.log("➡️ overlay:join envoyé", { room, key: "***", overlay: OVERLAY_NAME });
-    } else {
-      console.warn("⚠️ room/key manquants dans l'URL. Ajoute ?room=...&key=...");
+    document.body.classList.add("is-ready");
+    setDebug({ room, sock: "connecting...", join: "—", last: "—" });
+
+    if(!room || !key){
+      setDebug({ sock: "missing room/key", join: "NO" });
+      // en overlay OBS tu auras l'URL avec ?room=...&key=...
+      return;
     }
 
-    // Anti-flicker: on rend visible après connection socket
-    setLoadingDone();
-  });
+    socket = io(SERVER_URL, { transports: ["websocket","polling"] });
 
-  socket.on("overlay:forbidden", () => {
-    console.error("⛔ overlay:forbidden — check ID_SALLE/ROOM_KEY");
-    hideCard();
-  });
+    socket.on("connect", () => {
+      setDebug({ sock: "connected", join: "sent" });
+      socket.emit("overlay:join", { room, key, overlay: OVERLAY });
+    });
 
-  socket.on("disconnect", () => {
-    console.warn("🔌 disconnect");
-    hideCard();
-  });
+    socket.on("overlay:forbidden", () => {
+      setDebug({ sock: "FORBIDDEN", join: "refused" });
+      hideText();
+    });
 
-  // ===== 1) Collecte brute => AUTO SHOW (test) =====
-  socket.on("raw_vote", (data) => {
-    const text = clean(data?.vote);
-    const user = clean(data?.user);
+    socket.on("disconnect", () => {
+      setDebug({ sock: "disconnected" });
+      hideText();
+    });
 
-    if(!text) return;
+    // --- ÉVÉNEMENTS POSSIBLES CÔTÉ SERVEUR ---
+    // 1) Si le serveur broadcast raw_vote dans la room (pour debug)
+    socket.on("raw_vote", (data) => {
+      const t = clean(data?.vote ?? data?.text);
+      if(t) setDebug({ last: `raw_vote: ${t.slice(0, 40)}${t.length>40?"…":""}` });
+    });
 
-    // anti-doublons
-    const now = Date.now();
-    pruneSeen(now);
-    const sig = sigOf(text, user);
-    const last = seen.get(sig);
-    if(last && (now - last) < DEDUPE_WINDOW_MS) return;
-    seen.set(sig, now);
+    // 2) Si le serveur broadcast un "set_state" générique
+    socket.on("control:set_state", handleStatePayload);
 
-    // ✅ affichage direct (mode test collecte)
-    showCard(text, user);
-  });
+    // 3) variantes fréquentes
+    socket.on("overlay:set_state", handleStatePayload);
+    socket.on("overlay:state", handleStatePayload);
+    socket.on("commentaires:set_state", handleStatePayload);
+    socket.on("commentaires:state", handleStatePayload);
 
-  // ===== 2) Pilotage optionnel (télécommande) =====
-  socket.on("control:set_state", (payload) => {
-    if(payload?.overlay && clean(payload.overlay) !== OVERLAY_NAME) return;
+    // 4) ancien event spécifique
+    socket.on("control:commentaires", handleStatePayload);
+  }
 
-    const state = clean(payload?.state);
+  // état initial
+  setBodyState("idle");
+  document.body.classList.add("is-ready");
 
-    if(state === "show"){
-      const text = clean(payload?.data?.text ?? payload?.text);
-      const user = clean(payload?.data?.user ?? payload?.user);
-      showCard(text, user);
-    }
-
-    if(state === "hide"){
-      hideCard();
-    }
-  });
-
-  // Compat ancien event
-  socket.on("control:commentaires", (payload) => {
-    const action = clean(payload?.action);
-    if(action === "show") showCard(payload?.text, payload?.user);
-    if(action === "hide") hideCard();
-  });
-}
-
-// Start
-connect();
+  connect();
+})();
