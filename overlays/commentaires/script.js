@@ -64,6 +64,39 @@ function applyUiVars(){
 /* ---------------- Socket ---------------- */
 let socket = null;
 
+function handleRemotePayload(p){
+  if (!p) return;
+  const action = String(p.action || "").toLowerCase();
+
+  if (action === "hide") {
+    hidePanel();
+    return;
+  }
+  if (action === "clear") {
+    elMeta.textContent = "";
+    elText.textContent = "";
+    hidePanel();
+    return;
+  }
+  if (action === "show") {
+    const user = String(p.user || "").trim();
+    const text = String(p.text || "").trim();
+    if (!text) return;
+
+    elMeta.textContent = user ? user : "";
+    elMeta.style.display = user ? "block" : "none";
+    elText.textContent = text;
+
+    showPanel();
+
+    const autoHide = cssNum("--auto-hide-ms", 0);
+    if (autoHide > 0) {
+      clearTimeout(window.__mdiHideT);
+      window.__mdiHideT = setTimeout(() => hidePanel(), autoHide);
+    }
+  }
+}
+
 function initSocket(){
   socket = io(SERVER_URL, { transports: ["websocket","polling"] });
 
@@ -80,39 +113,11 @@ function initSocket(){
     hidePanel();
   });
 
-  // ✅ nouveau canal de contrôle (aligné serveur)
-  socket.on("control:commentaires", (p) => {
-    if (!p) return;
-    const action = String(p.action || "").toLowerCase();
+  // ✅ event officiel
+  socket.on("control:commentaires", handleRemotePayload);
 
-    if (action === "hide") {
-      hidePanel();
-      return;
-    }
-    if (action === "clear") {
-      elMeta.textContent = "";
-      elText.textContent = "";
-      hidePanel();
-      return;
-    }
-    if (action === "show") {
-      const user = String(p.user || "").trim();
-      const text = String(p.text || "").trim();
-      if (!text) return;
-
-      elMeta.textContent = user ? user : "";
-      elMeta.style.display = user ? "block" : "none";
-      elText.textContent = text;
-
-      showPanel();
-
-      const autoHide = cssNum("--auto-hide-ms", 0);
-      if (autoHide > 0) {
-        clearTimeout(window.__mdiHideT);
-        window.__mdiHideT = setTimeout(() => hidePanel(), autoHide);
-      }
-    }
-  });
+  // ✅ fallback (au cas où le serveur émet encore l'ancien event)
+  socket.on("control:chat_display_remote", handleRemotePayload);
 }
 
 /* ---------------- Init (anti-flicker) ---------------- */
