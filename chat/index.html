@@ -131,7 +131,7 @@
     <label>ROOM_KEY</label>
     <input id="key" placeholder="ROOM_KEY" autocomplete="off" />
     <button id="connect" class="btn">Connexion</button>
-    <div class="hint">Astuce : clique un message pour le sélectionner, puis affiche/masque avec le bouton.</div>
+    <div class="hint">Clique un message pour le sélectionner. Le message affiché à l’écran passe en vert. Le bouton “Masquer” devient rouge.</div>
   </div>
 
   <div class="card">
@@ -142,6 +142,13 @@
 </div>
 
 <script>
+/**
+ * 🔧 SWITCH COMPATIBILITÉ
+ * - Si ton overlay réagit à control:set_state : laisse "set_state"
+ * - Si ton overlay ne réagit pas : mets "commentaires"
+ */
+const CONTROL_MODE = "set_state"; // "set_state" | "commentaires"
+
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY = "commentaires";
 
@@ -166,12 +173,12 @@ function setStatus(ok){
 
 function cleanText(t){
   return String(t ?? "")
+    .replace(/\u00A0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function hashText(t){
-  // hash simple, suffisant pour dédupliquer UI
   let s = cleanText(t).toLowerCase();
   let h = 0;
   for(let i=0;i<s.length;i++){
@@ -189,13 +196,16 @@ function pruneSeen(now){
 
 function setButtonMode(){
   const isDisplayed = !!displayedText;
+
   if(!selectedText){
     btn.disabled = true;
     btn.textContent = "Afficher le commentaire";
     btn.className = "btn show";
     return;
   }
+
   btn.disabled = false;
+
   if(isDisplayed){
     btn.textContent = "Masquer le commentaire";
     btn.className = "btn hide";
@@ -206,7 +216,6 @@ function setButtonMode(){
 }
 
 function markSelectionAndDisplay(){
-  // reset classes
   chat.querySelectorAll(".msg").forEach(m => {
     m.classList.remove("selected");
     m.classList.remove("displayed");
@@ -215,16 +224,26 @@ function markSelectionAndDisplay(){
   });
 }
 
+/* ✅ Émission SHOW/HIDE : 2 modes possibles selon ton serveur/overlay */
 function emitShow(text){
   if(!socket || !socket.connected) return;
   const room = $("room").value.trim();
   const key  = $("key").value.trim();
 
-  socket.emit("control:set_state", {
-    room, key, overlay: OVERLAY,
-    state: "show",
-    data: { text }
-  });
+  if(CONTROL_MODE === "set_state"){
+    socket.emit("control:set_state", {
+      room, key, overlay: OVERLAY,
+      state: "show",
+      data: { text }
+    });
+  } else {
+    socket.emit("control:commentaires", {
+      room,
+      action: "show",
+      text,
+      user: ""
+    });
+  }
 }
 
 function emitHide(){
@@ -232,10 +251,17 @@ function emitHide(){
   const room = $("room").value.trim();
   const key  = $("key").value.trim();
 
-  socket.emit("control:set_state", {
-    room, key, overlay: OVERLAY,
-    state: "hide"
-  });
+  if(CONTROL_MODE === "set_state"){
+    socket.emit("control:set_state", {
+      room, key, overlay: OVERLAY,
+      state: "hide"
+    });
+  } else {
+    socket.emit("control:commentaires", {
+      room,
+      action: "hide"
+    });
+  }
 }
 
 $("connect").onclick = () => {
@@ -268,8 +294,7 @@ $("connect").onclick = () => {
     const h = hashText(txt);
     const last = seen.get(h);
     if(last && (now - last) < DEDUPE_WINDOW_MS){
-      // doublon : on ignore pour ne pas remplir la télécommande de 50 copies
-      return;
+      return; // ignore doublon UI
     }
     seen.set(h, now);
 
@@ -297,19 +322,16 @@ function addMessage(text){
   };
 
   chat.prepend(div);
-  // si c'est le tout premier message reçu, on peut le sélectionner automatiquement ? (non)
   markSelectionAndDisplay();
 }
 
 btn.onclick = () => {
   if(!selectedText || !socket || !socket.connected) return;
 
-  // Si rien n'est affiché => show du selected
   if(!displayedText){
     displayedText = selectedText;
     emitShow(displayedText);
   } else {
-    // Si déjà affiché => hide
     emitHide();
     displayedText = null;
   }
@@ -321,7 +343,7 @@ btn.onclick = () => {
 // init bouton
 setButtonMode();
 
-// Préremplissage URL optionnel (si tu utilises ?room=...&key=...)
+// Préremplissage URL optionnel (?room=...&key=...)
 const u = new URL(location.href);
 if(u.searchParams.get("room")) $("room").value = u.searchParams.get("room");
 if(u.searchParams.get("key")) $("key").value = u.searchParams.get("key");
