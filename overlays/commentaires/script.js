@@ -1,43 +1,50 @@
-/* commentaires.js
-   Overlay = "commentaires"
+/* commentaires.js — OVERLAY: "commentaires"
    - Auth/join : overlay:join { room, key, overlay:"commentaires" }
-   - Collecte : socket.on("raw_vote", ...)
-   - Display : socket.on("control:set_state", ...) show/hide
+   - Collecte : raw_vote => AUTO SHOW (pour test mécanique collecte)
+   - Pilotage optionnel : control:set_state show/hide (si télécommande plus tard)
 */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_NAME = "commentaires";
 
-// Utilitaires
+// ===== Utils =====
 const clean = (t) =>
   String(t ?? "")
     .replace(/\u00A0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-function getParam(name){
+function getParamAny(names){
   try{
     const u = new URL(location.href);
-    return clean(u.searchParams.get(name));
-  }catch(_){
-    return "";
-  }
+    for(const n of names){
+      const v = clean(u.searchParams.get(n));
+      if(v) return v;
+    }
+  }catch(_){}
+  return "";
 }
 
 function safeJsonParse(x){
   try{ return JSON.parse(x); }catch(_){ return null; }
 }
 
-// DOM
+// ===== DOM =====
 const elCard = document.getElementById("card");
 const elText = document.getElementById("text");
 const elAuthor = document.getElementById("author");
 const elSep = document.getElementById("sep");
 
-// État
+// ===== State =====
 let socket = null;
+
+// ⚠️ IMPORTANT: on accepte plusieurs noms de params pour éviter les pièges
 let room = "";
-let key = "";
+let key  = "";
+
+// Auto-hide timer
+let hideTimer = null;
+const AUTO_HIDE_MS = 8000; // ajuste si tu veux
 
 // Anti-doublons (évite rafales identiques)
 const seen = new Map(); // sig -> ts
@@ -53,6 +60,7 @@ function pruneSeen(now){
   }
 }
 
+// ===== UI =====
 function setLoadingDone(){
   document.body.classList.remove("is-loading");
 }
@@ -80,77 +88,86 @@ function showCard(text, user){
 
   elCard.classList.remove("hidden");
   elCard.classList.add("show");
+
+  // auto-hide
+  if(hideTimer) clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    hideCard();
+  }, AUTO_HIDE_MS);
 }
 
 function hideCard(){
   elCard.classList.remove("show");
+  if(hideTimer){
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
 }
 
-// Connexion
+// ===== Connect =====
 function connect(){
-  // ✅ Les overlays OBS passent souvent room/key dans l’URL
-  // ex: .../commentaires.html?room=XXX&key=YYY
-  room = getParam("room");
-  key  = getParam("key");
+  // ✅ récup params depuis URL
+  // Tu peux utiliser : ?room=ID_SALLE&key=ROOM_KEY
+  // ou ?ID_SALLE=...&ROOM_KEY=... etc.
+  room = getParamAny(["room","ID_SALLE","id_salle","idsalle","id"]);
+  key  = getParamAny(["key","ROOM_KEY","room_key","roomKey","k"]);
 
-  // Fallback: parfois ils sont fournis en hash JSON
+  // Fallback possible via hash JSON
   // ex: ...#{"room":"...","key":"..."}
   if((!room || !key) && location.hash && location.hash.length > 2){
     const maybe = safeJsonParse(decodeURIComponent(location.hash.slice(1)));
     if(maybe && typeof maybe === "object"){
-      room = room || clean(maybe.room);
-      key  = key  || clean(maybe.key);
+      room = room || clean(maybe.room || maybe.ID_SALLE);
+      key  = key  || clean(maybe.key  || maybe.ROOM_KEY);
     }
   }
 
   socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
   socket.on("connect", () => {
-    // Auth join (entitlements)
+    // IMPORTANT: join AVEC key
     if(room && key){
       socket.emit("overlay:join", { room, key, overlay: OVERLAY_NAME });
+      console.log("➡️ overlay:join envoyé", { room, key: "***", overlay: OVERLAY_NAME });
+    } else {
+      console.warn("⚠️ room/key manquants dans l'URL. Ajoute ?room=...&key=...");
     }
-    // prêt (anti-flicker)
+
+    // Anti-flicker: on rend visible après connection socket
     setLoadingDone();
   });
 
   socket.on("overlay:forbidden", () => {
-    // On reste invisible pour éviter un overlay "vide"
+    console.error("⛔ overlay:forbidden — check ID_SALLE/ROOM_KEY");
     hideCard();
   });
 
   socket.on("disconnect", () => {
-    // Par sécurité, on masque
+    console.warn("🔌 disconnect");
     hideCard();
   });
 
-  // 1) Collecte brute (extension → server → overlay)
+  // ===== 1) Collecte brute => AUTO SHOW (test) =====
   socket.on("raw_vote", (data) => {
-    // data attendu : { vote: "texte", user: "nom" }
     const text = clean(data?.vote);
     const user = clean(data?.user);
 
     if(!text) return;
 
+    // anti-doublons
     const now = Date.now();
     pruneSeen(now);
     const sig = sigOf(text, user);
-
-    // Anti-doublons
     const last = seen.get(sig);
     if(last && (now - last) < DEDUPE_WINDOW_MS) return;
     seen.set(sig, now);
 
-    // Ici on NE force pas l'affichage automatique,
-    // parce que tu pilotes l'affichage via la télécommande.
-    // Donc on ne fait rien d'autre que "collecter".
-    // (Si un jour tu veux auto-afficher, tu pourras appeler showCard(text,user))
+    // ✅ affichage direct (mode test collecte)
+    showCard(text, user);
   });
 
-  // 2) Pilotage affichage (télécommande → server → overlay)
+  // ===== 2) Pilotage optionnel (télécommande) =====
   socket.on("control:set_state", (payload) => {
-    // payload attendu :
-    // { overlay:"commentaires", state:"show|hide", data:{text, user} }
     if(payload?.overlay && clean(payload.overlay) !== OVERLAY_NAME) return;
 
     const state = clean(payload?.state);
@@ -166,18 +183,13 @@ function connect(){
     }
   });
 
-  // Optionnel : compat ancien event spécifique
+  // Compat ancien event
   socket.on("control:commentaires", (payload) => {
-    // payload attendu (ancien) : { action:"show|hide", text, user }
     const action = clean(payload?.action);
-    if(action === "show"){
-      showCard(payload?.text, payload?.user);
-    }
-    if(action === "hide"){
-      hideCard();
-    }
+    if(action === "show") showCard(payload?.text, payload?.user);
+    if(action === "hide") hideCard();
   });
 }
 
-// Démarrage
+// Start
 connect();
