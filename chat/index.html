@@ -1,51 +1,203 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>MDI • Remote Commentaires</title>
-  <link rel="stylesheet" href="./style.css"/>
-</head>
-<body>
-  <div class="wrap">
-    <header class="top">
-      <div class="brand">
-        <div id="dot" class="dot"></div>
-        <div>
-          <div class="title">MDI • Remote Commentaires</div>
-          <div id="status" class="status">Déconnecté</div>
-        </div>
-      </div>
-
-      <div class="controls">
-        <input id="room" class="input" placeholder="ID_SALLE (ex: H_Perso)" />
-        <input id="key" class="input" placeholder="ROOM_KEY (ex: H2208)" />
-        <button id="connect" class="btn">Connecter</button>
-        <button id="disconnect" class="btn ghost" disabled>Déconnecter</button>
-      </div>
-    </header>
-
-    <section class="panel">
-      <div class="row">
-        <div class="left">
-          <div class="label">Filtre</div>
-          <input id="filter" class="input wide" placeholder="contient… (ex: merci)" />
-        </div>
-        <div class="right">
-          <button id="hide" class="btn ghost" disabled>Masquer</button>
-          <button id="clear" class="btn ghost" disabled>Clear liste</button>
-        </div>
-      </div>
-
-      <div class="hint">
-        Clique un message pour l’afficher. Shift+clic = épingler.
-      </div>
-
-      <div id="list" class="list"></div>
-    </section>
-  </div>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MDI • Télécommande Commentaires</title>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="./script.js"></script>
+
+  <style>
+    :root{
+      --bg:#0A0F1E;
+      --panel:rgba(255,255,255,0.06);
+      --text:rgba(255,255,255,0.92);
+      --accent:#2ecc71;
+      --danger:#ff3b30;
+      --font:ui-sans-serif,system-ui,sans-serif;
+    }
+    *{ box-sizing:border-box }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:var(--font);
+      padding:16px;
+    }
+    .wrap{ max-width:720px; margin:auto; display:grid; gap:14px; }
+    .card{
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:16px;
+      padding:14px;
+    }
+    .title{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-weight:800;
+    }
+    .dot{
+      width:12px;height:12px;border-radius:50%;
+      background:#555;
+    }
+    .dot.ok{ background:var(--accent); box-shadow:0 0 0 4px rgba(46,204,113,.25); }
+    .dot.bad{ background:var(--danger); }
+
+    input{
+      width:100%;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid #444;
+      background:#111;
+      color:#fff;
+      margin-bottom:8px;
+    }
+    label{ font-size:12px; color:#aaa; }
+
+    .chat{
+      max-height:360px;
+      overflow:auto;
+      display:grid;
+      gap:6px;
+    }
+    .msg{
+      padding:10px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.08);
+      cursor:pointer;
+      transition:background .2s,border .2s;
+    }
+    .msg:hover{ background:rgba(255,255,255,0.06); }
+
+    .msg.active{
+      background:rgba(46,204,113,0.22);
+      border-color:rgba(46,204,113,0.6);
+    }
+
+    .btn{
+      width:100%;
+      padding:12px;
+      border-radius:12px;
+      border:none;
+      font-weight:700;
+      cursor:pointer;
+      background:rgba(255,255,255,0.1);
+      color:#fff;
+      margin-top:8px;
+    }
+    .btn.show{ background:rgba(46,204,113,0.25); color:#7CFFB2; }
+    .btn.hide{ background:rgba(255,59,48,0.25); color:#ff9b94; }
+    .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="card title">
+    <span>MDI • Télécommande Commentaires</span>
+    <span id="dot" class="dot"></span>
+  </div>
+
+  <div class="card">
+    <label>ID_SALLE</label>
+    <input id="room" placeholder="ID_SALLE" />
+    <label>ROOM_KEY</label>
+    <input id="key" placeholder="ROOM_KEY" />
+    <button id="connect" class="btn">Connexion</button>
+  </div>
+
+  <div class="card">
+    <div id="chat" class="chat"></div>
+    <button id="toggle" class="btn show" disabled>Afficher le commentaire</button>
+  </div>
+
+</div>
+
+<script>
+const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+const OVERLAY = "commentaires";
+
+let socket = null;
+let selected = null;
+let displayed = false;
+
+const $ = id => document.getElementById(id);
+const dot = $("dot");
+const chat = $("chat");
+const btn = $("toggle");
+
+function setStatus(ok){
+  dot.className = "dot " + (ok ? "ok" : "bad");
+}
+
+$("connect").onclick = () => {
+  const room = $("room").value.trim();
+  const key  = $("key").value.trim();
+  if(!room || !key) return;
+
+  if(socket) socket.disconnect();
+  socket = io(SERVER_URL);
+
+  socket.on("connect", () => {
+    setStatus(true);
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY });
+  });
+
+  socket.on("overlay:forbidden", () => {
+    setStatus(false);
+    alert("Accès refusé");
+  });
+
+  socket.on("disconnect", () => setStatus(false));
+
+  socket.on("raw_vote", data => {
+    if(!data?.vote) return;
+    addMessage(data.vote);
+  });
+};
+
+function addMessage(text){
+  const div = document.createElement("div");
+  div.className = "msg";
+  div.textContent = text;
+
+  div.onclick = () => {
+    document.querySelectorAll(".msg").forEach(m => m.classList.remove("active"));
+    div.classList.add("active");
+    selected = text;
+    btn.disabled = false;
+  };
+
+  chat.prepend(div);
+}
+
+btn.onclick = () => {
+  if(!selected || !socket) return;
+
+  const room = $("room").value.trim();
+  const key  = $("key").value.trim();
+
+  if(!displayed){
+    socket.emit("control:set_state", {
+      room, key, overlay: OVERLAY,
+      state: "show",
+      data: { text: selected }
+    });
+    btn.textContent = "Masquer le commentaire";
+    btn.className = "btn hide";
+    displayed = true;
+  } else {
+    socket.emit("control:set_state", {
+      room, key, overlay: OVERLAY,
+      state: "hide"
+    });
+    btn.textContent = "Afficher le commentaire";
+    btn.className = "btn show";
+    displayed = false;
+  }
+};
+</script>
 </body>
 </html>
