@@ -1,149 +1,183 @@
+/* commentaires.js
+   Overlay = "commentaires"
+   - Auth/join : overlay:join { room, key, overlay:"commentaires" }
+   - Collecte : socket.on("raw_vote", ...)
+   - Display : socket.on("control:set_state", ...) show/hide
+*/
+
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_NAME = "commentaires";
 
-/* ---------------- CSS Vars ---------------- */
-function cssVar(name, fallback = "") {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name);
-  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
-}
-function cssNum(name, fallback) {
-  const n = Number(cssVar(name, ""));
-  return Number.isFinite(n) ? n : fallback;
+// Utilitaires
+const clean = (t) =>
+  String(t ?? "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+function getParam(name){
+  try{
+    const u = new URL(location.href);
+    return clean(u.searchParams.get(name));
+  }catch(_){
+    return "";
+  }
 }
 
-/* ---------------- Boot / Security ---------------- */
-const elSecurity = document.getElementById("security-screen");
-const elApp = document.getElementById("app");
-const elMeta = document.getElementById("meta");
+function safeJsonParse(x){
+  try{ return JSON.parse(x); }catch(_){ return null; }
+}
+
+// DOM
+const elCard = document.getElementById("card");
 const elText = document.getElementById("text");
+const elAuthor = document.getElementById("author");
+const elSep = document.getElementById("sep");
 
-function setBootTransparent(){
-  elSecurity.style.display = "none";
-  elApp.style.display = "none";
-  document.documentElement.classList.remove("mdi-ready","mdi-denied","mdi-show");
-  document.documentElement.removeAttribute("data-position");
-}
-function showDenied(){
-  document.documentElement.classList.remove("mdi-ready","mdi-show");
-  document.documentElement.classList.add("mdi-denied");
-  elApp.style.display = "none";
-  elSecurity.style.display = "flex";
-  document.body.style.backgroundColor = "black";
-}
-function showReady(){
-  document.documentElement.classList.remove("mdi-denied");
-  document.documentElement.classList.add("mdi-ready");
-  elSecurity.style.display = "none";
-  elApp.style.display = "grid";
-  document.body.style.backgroundColor = "transparent";
-}
-function hidePanel(){
-  document.documentElement.classList.remove("mdi-show");
-}
-function showPanel(){
-  document.documentElement.classList.add("mdi-show");
-}
-
-/* ---------------- Auth vars ---------------- */
-let AUTH_MODE = "strict";
-let ROOM_ID = "";
-let ROOM_KEY = "";
-
-function readAuthVars(){
-  const s = getComputedStyle(document.documentElement);
-  AUTH_MODE = (s.getPropertyValue("--auth-mode").trim().replace(/"/g,"") || "strict").toLowerCase();
-  ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g,"") || "";
-  ROOM_KEY = s.getPropertyValue("--room-key").trim().replace(/"/g,"") || "";
-}
-
-function applyUiVars(){
-  const pos = (cssVar("--position","bottom") || "bottom").trim().toLowerCase();
-  document.documentElement.setAttribute("data-position", (pos === "top") ? "top" : "bottom");
-}
-
-/* ---------------- Socket ---------------- */
+// État
 let socket = null;
+let room = "";
+let key = "";
 
-function handleRemotePayload(p){
-  if (!p) return;
-  const action = String(p.action || "").toLowerCase();
+// Anti-doublons (évite rafales identiques)
+const seen = new Map(); // sig -> ts
+const DEDUPE_WINDOW_MS = 1200;
 
-  if (action === "hide") {
-    hidePanel();
+function sigOf(text, user){
+  return (clean(user) + "|" + clean(text)).toLowerCase();
+}
+
+function pruneSeen(now){
+  for(const [k, ts] of seen.entries()){
+    if(now - ts > DEDUPE_WINDOW_MS) seen.delete(k);
+  }
+}
+
+function setLoadingDone(){
+  document.body.classList.remove("is-loading");
+}
+
+function showCard(text, user){
+  const t = clean(text);
+  const u = clean(user);
+
+  if(!t){
+    hideCard();
     return;
   }
-  if (action === "clear") {
-    elMeta.textContent = "";
-    elText.textContent = "";
-    hidePanel();
-    return;
+
+  elText.textContent = t;
+
+  if(u){
+    elAuthor.textContent = u;
+    elAuthor.style.display = "";
+    elSep.style.display = "";
+  }else{
+    elAuthor.textContent = "";
+    elAuthor.style.display = "none";
+    elSep.style.display = "none";
   }
-  if (action === "show") {
-    const user = String(p.user || "").trim();
-    const text = String(p.text || "").trim();
-    if (!text) return;
 
-    elMeta.textContent = user ? user : "";
-    elMeta.style.display = user ? "block" : "none";
-    elText.textContent = text;
+  elCard.classList.remove("hidden");
+  elCard.classList.add("show");
+}
 
-    showPanel();
+function hideCard(){
+  elCard.classList.remove("show");
+}
 
-    const autoHide = cssNum("--auto-hide-ms", 0);
-    if (autoHide > 0) {
-      clearTimeout(window.__mdiHideT);
-      window.__mdiHideT = setTimeout(() => hidePanel(), autoHide);
+// Connexion
+function connect(){
+  // ✅ Les overlays OBS passent souvent room/key dans l’URL
+  // ex: .../commentaires.html?room=XXX&key=YYY
+  room = getParam("room");
+  key  = getParam("key");
+
+  // Fallback: parfois ils sont fournis en hash JSON
+  // ex: ...#{"room":"...","key":"..."}
+  if((!room || !key) && location.hash && location.hash.length > 2){
+    const maybe = safeJsonParse(decodeURIComponent(location.hash.slice(1)));
+    if(maybe && typeof maybe === "object"){
+      room = room || clean(maybe.room);
+      key  = key  || clean(maybe.key);
     }
   }
-}
 
-function initSocket(){
-  socket = io(SERVER_URL, { transports: ["websocket","polling"] });
+  socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
   socket.on("connect", () => {
-    socket.emit("overlay:join", { room: ROOM_ID, key: ROOM_KEY, overlay: OVERLAY_NAME });
+    // Auth join (entitlements)
+    if(room && key){
+      socket.emit("overlay:join", { room, key, overlay: OVERLAY_NAME });
+    }
+    // prêt (anti-flicker)
+    setLoadingDone();
   });
 
-  socket.on("overlay:forbidden", () => showDenied());
-
-  socket.on("overlay:state", (payload) => {
-    if (!payload || payload.overlay !== OVERLAY_NAME) return;
-    applyUiVars();
-    showReady();
-    hidePanel();
+  socket.on("overlay:forbidden", () => {
+    // On reste invisible pour éviter un overlay "vide"
+    hideCard();
   });
 
-  // ✅ event officiel
-  socket.on("control:commentaires", handleRemotePayload);
+  socket.on("disconnect", () => {
+    // Par sécurité, on masque
+    hideCard();
+  });
 
-  // ✅ fallback (au cas où le serveur émet encore l'ancien event)
-  socket.on("control:chat_display_remote", handleRemotePayload);
-}
+  // 1) Collecte brute (extension → server → overlay)
+  socket.on("raw_vote", (data) => {
+    // data attendu : { vote: "texte", user: "nom" }
+    const text = clean(data?.vote);
+    const user = clean(data?.user);
 
-/* ---------------- Init (anti-flicker) ---------------- */
-function init(){
-  setBootTransparent();
+    if(!text) return;
 
-  const poll = setInterval(() => {
-    readAuthVars();
+    const now = Date.now();
+    pruneSeen(now);
+    const sig = sigOf(text, user);
 
-    if (AUTH_MODE === "legacy"){
-      if (!ROOM_ID) return;
-      clearInterval(poll);
-      initSocket();
-      return;
+    // Anti-doublons
+    const last = seen.get(sig);
+    if(last && (now - last) < DEDUPE_WINDOW_MS) return;
+    seen.set(sig, now);
+
+    // Ici on NE force pas l'affichage automatique,
+    // parce que tu pilotes l'affichage via la télécommande.
+    // Donc on ne fait rien d'autre que "collecter".
+    // (Si un jour tu veux auto-afficher, tu pourras appeler showCard(text,user))
+  });
+
+  // 2) Pilotage affichage (télécommande → server → overlay)
+  socket.on("control:set_state", (payload) => {
+    // payload attendu :
+    // { overlay:"commentaires", state:"show|hide", data:{text, user} }
+    if(payload?.overlay && clean(payload.overlay) !== OVERLAY_NAME) return;
+
+    const state = clean(payload?.state);
+
+    if(state === "show"){
+      const text = clean(payload?.data?.text ?? payload?.text);
+      const user = clean(payload?.data?.user ?? payload?.user);
+      showCard(text, user);
     }
 
-    if (ROOM_ID && ROOM_KEY){
-      clearInterval(poll);
-      initSocket();
+    if(state === "hide"){
+      hideCard();
     }
-  }, 200);
+  });
 
-  setTimeout(() => {
-    readAuthVars();
-    if (AUTH_MODE === "strict" && (!ROOM_ID || !ROOM_KEY)) showDenied();
-  }, 1400);
+  // Optionnel : compat ancien event spécifique
+  socket.on("control:commentaires", (payload) => {
+    // payload attendu (ancien) : { action:"show|hide", text, user }
+    const action = clean(payload?.action);
+    if(action === "show"){
+      showCard(payload?.text, payload?.user);
+    }
+    if(action === "hide"){
+      hideCard();
+    }
+  });
 }
 
-init();
+// Démarrage
+connect();
