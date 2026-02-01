@@ -56,7 +56,7 @@ let collectStartTrigger = "INSCRIVEZ UN PSEUDO";
 let collectStopTrigger  = "PRET?";
 let collectClearTrigger = "CLEAR INSCRIPTION";
 
-let cmdMatchMode = "exact"; // exact | startsWith | contains
+let cmdMatchMode = "exact";
 let spinCooldownMs = 1800;
 let blockSpinWhileCollecting = true;
 let clearOnStart = true;
@@ -65,23 +65,20 @@ let minNameLen = 1;
 let maxNameLen = 18;
 let maxParticipants = 48;
 
-/* Anti-reliquat robust: baseline index size */
 let baselineMaxMessages = 6000;
 
-/* Sens de rotation: cw (droite) / ccw (gauche) */
-let spinDirection = "cw"; // cw | ccw
-
+let spinDirection = "cw";
 let pointerSide = "right";
 
 function readConfig(){
-  spinTrigger  = (cssVar("--spin-trigger","SPIN") || "SPIN").trim();
-  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim();
+  spinTrigger  = cssVar("--spin-trigger","SPIN").trim();
+  resetTrigger = cssVar("--reset-trigger","RESET").trim();
 
-  collectStartTrigger = (cssVar("--collect-start-trigger","INSCRIVEZ UN PSEUDO") || "INSCRIVEZ UN PSEUDO").trim();
-  collectStopTrigger  = (cssVar("--collect-stop-trigger","PRET?") || "PRET?").trim();
-  collectClearTrigger = (cssVar("--collect-clear-trigger","CLEAR INSCRIPTION") || "CLEAR INSCRIPTION").trim();
+  collectStartTrigger = cssVar("--collect-start-trigger","INSCRIVEZ UN PSEUDO").trim();
+  collectStopTrigger  = cssVar("--collect-stop-trigger","PRET?").trim();
+  collectClearTrigger = cssVar("--collect-clear-trigger","CLEAR INSCRIPTION").trim();
 
-  cmdMatchMode = (cssVar("--cmd-match-mode","exact") || "exact").trim().toLowerCase();
+  cmdMatchMode = cssVar("--cmd-match-mode","exact").toLowerCase();
   if (!["exact","startswith","contains"].includes(cmdMatchMode)) cmdMatchMode = "exact";
 
   spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
@@ -94,95 +91,67 @@ function readConfig(){
 
   baselineMaxMessages = clamp(cssNum("--baseline-max-messages", 6000), 500, 20000);
 
-  spinDirection = (cssVar("--spin-direction","cw") || "cw").trim().toLowerCase();
+  spinDirection = cssVar("--spin-direction","cw").toLowerCase();
   spinDirection = (spinDirection === "ccw") ? "ccw" : "cw";
 
-  pointerSide = (cssVar("--pointer-side","right") || "right").trim().toLowerCase();
+  pointerSide = cssVar("--pointer-side","right").toLowerCase();
   pointerSide = (pointerSide === "left") ? "left" : "right";
   document.documentElement.setAttribute("data-pointer-side", pointerSide);
 
-  const flip = cssOnOff("--pointer-rotate-180", true);
-  document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
+  document.documentElement.classList.toggle(
+    "mdi-pointer-flip",
+    cssOnOff("--pointer-rotate-180", true)
+  );
 }
 
-/* ---------------- Text normalization / command match ---------------- */
+/* ---------------- Text helpers ---------------- */
 function normalizeText(raw){
-  let t = String(raw || "");
-  t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
-  return t;
+  return String(raw || "").replace(/\u00A0/g," ").replace(/\s+/g," ").trim();
 }
-function normKey(raw){
-  return normalizeText(raw).toUpperCase();
-}
+function normKey(raw){ return normalizeText(raw).toUpperCase(); }
 function extractPayload(text){
   const t = normalizeText(text);
-  const m = t.match(/^.{1,24}:\s*(.+)$/); // "Name: payload"
-  if (m && m[1]) return m[1].trim();
-  return t;
+  const m = t.match(/^.{1,24}:\s*(.+)$/);
+  return m && m[1] ? m[1].trim() : t;
 }
 function cmdMatch(message, trigger){
   const msg = normKey(extractPayload(message));
   const trg = normKey(trigger);
   if (!msg || !trg) return false;
-
   if (cmdMatchMode === "exact") return msg === trg;
   if (cmdMatchMode === "startswith") return msg.startsWith(trg);
-  return msg.includes(trg); // contains
+  return msg.includes(trg);
 }
 
-/* ---------------- Robust anti-reliquat baseline ---------------- */
+/* ---------------- LRU baseline ---------------- */
 class LRUSet {
-  constructor(max = 5000){
-    this.max = max;
-    this.map = new Map();
-  }
-  has(key){ return this.map.has(key); }
-  add(key){
-    if (!key) return;
-    if (this.map.has(key)) {
-      this.map.delete(key);
-      this.map.set(key, true);
-      return;
-    }
-    this.map.set(key, true);
+  constructor(max = 5000){ this.max = max; this.map = new Map(); }
+  add(k){
+    if (!k) return;
+    if (this.map.has(k)) this.map.delete(k);
+    this.map.set(k,true);
     while (this.map.size > this.max){
-      const oldest = this.map.keys().next().value;
-      this.map.delete(oldest);
+      this.map.delete(this.map.keys().next().value);
     }
   }
-  clear(){ this.map.clear(); }
   snapshotSet(){ return new Set(this.map.keys()); }
-  setMax(n){
-    this.max = n;
-    while (this.map.size > this.max){
-      const oldest = this.map.keys().next().value;
-      this.map.delete(oldest);
-    }
-  }
+  clear(){ this.map.clear(); }
+  setMax(n){ this.max = n; }
 }
 
 const preStartIndex = new LRUSet(6000);
 let baselineSet = new Set();
 
 /* ---------------- Names ---------------- */
-function keyOfName(name){ return normalizeText(name).toLowerCase(); }
-
 function isValidName(raw){
   const t = normalizeText(extractPayload(raw));
   if (!t) return false;
-
-  if (cmdMatch(t, collectStartTrigger)) return false;
-  if (cmdMatch(t, collectStopTrigger))  return false;
-  if (cmdMatch(t, spinTrigger))         return false;
-  if (cmdMatch(t, collectClearTrigger)) return false;
-  if (cmdMatch(t, resetTrigger))        return false;
-
   if (t.length < minNameLen || t.length > maxNameLen) return false;
-  if (t.split(" ").filter(Boolean).length > 2) return false;
-
+  if (t.split(" ").length > 2) return false;
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
   return true;
 }
+function keyOfName(n){ return normalizeText(n).toLowerCase(); }
 
 /* ---------------- Wheel render ---------------- */
 const wheelCanvas = document.getElementById("wheel");
@@ -197,8 +166,7 @@ let targetAngle = 0;
 
 const basePalette = [
   "#2ecc71","#e74c3c","#3b82f6","#f1c40f",
-  "#9b59b6","#1abc9c","#e67e22","#ec4899",
-  "#22c55e","#ef4444","#60a5fa","#f59e0b"
+  "#9b59b6","#1abc9c","#e67e22","#ec4899"
 ];
 
 let participants = [];
@@ -207,13 +175,11 @@ let winnerIndex = -1;
 function resizeWheelCanvas(){
   const cssSize = cssNum("--wheel-size", 820);
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-
   wheelCanvas.style.width = cssSize + "px";
   wheelCanvas.style.height = cssSize + "px";
-  wheelCanvas.width = Math.floor(cssSize * dpr);
-  wheelCanvas.height = Math.floor(cssSize * dpr);
-
-  wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  wheelCanvas.width = cssSize * dpr;
+  wheelCanvas.height = cssSize * dpr;
+  wheelCtx.setTransform(dpr,0,0,dpr,0,0);
   drawWheel();
 }
 
@@ -223,17 +189,15 @@ function drawWheel(){
   const textSize = cssNum("--wheel-text-size", 30);
   const textWeight = cssNum("--wheel-text-weight", 900);
 
-  const W = cssSize, H = cssSize;
-  const cx = W/2, cy = H/2;
-  const r = (W/2) - stroke - 6;
+  const cx = cssSize/2, cy = cssSize/2;
+  const r = cx - stroke - 6;
 
-  wheelCtx.clearRect(0,0,W,H);
-
+  wheelCtx.clearRect(0,0,cssSize,cssSize);
   wheelCtx.save();
-  wheelCtx.translate(cx, cy);
+  wheelCtx.translate(cx,cy);
   wheelCtx.rotate(wheelAngle);
 
-  if (participants.length === 0){
+  if (!participants.length){
     wheelCtx.beginPath();
     wheelCtx.arc(0,0,r,0,Math.PI*2);
     wheelCtx.fillStyle = "rgba(10,15,30,0.65)";
@@ -246,404 +210,150 @@ function drawWheel(){
   }
 
   const n = participants.length;
-  const slice = (Math.PI*2) / n;
+  const slice = (Math.PI*2)/n;
 
   for (let i=0;i<n;i++){
-    const a0 = i*slice;
-    const a1 = a0 + slice;
-
+    const a0 = i*slice, a1 = a0+slice;
     wheelCtx.beginPath();
     wheelCtx.moveTo(0,0);
     wheelCtx.arc(0,0,r,a0,a1);
-    wheelCtx.closePath();
-
-    wheelCtx.fillStyle = basePalette[i % basePalette.length];
+    wheelCtx.fillStyle = basePalette[i%basePalette.length];
     wheelCtx.fill();
 
-    if (i === winnerIndex){
-      wheelCtx.save();
-      wheelCtx.shadowColor = "rgba(255,255,255,0.65)";
-      wheelCtx.shadowBlur = 22;
-      wheelCtx.lineWidth = 10;
-      wheelCtx.strokeStyle = "rgba(255,255,255,0.85)";
-      wheelCtx.stroke();
-      wheelCtx.restore();
-    } else {
-      wheelCtx.lineWidth = 2;
-      wheelCtx.strokeStyle = "rgba(0,0,0,0.18)";
-      wheelCtx.stroke();
-    }
-
-    const label = participants[i].name;
     const mid = a0 + slice/2;
+    const label = participants[i].name;
 
     wheelCtx.save();
     wheelCtx.rotate(mid);
 
-    wheelCtx.fillStyle = "rgba(255,255,255,0.96)";
-    wheelCtx.font = `${textWeight} ${textSize}px Montserrat, sans-serif`;
+    // 🔤 rotation 180° du texte si demandé
+    if (cssOnOff("--label-rotate-180", false)) {
+      wheelCtx.rotate(Math.PI);
+    }
+
+    wheelCtx.font = `${textWeight} ${textSize}px Montserrat`;
+    wheelCtx.fillStyle = "#fff";
     wheelCtx.textAlign = "left";
     wheelCtx.textBaseline = "middle";
 
-    const maxChars = 14;
-    const safeLabel = label.length > maxChars ? (label.slice(0, maxChars-1) + "…") : label;
-
-    const tx = Math.max(120, r*0.26);
-    wheelCtx.lineWidth = 4;
+    const safe = label.length > 14 ? label.slice(0,13)+"…" : label;
     wheelCtx.strokeStyle = "rgba(0,0,0,0.35)";
-    wheelCtx.strokeText(safeLabel, tx, 0);
-    wheelCtx.fillText(safeLabel, tx, 0);
-
+    wheelCtx.lineWidth = 4;
+    wheelCtx.strokeText(safe, r*0.28, 0);
+    wheelCtx.fillText(safe, r*0.28, 0);
     wheelCtx.restore();
   }
-
-  wheelCtx.beginPath();
-  wheelCtx.arc(0,0,r,0,Math.PI*2);
-  wheelCtx.lineWidth = stroke;
-  wheelCtx.strokeStyle = "rgba(255,255,255,0.22)";
-  wheelCtx.stroke();
 
   wheelCtx.restore();
 }
 
-/* ---------------- Confetti ---------------- */
-const confettiCanvas = document.getElementById("confetti");
-const confettiCtx = confettiCanvas.getContext("2d");
-let confetti = [];
-let confettiEndTs = 0;
-
-function resizeConfetti(){
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  confettiCanvas.width = Math.floor(window.innerWidth * dpr);
-  confettiCanvas.height = Math.floor(window.innerHeight * dpr);
-  confettiCtx.setTransform(dpr,0,0,dpr,0,0);
-}
-
-function rand01(){
-  const u = new Uint32Array(1);
-  crypto.getRandomValues(u);
-  return u[0] / 0xFFFFFFFF;
-}
-
-function startConfetti(){
-  if (!cssOnOff("--winner-confetti", true)) return;
-
-  document.documentElement.classList.add("mdi-confetti");
-  resizeConfetti();
-
-  const density = clamp(cssNum("--confetti-density", 180), 30, 600);
-  const dur = clamp(cssNum("--confetti-duration-ms", 2200), 600, 8000);
-
-  confetti = [];
-  confettiEndTs = performance.now() + dur;
-
-  for (let i=0;i<density;i++){
-    const x = rand01() * window.innerWidth;
-    const y = -20 - rand01()*200;
-    const s = 6 + rand01()*10;
-    const vx = (rand01()-0.5)*2.2;
-    const vy = 2.0 + rand01()*4.5;
-    const rot = rand01()*Math.PI*2;
-    const vr = (rand01()-0.5)*0.25;
-    const col = basePalette[i % basePalette.length];
-    confetti.push({x,y,s,vx,vy,rot,vr,col});
-  }
-  requestAnimationFrame(tickConfetti);
-}
-
-function tickConfetti(ts){
-  confettiCtx.clearRect(0,0,window.innerWidth, window.innerHeight);
-  if (ts >= confettiEndTs){
-    document.documentElement.classList.remove("mdi-confetti");
-    confetti = [];
-    return;
-  }
-  for (const p of confetti){
-    p.x += p.vx * 3.2;
-    p.y += p.vy * 3.6;
-    p.rot += p.vr;
-    const t = (confettiEndTs - ts) / 500;
-    const alpha = clamp(t, 0, 1);
-
-    confettiCtx.save();
-    confettiCtx.translate(p.x, p.y);
-    confettiCtx.rotate(p.rot);
-    confettiCtx.globalAlpha = alpha;
-    confettiCtx.fillStyle = p.col;
-    confettiCtx.fillRect(-p.s/2, -p.s/2, p.s, p.s*0.7);
-    confettiCtx.restore();
-  }
-  requestAnimationFrame(tickConfetti);
-}
-
-/* ---------------- Session helpers ---------------- */
-function clearAllForNewSession(){
-  participants = [];
-  winnerIndex = -1;
-  spinning = false;
-  wheelAngle = 0;
-  hideWinner();
-  drawWheel();
-}
-
-/* ---------------- Participants ---------------- */
-function addParticipant(message){
-  const payload = extractPayload(message);
-  if (!isValidName(payload)) return;
-
-  const msgKey = normKey(payload);
-
-  if (baselineSet.has(msgKey)) return;
-
-  const clean = normalizeText(payload);
-  const k = keyOfName(clean);
-  if (participants.some(p => p.key === k)) return;
-  if (participants.length >= maxParticipants) return;
-
-  participants.push({ name: clean, key: k });
-  winnerIndex = -1;
-  hideWinner();
-  drawWheel();
-}
-
 /* ---------------- Spin ---------------- */
-let phase = "IDLE"; // IDLE | COLLECTING | READY
+let phase = "IDLE";
 let lastSpinAt = 0;
 
 function normalizeAngle(a){
   let x = a % (Math.PI*2);
-  if (x < 0) x += Math.PI*2;
-  return x;
-}
-function pickRandomIndex(n){
-  const u = new Uint32Array(1);
-  crypto.getRandomValues(u);
-  return u[0] % n;
+  return x < 0 ? x + Math.PI*2 : x;
 }
 function pointerTargetAngle(){
   return (pointerSide === "left") ? Math.PI : 0;
 }
-
 function spin(){
-  const now = Date.now();
-  if (spinning) return;
-  if (phase !== "READY") return;
-  if (participants.length < 2) return;
-  if (now - lastSpinAt < spinCooldownMs) return;
+  if (spinning || phase !== "READY" || participants.length < 2) return;
+  if (Date.now() - lastSpinAt < spinCooldownMs) return;
+  lastSpinAt = Date.now();
 
-  lastSpinAt = now;
-  hideWinner();
   spinning = true;
-
   const n = participants.length;
-  const selected = pickRandomIndex(n);
   const slice = (Math.PI*2)/n;
-  const selectedCenter = selected*slice + slice/2;
+  const selected = Math.floor(Math.random()*n);
+  const desired = pointerTargetAngle() - (selected*slice + slice/2);
 
-  const pointerAngle = pointerTargetAngle();
-  const desired = pointerAngle - selectedCenter;
-
-  const extraTurns = 6 + Math.floor(rand01()*4);
+  const extraTurns = 6 + Math.floor(Math.random()*4);
   const extra = extraTurns * Math.PI*2;
 
-  const dir = (spinDirection === "ccw") ? +1 : -1;
+  // ✅ CORRECTION SENS ROTATION
+  const dir = (spinDirection === "cw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
-  targetAngle = desired + dir * extra;
-  spinDurationMs = clamp(3800 + Math.floor(rand01()*2200), 3400, 6500);
+  targetAngle = desired + dir*extra;
+  spinDurationMs = 4200;
   spinStartTs = performance.now();
 
-  requestAnimationFrame(tickSpin);
-
-  function tickSpin(ts){
-    const t = clamp((ts - spinStartTs)/spinDurationMs, 0, 1);
-    const e = 1 - Math.pow(1 - t, 3);
-
-    wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
+  requestAnimationFrame(function tick(ts){
+    const t = clamp((ts-spinStartTs)/spinDurationMs,0,1);
+    wheelAngle = spinStartAngle + (targetAngle-spinStartAngle)*(1-Math.pow(1-t,3));
     drawWheel();
-
-    if (t < 1){
-      requestAnimationFrame(tickSpin);
-      return;
-    }
+    if (t<1) return requestAnimationFrame(tick);
 
     spinning = false;
-
-    const ang = normalizeAngle(pointerAngle - wheelAngle);
-    const idx = Math.floor(ang / slice) % n;
-    winnerIndex = (idx + n) % n;
-
-    drawWheel();
-    elWinnerName.textContent = participants[winnerIndex]?.name || "";
+    const ang = normalizeAngle(pointerTargetAngle()-wheelAngle);
+    winnerIndex = Math.floor(ang/slice)%n;
+    elWinnerName.textContent = participants[winnerIndex].name;
     document.documentElement.classList.add("mdi-show-winner");
-    startConfetti();
-  }
+  });
 }
 
-/* ---------------- Socket / Auth ---------------- */
-let socket = null;
-let AUTH_MODE = "strict";
-let ROOM_ID = "";
-let ROOM_KEY = "";
-
-/* ✅ PATCH TIMESTAMP : overlay actif ? */
-let sessionActive = false;
+/* ---------------- Socket ---------------- */
+let socket;
+let AUTH_MODE, ROOM_ID, ROOM_KEY;
 
 function readAuthVars(){
-  const s = getComputedStyle(document.documentElement);
-  AUTH_MODE = (s.getPropertyValue("--auth-mode").trim().replace(/"/g,"") || "strict").toLowerCase();
-  ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g,"") || "";
-  ROOM_KEY = s.getPropertyValue("--room-key").trim().replace(/"/g,"") || "";
-}
-
-/* ✅ PATCH TIMESTAMP : déclenche frontière temporelle côté extension */
-function startSessionTimestamp(){
-  sessionActive = true;
-  try{
-    if (window.chrome?.runtime?.sendMessage){
-      window.chrome.runtime.sendMessage({
-        type: "MDI_SESSION_START",
-        ts: Date.now(),
-        overlay: OVERLAY_NAME
-      });
-    }
-  }catch(e){}
+  AUTH_MODE = cssVar("--auth-mode","strict").toLowerCase();
+  ROOM_ID = cssVar("--room-id","");
+  ROOM_KEY = cssVar("--room-key","");
 }
 
 function initSocket(){
-  socket = io(SERVER_URL, { transports: ["websocket","polling"] });
-
-  socket.on("connect", () => {
-    if (AUTH_MODE === "strict"){
-      socket.emit("overlay:join", { room: ROOM_ID, key: ROOM_KEY, overlay: OVERLAY_NAME });
-    } else {
-      socket.emit("rejoindre_salle", ROOM_ID);
-    }
+  socket = io(SERVER_URL,{transports:["websocket","polling"]});
+  socket.on("connect",()=>{
+    socket.emit("overlay:join",{room:ROOM_ID,key:ROOM_KEY,overlay:OVERLAY_NAME});
   });
-
-  socket.on("overlay:forbidden", () => showDenied());
-
-  socket.on("overlay:state", (payload) => {
-    if (!payload || payload.overlay !== OVERLAY_NAME) return;
-
+  socket.on("overlay:forbidden",showDenied);
+  socket.on("overlay:state",p=>{
+    if(p?.overlay!==OVERLAY_NAME) return;
     showReady();
     readConfig();
-    preStartIndex.setMax(baselineMaxMessages);
-
-    /* ✅ PATCH TIMESTAMP */
-    startSessionTimestamp();
-
-    if ((cssVar("--auto-reset","false") || "false") === "true"){
-      clearAllForNewSession();
-      preStartIndex.clear();
-    } else {
-      hideWinner();
-      drawWheel();
-    }
-
-    phase = "IDLE";
-    baselineSet = new Set();
+    participants=[];
+    phase="IDLE";
+    drawWheel();
   });
+  socket.on("raw_vote",d=>{
+    const msg = normalizeText(d?.vote);
+    if(!msg) return;
 
-  socket.on("raw_vote", (data) => {
-    if (!data) return;
+    if(phase==="IDLE") preStartIndex.add(normKey(msg));
 
-    /* ✅ PATCH TIMESTAMP : ne traite rien avant activation overlay */
-    if (!sessionActive) return;
-
-    readConfig();
-    preStartIndex.setMax(baselineMaxMessages);
-
-    const raw = String(data.vote || "");
-    const msg = normalizeText(raw);
-    if (!msg) return;
-
-    const msgKey = normKey(extractPayload(msg));
-
-    if (phase === "IDLE") {
-      preStartIndex.add(msgKey);
-    }
-
-    if (cmdMatch(msg, collectClearTrigger) || cmdMatch(msg, resetTrigger)) {
-      clearAllForNewSession();
-      preStartIndex.clear();
-      baselineSet = new Set();
-      phase = "IDLE";
-      return;
-    }
-
-    if (cmdMatch(msg, collectStartTrigger)) {
-      if (clearOnStart) clearAllForNewSession();
-
+    if(cmdMatch(msg,collectStartTrigger)){
       baselineSet = preStartIndex.snapshotSet();
-      baselineSet.add(msgKey);
-
-      phase = "COLLECTING";
-      hideWinner();
+      phase="COLLECTING";
       return;
     }
+    if(cmdMatch(msg,collectStopTrigger)){ phase="READY"; return; }
+    if(cmdMatch(msg,spinTrigger)){ spin(); return; }
 
-    if (cmdMatch(msg, collectStopTrigger)) {
-      if (phase === "COLLECTING") phase = "READY";
-      return;
-    }
+    if(phase!=="COLLECTING") return;
+    if(baselineSet.has(normKey(msg))) return;
+    if(!isValidName(msg)) return;
 
-    if (cmdMatch(msg, spinTrigger)) {
-      if (blockSpinWhileCollecting && phase === "COLLECTING") return;
-      if (phase !== "READY") return;
-      spin();
-      return;
-    }
-
-    if (phase !== "COLLECTING") return;
-    addParticipant(msg);
+    const k = keyOfName(msg);
+    if(participants.some(p=>p.key===k)) return;
+    participants.push({name:msg,key:k});
+    drawWheel();
   });
 }
 
 /* ---------------- Init ---------------- */
 function init(){
   setBootTransparent();
-
-  // ✅ PATCH TIMESTAMP : session inactive tant que overlay:state pas reçu
-  sessionActive = false;
-
-  const poll = setInterval(() => {
-    readAuthVars();
-    readConfig();
-
-    if (AUTH_MODE === "legacy"){
-      if (!ROOM_ID) return;
+  const poll=setInterval(()=>{
+    readAuthVars(); readConfig();
+    if(ROOM_ID && ROOM_KEY){
       clearInterval(poll);
       resizeWheelCanvas();
-      resizeConfetti();
-      initSocket();
-      return;
-    }
-
-    if (ROOM_ID && ROOM_KEY){
-      clearInterval(poll);
-      resizeWheelCanvas();
-      resizeConfetti();
       initSocket();
     }
-  }, 200);
-
-  setTimeout(() => {
-    readAuthVars();
-    if (AUTH_MODE === "strict" && (!ROOM_ID || !ROOM_KEY)){
-      showDenied();
-    }
-  }, 1400);
-
-  window.addEventListener("resize", () => {
-    resizeWheelCanvas();
-    resizeConfetti();
-  });
-
+  },200);
   resizeWheelCanvas();
-  resizeConfetti();
-  hideWinner();
-  drawWheel();
 }
-
 init();
