@@ -25,6 +25,13 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-famil
 .btn:hover{background:rgba(255,255,255,0.14)}
 .btn:disabled{opacity:0.45;cursor:not-allowed}
 .btn.ghost{background:transparent}
+.btn.danger{
+  background: rgba(255,59,48,0.20);
+  border-color: rgba(255,59,48,0.35);
+  color: rgba(255,210,210,0.95);
+}
+.btn.danger:hover{background: rgba(255,59,48,0.26);}
+
 .panel{margin-top:14px;padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:16px}
 .row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .label{font-size:12px;color:var(--muted);margin:0 0 6px 2px}
@@ -32,9 +39,17 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-famil
 .right{display:flex;gap:10px}
 .hint{margin-top:10px;font-size:13px;color:var(--muted)}
 .list{margin-top:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 220px);overflow:auto;padding-right:4px}
+
 .item{display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--panel2);border:1px solid rgba(255,255,255,0.10);border-radius:14px;cursor:pointer}
 .item:hover{border-color:rgba(255,255,255,0.18)}
 .item.pinned{outline:2px solid rgba(249,173,72,0.55)}
+
+/* ✅ Surbrillance verte = message actuellement affiché */
+.item.active{
+  border-color: rgba(46,204,113,0.60);
+  box-shadow: 0 0 0 3px rgba(46,204,113,0.18);
+}
+
 .badge{flex:0 0 auto;font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);color:rgba(255,255,255,0.78);background:rgba(0,0,0,0.25)}
 .body{flex:1 1 auto;min-width:0}
 .meta{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;gap:8px}
