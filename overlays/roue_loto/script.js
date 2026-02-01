@@ -130,21 +130,16 @@ function cmdMatch(message, trigger){
   return msg.includes(trg); // contains
 }
 
-/* ---------------- Robust anti-reliquat baseline ----------------
-   On indexe TOUS les messages vus avant START (pas juste 15s).
-   START => on "gèle" une baseline (ensemble des messages déjà vus).
-   COLLECTING => on ignore tout message qui appartient à baseline.
---------------------------------------------------------------- */
+/* ---------------- Robust anti-reliquat baseline ---------------- */
 class LRUSet {
   constructor(max = 5000){
     this.max = max;
-    this.map = new Map(); // key -> true (in insertion order)
+    this.map = new Map();
   }
   has(key){ return this.map.has(key); }
   add(key){
     if (!key) return;
     if (this.map.has(key)) {
-      // refresh order
       this.map.delete(key);
       this.map.set(key, true);
       return;
@@ -156,9 +151,7 @@ class LRUSet {
     }
   }
   clear(){ this.map.clear(); }
-  snapshotSet(){
-    return new Set(this.map.keys());
-  }
+  snapshotSet(){ return new Set(this.map.keys()); }
   setMax(n){
     this.max = n;
     while (this.map.size > this.max){
@@ -178,7 +171,6 @@ function isValidName(raw){
   const t = normalizeText(extractPayload(raw));
   if (!t) return false;
 
-  // Interdit si commande
   if (cmdMatch(t, collectStartTrigger)) return false;
   if (cmdMatch(t, collectStopTrigger))  return false;
   if (cmdMatch(t, spinTrigger))         return false;
@@ -189,7 +181,6 @@ function isValidName(raw){
   if (t.split(" ").filter(Boolean).length > 2) return false;
 
   if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
-
   return true;
 }
 
@@ -402,9 +393,6 @@ function addParticipant(message){
 
   const msgKey = normKey(payload);
 
-  // ✅ NOUVEL ANTI-RELIQUAT ROBUSTE :
-  // si ce texte a déjà été vu AVANT START, on l’ignore,
-  // même s’il est renvoyé après (re-render chat).
   if (baselineSet.has(msgKey)) return;
 
   const clean = normalizeText(payload);
@@ -418,7 +406,7 @@ function addParticipant(message){
   drawWheel();
 }
 
-/* ---------------- Spin (blindé) ---------------- */
+/* ---------------- Spin ---------------- */
 let phase = "IDLE"; // IDLE | COLLECTING | READY
 let lastSpinAt = 0;
 
@@ -458,9 +446,6 @@ function spin(){
   const extraTurns = 6 + Math.floor(rand01()*4);
   const extra = extraTurns * Math.PI*2;
 
-  // ✅ sens de rotation :
-  // cw = horaire => angle diminue
-  // ccw = anti-horaire => angle augmente
   const dir = (spinDirection === "ccw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
@@ -501,11 +486,28 @@ let AUTH_MODE = "strict";
 let ROOM_ID = "";
 let ROOM_KEY = "";
 
+/* ✅ PATCH TIMESTAMP : overlay actif ? */
+let sessionActive = false;
+
 function readAuthVars(){
   const s = getComputedStyle(document.documentElement);
   AUTH_MODE = (s.getPropertyValue("--auth-mode").trim().replace(/"/g,"") || "strict").toLowerCase();
   ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g,"") || "";
   ROOM_KEY = s.getPropertyValue("--room-key").trim().replace(/"/g,"") || "";
+}
+
+/* ✅ PATCH TIMESTAMP : déclenche frontière temporelle côté extension */
+function startSessionTimestamp(){
+  sessionActive = true;
+  try{
+    if (window.chrome?.runtime?.sendMessage){
+      window.chrome.runtime.sendMessage({
+        type: "MDI_SESSION_START",
+        ts: Date.now(),
+        overlay: OVERLAY_NAME
+      });
+    }
+  }catch(e){}
 }
 
 function initSocket(){
@@ -528,6 +530,9 @@ function initSocket(){
     readConfig();
     preStartIndex.setMax(baselineMaxMessages);
 
+    /* ✅ PATCH TIMESTAMP */
+    startSessionTimestamp();
+
     if ((cssVar("--auto-reset","false") || "false") === "true"){
       clearAllForNewSession();
       preStartIndex.clear();
@@ -543,6 +548,9 @@ function initSocket(){
   socket.on("raw_vote", (data) => {
     if (!data) return;
 
+    /* ✅ PATCH TIMESTAMP : ne traite rien avant activation overlay */
+    if (!sessionActive) return;
+
     readConfig();
     preStartIndex.setMax(baselineMaxMessages);
 
@@ -552,12 +560,10 @@ function initSocket(){
 
     const msgKey = normKey(extractPayload(msg));
 
-    // En IDLE, on indexe tout ce qui passe (anti-reliquat)
     if (phase === "IDLE") {
       preStartIndex.add(msgKey);
     }
 
-    // --- Commandes
     if (cmdMatch(msg, collectClearTrigger) || cmdMatch(msg, resetTrigger)) {
       clearAllForNewSession();
       preStartIndex.clear();
@@ -569,10 +575,7 @@ function initSocket(){
     if (cmdMatch(msg, collectStartTrigger)) {
       if (clearOnStart) clearAllForNewSession();
 
-      // ✅ Baseline = tous les messages vus AVANT START (LRU)
       baselineSet = preStartIndex.snapshotSet();
-
-      // On indexe aussi le START lui-même pour éviter que ça pollue
       baselineSet.add(msgKey);
 
       phase = "COLLECTING";
@@ -592,7 +595,6 @@ function initSocket(){
       return;
     }
 
-    // --- Collecte
     if (phase !== "COLLECTING") return;
     addParticipant(msg);
   });
@@ -601,6 +603,9 @@ function initSocket(){
 /* ---------------- Init ---------------- */
 function init(){
   setBootTransparent();
+
+  // ✅ PATCH TIMESTAMP : session inactive tant que overlay:state pas reçu
+  sessionActive = false;
 
   const poll = setInterval(() => {
     readAuthVars();
