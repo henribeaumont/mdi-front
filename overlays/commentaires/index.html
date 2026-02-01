@@ -3,25 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Chat Display Remote</title>
+  <title>MDI • Commentaires</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-  <!-- Écran sécurité -->
-  <div id="security-screen" class="mdi-security hidden" aria-hidden="true">
-    <div class="mdi-x">✖</div>
-    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  <!-- Sécurité -->
+  <div id="security-screen" aria-hidden="true">
+    <div class="security-x">✖</div>
+    <div class="security-text">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
 
   <!-- App -->
-  <div id="app" class="hidden" aria-hidden="true">
-    <div id="card" class="card is-hidden" aria-hidden="true">
-      <div id="meta" class="meta hidden">
-        <span id="author" class="author"></span>
-      </div>
+  <div id="app" aria-hidden="true">
+    <div id="panel" class="panel">
+      <div id="meta" class="meta"></div>
       <div id="text" class="text"></div>
     </div>
   </div>
