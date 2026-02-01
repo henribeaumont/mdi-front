@@ -1,94 +1,106 @@
 /**
- * MDI WORD CLOUD - V6.1 DEBUG FORCE
- * - Affiche les logs de connexion directement sur l'écran
- * - Tolérance maximale sur les variables CSS
+ * MDI WORD CLOUD - V6.2 (HOTFIX FLUX)
+ * Réconciliation Extension (Legacy) + Overlay (SaaS)
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "word_cloud";
 
-/* --- LECTEUR CONFIG --- */
 function cssVar(name, fallback = "") {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(name);
-    return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
 }
 
-// Zone de log pour voir ce qui se passe dans OBS
-const debugDiv = document.createElement('div');
-debugDiv.style = "position:absolute; top:10px; left:10px; color:white; font-family:monospace; font-size:12px; background:rgba(0,0,0,0.7); z-index:9999; padding:10px; border-radius:5px;";
-document.body.appendChild(debugDiv);
-
-function logDebug(msg) {
-    debugDiv.innerHTML += `<div>> ${msg}</div>`;
-    console.log(msg);
-}
-
-/* --- UI --- */
 const zone = document.getElementById("word-zone");
 const container = document.getElementById("cloud-container");
 
-function showCloud() {
-    document.getElementById("security-screen").classList.add("hidden");
-    container.classList.remove("hidden");
-}
-
-/* --- LOGIQUE --- */
+/* --- MOTEUR --- */
 let dbMots = {};
+let dedupeCache = new Map();
+let globalColorIndex = 0;
+
+function resetEcran() {
+  zone.innerHTML = "";
+  dbMots = {};
+  dedupeCache.clear();
+}
 
 function traiterMessage(v) {
-    logDebug(`Message reçu: ${v}`);
-    let texte = String(v).trim();
+  let texte = String(v || "").trim();
+  const prefixMode = cssVar("--wc-prefix-mode", "on");
+  const prefix = cssVar("--wc-prefix", "#");
 
-    // Filtre simple pour test
-    if (!texte.startsWith("#")) {
-        logDebug("Ignoré: pas de #");
-        return;
-    }
+  // FILTRE PREFIXE
+  if (prefixMode === "on") {
+    if (!texte.startsWith(prefix)) return;
+    texte = texte.substring(prefix.length).trim();
+  }
+  
+  if (!texte || texte.toUpperCase() === "RESET") { if(texte) resetEcran(); return; }
 
-    const mot = texte.replace("#", "").trim().toUpperCase();
-    if (!dbMots[mot]) dbMots[mot] = { count: 0 };
-    dbMots[mot].count++;
+  // DEDUP (10 sec par défaut pour test)
+  const key = texte.toUpperCase();
+  if (dedupeCache.has(key)) return;
+  dedupeCache.set(key, true);
+  setTimeout(() => dedupeCache.delete(key), 10000);
 
-    renderSimple();
+  if (dbMots[key]) {
+    dbMots[key].count++;
+  } else {
+    const palette = [cssVar("--color-1", "#F054A2"), cssVar("--color-2", "#2ecc71"), cssVar("--color-3", "#F9AD48"), cssVar("--color-4", "#3b82f6"), cssVar("--color-5", "#ffffff")];
+    dbMots[key] = { text: texte, count: 1, color: palette[globalColorIndex % 5] };
+    globalColorIndex++;
+  }
+  render();
 }
 
-function renderSimple() {
-    zone.innerHTML = "";
-    Object.keys(dbMots).forEach((m, i) => {
-        const div = document.createElement("div");
-        div.className = "mot mdi-in";
-        div.style = `position:absolute; left:50%; top:${50 + (i*40)}px; color:white; font-size:30px; transform:translateX(-50%);`;
-        div.innerText = `${m} (${dbMots[m].count})`;
-        zone.appendChild(div);
-    });
+function render() {
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  Object.values(dbMots).forEach((mot, i) => {
+    let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
+    if (!el) {
+      el = document.createElement("div");
+      el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
+      el.className = "mot mdi-in";
+      el.innerText = mot.text;
+      el.style.color = mot.color;
+      zone.appendChild(el);
+    }
+    el.style.left = `${(W/2) + (Math.cos(i) * (i * 20))}px`;
+    el.style.top = `${(H/2) + (Math.sin(i) * (i * 20))}px`;
+    el.style.fontSize = `${Math.max(20, 70 - (i * 2))}px`;
+  });
 }
 
 /* --- CONNEXION --- */
-logDebug("Initialisation socket...");
 const socket = io(SERVER_URL, { transports: ["websocket"] });
 
 async function init() {
-    await new Promise(r => setTimeout(r, 1000));
-    
-    const room = cssVar("--room-id", "H_Perso");
-    const key = cssVar("--room-key", "H2208");
+  await new Promise(r => setTimeout(r, 1000));
+  const room = cssVar("--room-id");
+  const key = cssVar("--room-key");
 
-    logDebug(`Tentative Join Room: ${room}`);
-    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  if (!room) return;
 
-    socket.on("connect", () => logDebug("✅ Serveur Connecté !"));
-    socket.on("connect_error", (e) => logDebug(`❌ Erreur Connexion: ${e.message}`));
+  // 1. Join SaaS (pour l'auth et l'état)
+  socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  
+  // 2. IMPORTANT : Join Legacy (pour entendre l'extension content.js)
+  // C'est ici que ton server.js attend l'extension
+  socket.emit("rejoindre_salle", room);
 
-    socket.on("overlay:state", (p) => {
-        logDebug("📩 État reçu du serveur");
-        showCloud();
-    });
+  socket.on("overlay:state", (p) => {
+    if (p.overlay === OVERLAY_TYPE) {
+        document.getElementById("security-screen").classList.add("hidden");
+        container.classList.remove("hidden");
+    }
+  });
 
-    socket.on("raw_vote", (data) => {
-        traiterMessage(data.vote);
-    });
-
-    socket.on("overlay:forbidden", () => logDebug("❌ Erreur: Clé/Room invalide"));
+  // Écoute le canal de l'extension
+  socket.on("raw_vote", (data) => {
+    traiterMessage(data.vote);
+  });
 }
 
 init();
