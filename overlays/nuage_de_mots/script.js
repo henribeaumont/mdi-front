@@ -1,141 +1,94 @@
 /**
- * MDI WORD CLOUD - V6.0 SaaS
- * Support complet du CSS OBS pédagogique (Préfixe, TTL, Room)
+ * MDI WORD CLOUD - V6.1 DEBUG FORCE
+ * - Affiche les logs de connexion directement sur l'écran
+ * - Tolérance maximale sur les variables CSS
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "word_cloud";
 
-/* --- LECTEUR DE CONFIG OBS --- */
+/* --- LECTEUR CONFIG --- */
 function cssVar(name, fallback = "") {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name);
-  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+    return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+}
+
+// Zone de log pour voir ce qui se passe dans OBS
+const debugDiv = document.createElement('div');
+debugDiv.style = "position:absolute; top:10px; left:10px; color:white; font-family:monospace; font-size:12px; background:rgba(0,0,0,0.7); z-index:9999; padding:10px; border-radius:5px;";
+document.body.appendChild(debugDiv);
+
+function logDebug(msg) {
+    debugDiv.innerHTML += `<div>> ${msg}</div>`;
+    console.log(msg);
 }
 
 /* --- UI --- */
-const elSecurity = document.getElementById("security-screen");
-const elCloud = document.getElementById("cloud-container");
 const zone = document.getElementById("word-zone");
 const container = document.getElementById("cloud-container");
-const measureZone = document.getElementById("measure-zone");
-
-function showDenied() {
-  elCloud.classList.add("hidden");
-  elSecurity.classList.remove("hidden");
-}
 
 function showCloud() {
-  elSecurity.classList.add("hidden");
-  elCloud.classList.remove("hidden");
+    document.getElementById("security-screen").classList.add("hidden");
+    container.classList.remove("hidden");
 }
 
-/* --- MOTEUR --- */
+/* --- LOGIQUE --- */
 let dbMots = {};
-let dedupeCache = new Map(); // Cache intelligent avec expiration
-let globalColorIndex = 0;
 
-function resetEcran() {
-  zone.innerHTML = "";
-  dbMots = {};
-  dedupeCache.clear();
-  globalColorIndex = 0;
-}
+function traiterMessage(v) {
+    logDebug(`Message reçu: ${v}`);
+    let texte = String(v).trim();
 
-function traiterMessage(texteBrut) {
-  if (!texteBrut) return;
-  let texte = String(texteBrut).trim();
-
-  // 1. GESTION DU PRÉFIXE (#)
-  const prefixMode = cssVar("--wc-prefix-mode", "on");
-  const prefix = cssVar("--wc-prefix", "#");
-
-  if (prefixMode === "on") {
-    if (!texte.startsWith(prefix)) return;
-    texte = texte.substring(prefix.length).trim();
-  }
-  
-  if (!texte) return;
-  if (texte.toUpperCase() === "RESET") { resetEcran(); return; }
-
-  // 2. ANTI-DOUBLON (DEDUP)
-  const ttl = parseInt(cssVar("--wc-dedup-ttl-ms", "600000"));
-  const key = texte.toUpperCase();
-  const now = Date.now();
-
-  if (dedupeCache.has(key) && (now - dedupeCache.get(key) < ttl)) {
-    return; // Ignoré car déjà vu récemment
-  }
-  dedupeCache.set(key, now);
-
-  // 3. MISE À JOUR DB
-  if (dbMots[key]) {
-    dbMots[key].count++;
-  } else {
-    const palette = [
-      cssVar("--color-1", "#F054A2"), cssVar("--color-2", "#2ecc71"),
-      cssVar("--color-3", "#F9AD48"), cssVar("--color-4", "#3b82f6"),
-      cssVar("--color-5", "#ffffff")
-    ];
-    dbMots[key] = { text: texte, count: 1, color: palette[globalColorIndex] };
-    globalColorIndex = (globalColorIndex + 1) % palette.length;
-  }
-  
-  calculerEtAfficherNuage();
-}
-
-function calculerEtAfficherNuage() {
-  let listeMots = Object.values(dbMots);
-  listeMots.sort((a, b) => b.count - a.count);
-  
-  const W = container.clientWidth;
-  const H = container.clientHeight;
-  
-  // Placement simplifié pour validation immédiate
-  listeMots.forEach((mot, index) => {
-    let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
-    if (!el) {
-      el = document.createElement("div");
-      el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
-      el.className = "mot mdi-in";
-      el.innerText = mot.text;
-      el.style.color = mot.color;
-      zone.appendChild(el);
+    // Filtre simple pour test
+    if (!texte.startsWith("#")) {
+        logDebug("Ignoré: pas de #");
+        return;
     }
-    const angle = index * 0.8;
-    const radius = index * 20;
-    el.style.left = `${(W/2) + Math.cos(angle) * radius}px`;
-    el.style.top = `${(H/2) + Math.sin(angle) * radius}px`;
-    el.style.fontSize = `${Math.max(20, 80 - (index * 3))}px`;
-  });
+
+    const mot = texte.replace("#", "").trim().toUpperCase();
+    if (!dbMots[mot]) dbMots[mot] = { count: 0 };
+    dbMots[mot].count++;
+
+    renderSimple();
+}
+
+function renderSimple() {
+    zone.innerHTML = "";
+    Object.keys(dbMots).forEach((m, i) => {
+        const div = document.createElement("div");
+        div.className = "mot mdi-in";
+        div.style = `position:absolute; left:50%; top:${50 + (i*40)}px; color:white; font-size:30px; transform:translateX(-50%);`;
+        div.innerText = `${m} (${dbMots[m].count})`;
+        zone.appendChild(div);
+    });
 }
 
 /* --- CONNEXION --- */
+logDebug("Initialisation socket...");
 const socket = io(SERVER_URL, { transports: ["websocket"] });
 
 async function init() {
-  // Attente pour laisser le temps à OBS d'injecter le CSS
-  await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const room = cssVar("--room-id", "H_Perso");
+    const key = cssVar("--room-key", "H2208");
 
-  const room = cssVar("--room-id");
-  const key = cssVar("--room-key");
-  const authMode = cssVar("--auth-mode", "strict");
+    logDebug(`Tentative Join Room: ${room}`);
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
 
-  if (!room || (authMode === "strict" && !key)) {
-    showDenied();
-    return;
-  }
+    socket.on("connect", () => logDebug("✅ Serveur Connecté !"));
+    socket.on("connect_error", (e) => logDebug(`❌ Erreur Connexion: ${e.message}`));
 
-  socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+    socket.on("overlay:state", (p) => {
+        logDebug("📩 État reçu du serveur");
+        showCloud();
+    });
 
-  socket.on("overlay:state", (p) => {
-    if (p.overlay === OVERLAY_TYPE) {
-      if (cssVar("--auto-reset") === "true") resetEcran();
-      showCloud();
-    }
-  });
+    socket.on("raw_vote", (data) => {
+        traiterMessage(data.vote);
+    });
 
-  socket.on("raw_vote", (data) => traiterMessage(data.vote));
-  socket.on("overlay:forbidden", () => showDenied());
+    socket.on("overlay:forbidden", () => logDebug("❌ Erreur: Clé/Room invalide"));
 }
 
 init();
