@@ -101,8 +101,8 @@ function readConfig(){
   pointerSide = (pointerSide === "left") ? "left" : "right";
   document.documentElement.setAttribute("data-pointer-side", pointerSide);
 
-  const flipPointer = cssOnOff("--pointer-rotate-180", true);
-  document.documentElement.classList.toggle("mdi-pointer-flip", !!flipPointer);
+  const flip = cssOnOff("--pointer-rotate-180", true);
+  document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
 }
 
 /* ---------------- Text normalization / command match ---------------- */
@@ -134,12 +134,13 @@ function cmdMatch(message, trigger){
 class LRUSet {
   constructor(max = 5000){
     this.max = max;
-    this.map = new Map(); // key -> true
+    this.map = new Map(); // key -> true (in insertion order)
   }
   has(key){ return this.map.has(key); }
   add(key){
     if (!key) return;
     if (this.map.has(key)) {
+      // refresh order
       this.map.delete(key);
       this.map.set(key, true);
       return;
@@ -151,7 +152,9 @@ class LRUSet {
     }
   }
   clear(){ this.map.clear(); }
-  snapshotSet(){ return new Set(this.map.keys()); }
+  snapshotSet(){
+    return new Set(this.map.keys());
+  }
   setMax(n){
     this.max = n;
     while (this.map.size > this.max){
@@ -282,7 +285,7 @@ function drawWheel(){
     wheelCtx.save();
     wheelCtx.rotate(mid);
 
-    // ✅ IMPORTANT : définir la police AVANT de dessiner (sinon texte minuscule)
+    // ✅ (inchangé) style texte EXACT comme avant
     wheelCtx.fillStyle = "rgba(255,255,255,0.96)";
     wheelCtx.font = `${textWeight} ${textSize}px Montserrat, sans-serif`;
     wheelCtx.textBaseline = "middle";
@@ -294,8 +297,7 @@ function drawWheel(){
 
     const tx = Math.max(120, r*0.26);
 
-    // ✅ Flip 180° SANS changer de camembert :
-    // on retourne l’axe, puis on écrit à -tx avec align right.
+    // ✅ PATCH 1 : rotation 180° DU TEXTE SANS CHANGER DE CAMEMBERT
     const flipLabel = cssOnOff("--label-rotate-180", false);
     if (flipLabel) {
       wheelCtx.rotate(Math.PI);
@@ -420,7 +422,7 @@ function addParticipant(message){
   drawWheel();
 }
 
-/* ---------------- Spin ---------------- */
+/* ---------------- Spin (blindé) ---------------- */
 let phase = "IDLE"; // IDLE | COLLECTING | READY
 let lastSpinAt = 0;
 
@@ -460,7 +462,7 @@ function spin(){
   const extraTurns = 6 + Math.floor(rand01()*4);
   const extra = extraTurns * Math.PI*2;
 
-  // ✅ CORRECTION : cw = horaire, ccw = anti-horaire
+  // ✅ PATCH 2 : cw = horaire, ccw = anti-horaire
   const dir = (spinDirection === "cw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
@@ -501,27 +503,11 @@ let AUTH_MODE = "strict";
 let ROOM_ID = "";
 let ROOM_KEY = "";
 
-/* timestamp/session : overlay actif ? */
-let sessionActive = false;
-
 function readAuthVars(){
   const s = getComputedStyle(document.documentElement);
   AUTH_MODE = (s.getPropertyValue("--auth-mode").trim().replace(/"/g,"") || "strict").toLowerCase();
   ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g,"") || "";
   ROOM_KEY = s.getPropertyValue("--room-key").trim().replace(/"/g,"") || "";
-}
-
-function startSessionTimestamp(){
-  sessionActive = true;
-  try{
-    if (window.chrome?.runtime?.sendMessage){
-      window.chrome.runtime.sendMessage({
-        type: "MDI_SESSION_START",
-        ts: Date.now(),
-        overlay: OVERLAY_NAME
-      });
-    }
-  }catch(e){}
 }
 
 function initSocket(){
@@ -544,8 +530,6 @@ function initSocket(){
     readConfig();
     preStartIndex.setMax(baselineMaxMessages);
 
-    startSessionTimestamp();
-
     if ((cssVar("--auto-reset","false") || "false") === "true"){
       clearAllForNewSession();
       preStartIndex.clear();
@@ -560,7 +544,6 @@ function initSocket(){
 
   socket.on("raw_vote", (data) => {
     if (!data) return;
-    if (!sessionActive) return;
 
     readConfig();
     preStartIndex.setMax(baselineMaxMessages);
@@ -571,7 +554,7 @@ function initSocket(){
 
     const msgKey = normKey(extractPayload(msg));
 
-    // En IDLE, on indexe tout ce qui passe
+    // En IDLE, on indexe tout ce qui passe (anti-reliquat)
     if (phase === "IDLE") {
       preStartIndex.add(msgKey);
     }
@@ -588,6 +571,7 @@ function initSocket(){
     if (cmdMatch(msg, collectStartTrigger)) {
       if (clearOnStart) clearAllForNewSession();
 
+      // Baseline = tous les messages vus AVANT START (LRU)
       baselineSet = preStartIndex.snapshotSet();
       baselineSet.add(msgKey);
 
@@ -617,7 +601,6 @@ function initSocket(){
 /* ---------------- Init ---------------- */
 function init(){
   setBootTransparent();
-  sessionActive = false;
 
   const poll = setInterval(() => {
     readAuthVars();
