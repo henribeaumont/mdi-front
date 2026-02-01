@@ -3,30 +3,229 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Commentaires</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+  <title>MDI • Overlay Commentaires</title>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <!-- Sécurité -->
-  <div id="security-screen" aria-hidden="true">
-    <div class="security-x">✖</div>
-    <div class="security-text">ACCÈS REFUSÉ / ACCESS DENIED</div>
-  </div>
 
-  <!-- App -->
-  <div id="app" aria-hidden="true">
-    <div id="panel" class="panel">
-      <div id="meta" class="meta"></div>
-      <div id="text" class="text"></div>
+  <style>
+    :root{
+      --bg: transparent;
+      --text: rgba(255,255,255,0.96);
+      --muted: rgba(255,255,255,0.70);
+      --accent:#F9AD48;
+      --ok:#2ecc71;
+      --panel: rgba(10,15,30,0.72);
+      --border: rgba(255,255,255,0.16);
+
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    *{ box-sizing:border-box; }
+    html, body{
+      width:100%;
+      height:100%;
+      margin:0;
+      background: var(--bg);
+      overflow:hidden;
+      font-family: var(--font);
+    }
+
+    /* Anti-flicker */
+    body.ready { opacity: 1; }
+    body { opacity: 0; transition: opacity .12s ease; }
+
+    .stage{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      padding: 36px;
+    }
+
+    .card{
+      max-width: 1100px;
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px 20px;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+      transform: translateY(16px);
+      opacity: 0;
+      transition: opacity .18s ease, transform .18s ease;
+      pointer-events:none;
+    }
+
+    .card.show{
+      opacity: 1;
+      transform: translateY(0px);
+    }
+
+    .meta{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(0,0,0,0.18);
+    }
+
+    .dot{
+      width:10px; height:10px;
+      border-radius:50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(249,173,72,0.18);
+    }
+
+    .text{
+      color: var(--text);
+      font-size: 44px;
+      font-weight: 900;
+      line-height: 1.08;
+      letter-spacing: -0.6px;
+      word-break: break-word;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px){
+      .stage{ padding: 18px; }
+      .text{ font-size: 34px; }
+    }
+    @media (max-width: 520px){
+      .text{ font-size: 26px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage">
+    <div id="card" class="card" aria-live="polite">
+      <div class="meta">
+        <span class="pill"><span class="dot"></span><span>Commentaire</span></span>
+        <span id="clock"></span>
+      </div>
+      <div id="txt" class="text"></div>
     </div>
   </div>
 
-  <script src="script.js"></script>
+<script>
+  const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+  const OVERLAY = "commentaires";
+
+  // ✅ Mets tes valeurs en dur ici si tu veux (sinon via URL ?room=...&key=...)
+  // const ID_SALLE = "TON_ID";
+  // const ROOM_KEY = "TA_KEY";
+
+  const $ = (id) => document.getElementById(id);
+  const card = $("card");
+  const txt  = $("txt");
+  const clock = $("clock");
+
+  let socket = null;
+  let displayed = false;
+  let lastText = "";
+
+  function setClock(){
+    const d = new Date();
+    const h = String(d.getHours()).padStart(2,"0");
+    const m = String(d.getMinutes()).padStart(2,"0");
+    const s = String(d.getSeconds()).padStart(2,"0");
+    clock.textContent = `${h}:${m}:${s}`;
+  }
+  setClock();
+  setInterval(setClock, 1000);
+
+  function cleanText(t){
+    return String(t ?? "").replace(/\s+/g, " ").trim();
+  }
+
+  function show(text){
+    const t = cleanText(text);
+    if(!t) return;
+
+    // évite spam de "show" identiques
+    if(displayed && t === lastText) return;
+
+    lastText = t;
+    txt.textContent = t;
+
+    card.classList.add("show");
+    displayed = true;
+  }
+
+  function hide(){
+    card.classList.remove("show");
+    displayed = false;
+    // on garde lastText (pratique si show identique revient)
+  }
+
+  // ---- Auth params ----
+  const u = new URL(location.href);
+  const room = cleanText(u.searchParams.get("room") /*|| ID_SALLE*/);
+  const key  = cleanText(u.searchParams.get("key")  /*|| ROOM_KEY*/);
+
+  // Si pas de room/key -> on reste juste prêt (évite écran vide flicker)
+  document.body.classList.add("ready");
+
+  if(!room || !key){
+    console.warn("[overlay commentaires] Missing room/key. Add ?room=...&key=...");
+  } else {
+    socket = io(SERVER_URL, { transports: ["websocket","polling"] });
+
+    socket.on("connect", () => {
+      socket.emit("overlay:join", { room, key, overlay: OVERLAY });
+    });
+
+    socket.on("overlay:forbidden", () => {
+      console.error("[overlay commentaires] FORBIDDEN. Check ID_SALLE / ROOM_KEY.");
+    });
+
+    // ✅ Chemin “standard” : control:set_state
+    socket.on("control:set_state", (payload) => {
+      try{
+        if(!payload) return;
+        if(payload.overlay && payload.overlay !== OVERLAY) return;
+
+        const state = payload.state;
+        const data  = payload.data || {};
+        if(state === "show") show(data.text);
+        if(state === "hide") hide();
+      }catch(e){
+        console.warn("[overlay commentaires] bad payload", e);
+      }
+    });
+
+    // ✅ Bonus compat : certains builds envoient "control:commentaires"
+    socket.on("control:commentaires", (payload) => {
+      try{
+        if(!payload) return;
+        // payload: { room, action:"show/hide", text, user }
+        const action = payload.action;
+        if(action === "show") show(payload.text);
+        if(action === "hide") hide();
+      }catch(e){
+        console.warn("[overlay commentaires] bad payload (commentaires)", e);
+      }
+    });
+  }
+
+  // Pour tests rapides dans OBS: ajoute #test=Hello dans l’URL
+  if(u.searchParams.get("test")){
+    show(u.searchParams.get("test"));
+  }
+</script>
 </body>
 </html>
