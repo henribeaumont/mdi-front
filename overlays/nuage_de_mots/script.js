@@ -1,10 +1,12 @@
 /**
- * MDI WORD CLOUD - V5.7 SaaS (PREFIX FILTER + DEDUP TTL + DEBUG)
- * Objectif: ne traiter QUE les messages préfixés (ex: #), sans toucher serveur/extension.
+ * MDI WORD CLOUD - V5.7 SaaS
+ * BUILD: WC-PREFIX-DEBUG-001
+ * Objectif: prouver visuellement que le bon script est chargé + filtrer par préfixe.
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "word_cloud";
+const BUILD_ID = "WC-PREFIX-DEBUG-001";
 
 /* --- UTILS --- */
 function cssVar(name, fallback = "") {
@@ -41,6 +43,33 @@ function showCloud() {
   document.body.style.backgroundColor = "transparent";
 }
 
+/* --- BADGE DEBUG (pour prouver le bon build + valeurs CSS lues) --- */
+function ensureBadge() {
+  let badge = document.getElementById("mdi-wc-badge");
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "mdi-wc-badge";
+    badge.style.position = "fixed";
+    badge.style.left = "10px";
+    badge.style.top = "10px";
+    badge.style.zIndex = "99999";
+    badge.style.padding = "6px 10px";
+    badge.style.borderRadius = "10px";
+    badge.style.font = "700 12px ui-sans-serif, system-ui, sans-serif";
+    badge.style.background = "rgba(0,0,0,0.55)";
+    badge.style.color = "rgba(255,255,255,0.95)";
+    badge.style.backdropFilter = "blur(6px)";
+    badge.style.pointerEvents = "none";
+    document.body.appendChild(badge);
+  }
+  return badge;
+}
+
+function updateBadge(extraLine) {
+  const badge = ensureBadge();
+  badge.innerHTML = `<div>MDI WC • ${BUILD_ID}</div>${extraLine ? `<div style="opacity:.9">${extraLine}</div>` : ""}`;
+}
+
 /* --- MOTEUR VISUEL --- */
 let dbMots = {};
 let globalColorIndex = 0;
@@ -71,15 +100,14 @@ function resetEcran() {
   dedupMap.clear();
 }
 
-/* --- PREFIX FILTER + DEDUP --- */
+/* --- PREFIX FILTER + DEDUP TTL --- */
 function getPrefixConfig() {
-  // IMPORTANT: on considère "off" comme seul désactivateur.
   const mode = (cssVar("--wc-prefix-mode", "on") || "on").toLowerCase(); // on|off
   const prefix = cssVar("--wc-prefix", "#") || "#";
   return { enabled: mode !== "off", prefix: String(prefix) };
 }
 
-const dedupMap = new Map(); // key => lastSeenMs
+const dedupMap = new Map();
 function getDedupConfig() {
   const ttlMs = parseInt(cssVar("--wc-dedup-ttl-ms", "600000"), 10);
   const maxSize = parseInt(cssVar("--wc-dedup-max", "1200"), 10);
@@ -88,7 +116,6 @@ function getDedupConfig() {
     maxSize: clamp(Number.isFinite(maxSize) ? maxSize : 1200, 50, 20000),
   };
 }
-
 function dedupShouldDrop(tokenUpper) {
   const { ttlMs, maxSize } = getDedupConfig();
   if (ttlMs <= 0) return false;
@@ -116,7 +143,6 @@ function extractIfPrefixed(inputText) {
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // Si enabled => DOIT commencer par prefix
   if (enabled) {
     if (!trimmed.startsWith(prefix)) return null;
     let out = trimmed.slice(prefix.length);
@@ -124,7 +150,6 @@ function extractIfPrefixed(inputText) {
     return out ? out : null;
   }
 
-  // disabled => passe tout
   return trimmed;
 }
 
@@ -132,46 +157,34 @@ function extractIfPrefixed(inputText) {
 function traiterMessage(texteBrut) {
   if (!texteBrut) return;
 
-  // 1) quiz token out
   if (isQuizToken(texteBrut)) return;
 
-  // 2) prefix filter
   let texte = extractIfPrefixed(texteBrut);
   if (texte === null) return;
 
-  // 3) normalisation soft
   texte = String(texte).replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
   if (!texte) return;
 
-  // 4) reset (uniquement après extraction => donc #RESET si prefix on)
   if (texte.toUpperCase() === "RESET") { resetEcran(); return; }
 
-  // 5) limites
   if (texte.length > 60) return;
   if (texte.split(" ").filter(Boolean).length > 6) return;
 
   const key = texte.toUpperCase();
-
-  // 6) anti-ghost dup TTL
   if (dedupShouldDrop(key)) return;
 
   if (dbMots[key]) {
     dbMots[key].count++;
   } else {
     const palette = getPalette();
-    dbMots[key] = {
-      text: key,
-      count: 1,
-      color: palette[globalColorIndex],
-      _isNew: true
-    };
+    dbMots[key] = { text: key, count: 1, color: palette[globalColorIndex], _isNew: true };
     globalColorIndex = (globalColorIndex + 1) % palette.length;
   }
 
   requestAnimationFrame(calculerEtAfficherNuage);
 }
 
-/* --- Placement spirale (inchangé) --- */
+// --- Placement spirale (inchangé) ---
 function calculerEtAfficherNuage() {
   let listeMots = Object.values(dbMots);
   listeMots.sort((a, b) => b.count - a.count);
@@ -305,10 +318,8 @@ async function init() {
   // attente injection CSS OBS
   await new Promise(r => setTimeout(r, 650));
 
-  // DEBUG : affiche ce que l'overlay lit réellement
   const pcfg = getPrefixConfig();
-  console.log("[MDI WC] prefix-mode:", pcfg.enabled ? "ON" : "OFF", "prefix:", JSON.stringify(pcfg.prefix));
-  console.log("[MDI WC] room:", cssVar("--room-id", ""), "auth:", cssVar("--auth-mode", "strict"));
+  updateBadge(`prefix=${pcfg.enabled ? "ON" : "OFF"} • prefix=${JSON.stringify(pcfg.prefix)}`);
 
   const authMode = (cssVar("--auth-mode", "strict") || "strict").toLowerCase();
   const room = cssVar("--room-id", "");
@@ -330,6 +341,11 @@ async function init() {
     if (cssBool("--auto-reset", false) === true || cssVar("--auto-reset") === "true") {
       resetEcran();
     }
+
+    // refresh badge (au cas où CSS arrive après)
+    const pcfg2 = getPrefixConfig();
+    updateBadge(`prefix=${pcfg2.enabled ? "ON" : "OFF"} • prefix=${JSON.stringify(pcfg2.prefix)}`);
+
     showCloud();
   });
 
