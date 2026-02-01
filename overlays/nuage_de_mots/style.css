@@ -1,133 +1,71 @@
-:root{
-  --bg: rgba(10,15,30,.0);
-  --panel: rgba(10,15,30,.65);
-  --txt: #ffffff;
-  --muted: rgba(255,255,255,.7);
-  --danger: #ff3b30;
-  --accent: #F9AD48;
-
-  /* OBS injected */
-  --room-id: "";
-  --room-key: "";
+html, body {
+  background-color: transparent;
+  margin: 0; padding: 0; overflow: hidden;
+  height: 100vh; width: 100vw;
+  font-family: 'Montserrat', sans-serif;
 }
 
-html,body{
-  margin:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background: var(--bg);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+.hidden { display: none !important; }
+
+/* Écran sécurité standard MDI */
+.mdi-security {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  background: #000;
+  color: #ff3b30;
+  z-index: 1000;
+  position: absolute;
+}
+.mdi-security .mdi-x { font-size: 84px; font-weight: 900; color: #ff3b30; }
+.mdi-security .mdi-msg { font-size: 34px; font-weight: 900; text-align: center; color: #ff3b30; }
+
+/* LE CONTENEUR PRINCIPAL */
+#cloud-container {
+  position: absolute;
+  right: var(--cloud-right, 50px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--cloud-width, 650px);
+  height: var(--cloud-height, 850px);
+  background-color: rgba(88, 88, 88, 0);
+  overflow: hidden;
+  transition: opacity 0.6s ease-in-out;
 }
 
-.hidden{ display:none; }
+#word-zone { width: 100%; height: 100%; position: relative; }
 
-.boot{
-  width:100%;
-  height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+#measure-zone {
+  position: absolute; top: -9999px; left: -9999px;
+  visibility: hidden; white-space: nowrap;
+  font-weight: 900; line-height: 1;
 }
 
-.denied{
-  width:100%;
-  height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#000;
-  color: var(--danger);
+.mot {
+  position: absolute;
+  line-height: 1;
+  white-space: nowrap;
   font-weight: 900;
-  font-size: 44px;
-  letter-spacing: .5px;
+  transition: left 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+              top 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+              font-size 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+              opacity 0.45s ease;
+  transform: translate(-50%, -50%);
+  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.85);
+  paint-order: stroke fill;
+  filter: drop-shadow(3px 3px 0px rgba(0, 0, 0, 0.2));
+  will-change: left, top, font-size, transform, opacity;
+  user-select: none;
+  z-index: 10;
 }
 
-.app{
-  width: 960px;
-  max-width: 96vw;
-  padding: 18px;
-  border-radius: 18px;
-  background: var(--panel);
-  color: var(--txt);
-  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+/* ✅ Apparition en fondu pour un NOUVEAU mot */
+.mot.is-new {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.92);
 }
-
-.top{
-  display:flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.title{
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: .2px;
-}
-
-.meta{
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.cloud{
-  min-height: 260px;
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 14px;
-  padding: 14px;
-  background: rgba(0,0,0,.10);
-}
-
-.chips{
-  display:flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.chip{
-  display:inline-flex;
-  align-items:center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-  font-weight: 800;
-}
-
-.chip .count{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: rgba(249,173,72,.18);
-  border: 1px solid rgba(249,173,72,.45);
-  color: var(--accent);
-  font-weight: 900;
-}
-
-.controls{
-  display:flex;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-button{
-  flex:1;
-  padding: 12px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.08);
-  color: #fff;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-button:disabled{
-  opacity: .45;
-  cursor:not-allowed;
+.mot.is-new.mdi-in {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
