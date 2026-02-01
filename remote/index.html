@@ -88,7 +88,7 @@ $("btnConnect").onclick = async () => {
   socket.on("disconnect", () => setStatus(false));
 
   try {
-    const res = await fetch(`${SERVER_URL}/debug/questions?room=${room}`);
+    const res = await fetch(${SERVER_URL}/debug/questions?room=${room});
     const json = await res.json();
     questions = json.data || [];
     
@@ -97,7 +97,7 @@ $("btnConnect").onclick = async () => {
     questions.forEach(q => {
       const opt = document.createElement("option");
       opt.value = q.question_key;
-      opt.textContent = `${q.question_key} - ${q.prompt}`;
+      opt.textContent = ${q.question_key} - ${q.prompt};
       sel.appendChild(opt);
     });
   } catch(e) { alert("Erreur catalogue: " + e.message); }
