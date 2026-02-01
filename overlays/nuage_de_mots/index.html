@@ -1,49 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MDI Nuage - V5.7 SaaS</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
-
-  <!-- Cache-bust CSS via ?v=... -->
-  <script>
-    (function() {
-      const v = new URLSearchParams(window.location.search).get("v") || String(Date.now());
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "style.css?v=" + encodeURIComponent(v);
-      document.head.appendChild(link);
-    })();
-  </script>
-
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MDI WC TEST</title>
+  <style>
+    html,body{margin:0;height:100%;width:100%;background:transparent;overflow:hidden}
+    .test{
+      position:fixed;left:20px;top:20px;
+      font:900 40px ui-sans-serif,system-ui,sans-serif;
+      color:#00ff88;
+      text-shadow:0 6px 20px rgba(0,0,0,.85);
+      background:rgba(0,0,0,.35);
+      padding:14px 18px;border-radius:18px;
+    }
+    .sub{font:700 14px ui-sans-serif,system-ui,sans-serif;opacity:.9;margin-top:8px}
+  </style>
 </head>
 <body>
-  <!-- Écran sécurité (uniquement si REFUS) -->
-  <div id="security-screen" class="mdi-security hidden" aria-hidden="true">
-    <div class="mdi-x">✖</div>
-    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  <div class="test">
+    BOOT OK ✅
+    <div class="sub" id="sub"></div>
   </div>
 
-  <!-- Conteneur nuage -->
-  <div id="cloud-container" class="hidden" aria-hidden="true">
-    <div id="word-zone"></div>
-  </div>
-
-  <div id="measure-zone"></div>
-
-  <!-- Cache-bust JS via ?v=... -->
   <script>
-    (function() {
-      const v = new URLSearchParams(window.location.search).get("v") || String(Date.now());
-      const s = document.createElement("script");
-      s.src = "script.js?v=" + encodeURIComponent(v);
-      document.body.appendChild(s);
-    })();
+    const v = new URLSearchParams(location.search).get("v") || "NO_V";
+    document.getElementById("sub").textContent = "index.html chargé • v=" + v + " • " + new Date().toLocaleString();
+    console.log("[MDI WC TEST] index.html chargé, v=", v);
   </script>
 </body>
 </html>
