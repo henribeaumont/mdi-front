@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MDI • Timer/Chrono</title>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- Écran sécurité (uniquement si REFUS) -->
+  <div id="security-screen" class="mdi-security hidden" aria-hidden="true">
+    <div class="mdi-x">✖</div>
+    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="hidden" aria-hidden="true">
+    <div id="panel" class="panel" role="img" aria-label="timer chrono">
+      <span id="time" class="time">00:00</span>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
