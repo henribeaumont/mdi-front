@@ -3,22 +3,306 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MDI Nuage - V5.8 SaaS</title>
+  <title>MDI Nuage de Mots - V6.3 SaaS (État Unifié)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  </head>
+  
+  <style>
+    /* ==========================================================
+       BASE TRANSPARENTE (OBS)
+    ========================================================== */
+    html, body {
+      background-color: transparent;
+      margin: 0; padding: 0; overflow: hidden;
+      height: 100vh; width: 100vw;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ==========================================================
+       ÉCRAN SÉCURITÉ (ACCÈS REFUSÉ)
+       - Fond transparent pour ne pas masquer la caméra
+       - Croix rouge + message bilingue
+    ========================================================== */
+    .mdi-security {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      background: rgba(0,0,0,0); /* TRANSPARENT */
+      color: #ff3b30;
+      z-index: 1000;
+      position: absolute;
+      text-shadow: 0 3px 18px rgba(0,0,0,0.9);
+    }
+    .mdi-security .mdi-x {
+      font-size: 84px;
+      font-weight: 900;
+      color: #ff3b30;
+    }
+    .mdi-security .mdi-msg {
+      font-size: 34px;
+      font-weight: 900;
+      text-align: center;
+      color: #ff3b30;
+    }
+
+    /* ==========================================================
+       CONTENEUR PRINCIPAL DU NUAGE
+    ========================================================== */
+    #cloud-container {
+      position: absolute;
+      right: var(--cloud-right, 50px);
+      top: 50%;
+      transform: translateY(-50%);
+      width: var(--cloud-width, 650px);
+      height: var(--cloud-height, 850px);
+      background-color: rgba(88, 88, 88, 0);
+      overflow: hidden;
+      transition: opacity 0.6s ease-in-out;
+    }
+
+    #word-zone { width: 100%; height: 100%; position: relative; }
+
+    #measure-zone {
+      position: absolute; top: -9999px; left: -9999px;
+      visibility: hidden; white-space: nowrap;
+      font-weight: 900; line-height: 1;
+    }
+
+    /* ==========================================================
+       STYLE DES MOTS
+    ========================================================== */
+    .mot {
+      position: absolute;
+      line-height: 1;
+      white-space: nowrap;
+      font-weight: 900;
+      transition: left 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+                  top 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+                  font-size 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+                  transform 0.6s cubic-bezier(0.19, 1, 0.22, 1),
+                  opacity 0.45s ease;
+      transform: translate(-50%, -50%);
+      -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.85);
+      paint-order: stroke fill;
+      filter: drop-shadow(3px 3px 0px rgba(0, 0, 0, 0.2));
+      will-change: left, top, font-size, transform, opacity;
+      user-select: none;
+      z-index: 10;
+    }
+
+    /* Apparition en fondu pour un NOUVEAU mot */
+    .mot.is-new {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.92);
+    }
+    .mot.is-new.mdi-in {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  </style>
+</head>
 <body>
+  <!-- Écran d'accès refusé (masqué par défaut) -->
   <div id="security-screen" class="mdi-security hidden">
     <div class="mdi-x">✖</div>
     <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
+
+  <!-- Conteneur du nuage (masqué par défaut, transparent au boot) -->
   <div id="cloud-container" class="hidden">
     <div id="word-zone"></div>
   </div>
+
   <div id="measure-zone"></div>
-  <script src="script.js"></script>
+
+  <script>
+    /**
+     * ============================================================
+     * MDI NUAGE DE MOTS - V6.3 (ÉTAT UNIFIÉ - ANTI-POLLUTION)
+     * ============================================================
+     * ✅ NOUVEAU : Écoute overlay:state au lieu de raw_vote
+     * ✅ CORRIGÉ : Plus de pollution (messages fantômes éliminés)
+     * ✅ CONSERVÉ : Auth stricte, boot transparent, CSS OBS pédagogique
+     * ============================================================
+     */
+
+    const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+    const OVERLAY_TYPE = "nuage_de_mots";
+
+    // --- UTILITAIRES CSS VARIABLES ---
+    function cssVar(name, fallback = "") {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+      return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+    }
+
+    // --- ÉLÉMENTS DOM ---
+    const zone = document.getElementById("word-zone");
+    const container = document.getElementById("cloud-container");
+    const securityScreen = document.getElementById("security-screen");
+
+    // --- ÉTAT OVERLAY ---
+    let STATE = "idle"; // "idle" | "active"
+    let dbMots = {}; // { "MOT_KEY": { text, count, color } }
+    let globalColorIndex = 0;
+
+    // --- PALETTE COULEURS ---
+    function getPalette() {
+      return [
+        cssVar("--color-1", "#F054A2"),
+        cssVar("--color-2", "#2ecc71"),
+        cssVar("--color-3", "#F9AD48"),
+        cssVar("--color-4", "#3b82f6"),
+        cssVar("--color-5", "#ffffff")
+      ];
+    }
+
+    // --- RESET ÉCRAN ---
+    function resetEcran() {
+      zone.innerHTML = "";
+      dbMots = {};
+      globalColorIndex = 0;
+      console.log("🔄 [NUAGE] Reset complet");
+    }
+
+    // --- RENDU DU NUAGE ---
+    function render() {
+      const W = container.clientWidth;
+      const H = container.clientHeight;
+      const words = Object.values(dbMots);
+
+      words.forEach((mot, i) => {
+        let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
+        
+        if (!el) {
+          // Création du mot
+          el = document.createElement("div");
+          el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
+          el.className = "mot is-new";
+          el.innerText = mot.text;
+          el.style.color = mot.color;
+          zone.appendChild(el);
+
+          // Trigger animation après un frame
+          requestAnimationFrame(() => {
+            el.classList.add("mdi-in");
+          });
+        }
+
+        // Position en spirale
+        const angle = i * 0.5;
+        const radius = i * 20;
+        el.style.left = `${(W/2) + Math.cos(angle) * radius}px`;
+        el.style.top = `${(H/2) + Math.sin(angle) * radius}px`;
+        
+        // Taille proportionnelle au nombre d'occurrences
+        const baseSize = 70;
+        const sizeDecrease = i * 2;
+        const countBonus = (mot.count - 1) * 5; // +5px par occurrence supplémentaire
+        el.style.fontSize = `${Math.max(20, baseSize - sizeDecrease + countBonus)}px`;
+      });
+    }
+
+    // --- CONNEXION SOCKET ---
+    const socket = io(SERVER_URL, { 
+      transports: ["websocket", "polling"],
+      reconnection: true
+    });
+
+    socket.on("connect", () => {
+      console.log("✅ [NUAGE] Connecté au serveur");
+    });
+
+    socket.on("connect_error", (err) => {
+      console.warn("⚠️ [NUAGE] Erreur connexion:", err.message);
+    });
+
+    // --- GESTION ÉTAT OVERLAY ---
+    socket.on("overlay:state", (payload) => {
+      if (payload.overlay !== OVERLAY_TYPE) return;
+
+      console.log(`📡 [NUAGE] État reçu:`, payload.state, payload.data);
+
+      STATE = payload.state;
+
+      if (STATE === "idle") {
+        // Désactivation : masquer le nuage
+        container.classList.add("hidden");
+        resetEcran();
+        return;
+      }
+
+      if (STATE === "active") {
+        // Activation : afficher le nuage
+        securityScreen.classList.add("hidden");
+        container.classList.remove("hidden");
+
+        // Synchroniser avec les données serveur
+        if (payload.data && payload.data.words) {
+          const serverWords = payload.data.words;
+          const palette = getPalette();
+
+          // Reconstruire dbMots depuis le serveur
+          dbMots = {};
+          Object.keys(serverWords).forEach((key, index) => {
+            dbMots[key] = {
+              text: key,
+              count: serverWords[key],
+              color: palette[index % 5]
+            };
+          });
+
+          globalColorIndex = Object.keys(dbMots).length;
+          render();
+        }
+      }
+    });
+
+    // --- GESTION ACCÈS REFUSÉ ---
+    socket.on("overlay:forbidden", (payload) => {
+      console.error("❌ [NUAGE] Accès refusé:", payload.reason);
+      securityScreen.classList.remove("hidden");
+      container.classList.add("hidden");
+    });
+
+    // --- INITIALISATION ---
+    async function init() {
+      // Attendre que le CSS OBS soit appliqué
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const authMode = cssVar("--auth-mode", "strict");
+      const room = cssVar("--room-id", "").trim();
+      const key = cssVar("--room-key", "").trim();
+
+      console.log(`🔐 [NUAGE] Auth mode: ${authMode}, Room: ${room}`);
+
+      if (!room) {
+        console.error("❌ [NUAGE] Aucun room-id fourni");
+        securityScreen.classList.remove("hidden");
+        return;
+      }
+
+      // Envoi de l'auth au serveur
+      if (authMode === "strict") {
+        if (!key) {
+          console.error("❌ [NUAGE] Mode strict mais aucune room-key");
+          securityScreen.classList.remove("hidden");
+          return;
+        }
+        socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+      } else {
+        // Mode legacy (debug uniquement)
+        socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
+      }
+
+      console.log("✅ [NUAGE] Authentification envoyée, en attente de overlay:state...");
+    }
+
+    // Démarrage quand Socket.io est connecté
+    socket.on("connect", init);
+  </script>
 </body>
 </html>
