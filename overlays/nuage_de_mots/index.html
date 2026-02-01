@@ -1,32 +1,24 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI WC TEST</title>
-  <style>
-    html,body{margin:0;height:100%;width:100%;background:transparent;overflow:hidden}
-    .test{
-      position:fixed;left:20px;top:20px;
-      font:900 40px ui-sans-serif,system-ui,sans-serif;
-      color:#00ff88;
-      text-shadow:0 6px 20px rgba(0,0,0,.85);
-      background:rgba(0,0,0,.35);
-      padding:14px 18px;border-radius:18px;
-    }
-    .sub{font:700 14px ui-sans-serif,system-ui,sans-serif;opacity:.9;margin-top:8px}
-  </style>
-</head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MDI Nuage - V5.8 SaaS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  </head>
 <body>
-  <div class="test">
-    BOOT OK ✅
-    <div class="sub" id="sub"></div>
+  <div id="security-screen" class="mdi-security hidden">
+    <div class="mdi-x">✖</div>
+    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
-
-  <script>
-    const v = new URLSearchParams(location.search).get("v") || "NO_V";
-    document.getElementById("sub").textContent = "index.html chargé • v=" + v + " • " + new Date().toLocaleString();
-    console.log("[MDI WC TEST] index.html chargé, v=", v);
-  </script>
+  <div id="cloud-container" class="hidden">
+    <div id="word-zone"></div>
+  </div>
+  <div id="measure-zone"></div>
+  <script src="script.js"></script>
 </body>
 </html>
