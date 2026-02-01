@@ -1,3 +1,4 @@
+
 /**
  * MDI WORD CLOUD - V5.7 SaaS
  * - ZÉRO FLICKER (invisible tant que state OK)
@@ -6,10 +7,6 @@
  * - Nouveau mot en fondu (fade-in)
  * - Ignore quiz A/B/C/D
  * - Écoute raw_vote
- *
- * ✅ PATCH MINIMAL : Session timestamp
- * - Au overlay:state : déclenche une "frontière temporelle" côté extension
- * - L’overlay ne traite rien avant activation (sessionActive=false)
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -80,36 +77,9 @@ function resetEcran() {
   globalColorIndex = 0;
 }
 
-/* ==========================================================
-   ✅ PATCH TIMESTAMP (minimal)
-   - l’overlay ne traite rien avant activation
-   - au moment overlay:state -> envoi MDI_SESSION_START à l’extension
-   ========================================================== */
-let sessionActive = false;
-
-function startSessionTimestamp() {
-  sessionActive = true; // l’overlay peut traiter à partir de maintenant
-
-  // Déclenchement de la frontière temporelle côté extension
-  try {
-    if (window.chrome?.runtime?.sendMessage) {
-      window.chrome.runtime.sendMessage({
-        type: "MDI_SESSION_START",
-        ts: Date.now(),
-        overlay: OVERLAY_TYPE
-      });
-    }
-  } catch (e) {
-    // Si pas dispo (test hors extension), on continue sans bloquer
-  }
-}
-
-/* ✅ traitement message (inchangé) */
+/* ✅ traitement message (patch safe) */
 function traiterMessage(texteBrut) {
   if (!texteBrut) return;
-
-  // ✅ PATCH : tant que l’overlay n’est pas activé, on ignore tout
-  if (!sessionActive) return;
 
   let texte = String(texteBrut).trim();
 
@@ -227,7 +197,7 @@ function trouverPlaceSpirale(w, h, cx, cy, containerW, containerH, obstacles) {
   return null;
 }
 
-/* ✅ DOM apply + fade-in nouveaux mots (inchangé) */
+/* ✅ DOM apply + fade-in nouveaux mots */
 function appliquerAuDom(liste) {
   liste.forEach(mot => {
     if (!mot.tempRenderInfo) return;
@@ -258,10 +228,12 @@ function appliquerAuDom(liste) {
     el.style.fontSize = mot.tempRenderInfo.fontSize + "px";
 
     if (isNew) {
+      // déclenche le fondu après insertion (sinon transition skip)
       requestAnimationFrame(() => {
-        el.classList.add("mdi-in");
+        el.classList.add("mdi-in"); // opacity -> 1 / scale -> 1
       });
 
+      // nettoyage classes après anim (optionnel, mais évite de rester "new")
       setTimeout(() => {
         el.classList.remove("is-new");
         el.classList.remove("mdi-in");
@@ -273,6 +245,7 @@ function appliquerAuDom(liste) {
       el.style.transform = "translate(-50%, -50%)";
     }
 
+    // reset flag
     mot._isNew = false;
   });
 }
@@ -283,9 +256,6 @@ const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 async function init() {
   setBootHidden();
 
-  // Important: session inactive tant que overlay:state n'a pas validé
-  sessionActive = false;
-
   // Attente OBS injection CSS personnalisé
   await new Promise(r => setTimeout(r, 650));
 
@@ -293,9 +263,11 @@ async function init() {
   const room = cssVar("--room-id", "");
   const key  = cssVar("--room-key", "");
 
+  // Strict: room+key obligatoires
   if (authMode === "strict") {
     if (!room || !key) { showDenied(); return; }
   } else {
+    // Legacy: room seulement (mais on garde un refus si pas de room)
     if (!room) { showDenied(); return; }
   }
 
@@ -307,9 +279,6 @@ async function init() {
 
   socket.on("overlay:state", (payload) => {
     if (payload?.overlay !== OVERLAY_TYPE) return;
-
-    // ✅ PATCH : déclenche timestamp session côté extension
-    startSessionTimestamp();
 
     // Auto reset si demandé
     if (cssBool("--auto-reset", false) === true || cssVar("--auto-reset") === "true") {
