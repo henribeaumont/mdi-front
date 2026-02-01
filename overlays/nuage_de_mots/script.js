@@ -1,12 +1,13 @@
-
 /**
- * MDI WORD CLOUD - V5.7 SaaS
+ * MDI WORD CLOUD - V5.7 SaaS (PATCH PREFIX + DEDUP TTL)
  * - ZÉRO FLICKER (invisible tant que state OK)
  * - Auth strict/legacy
- * - Affiche ✖ ACCÈS REFUSÉ / ACCESS DENIED en cas d'échec
+ * - Accès refusé : ✖ ACCÈS REFUSÉ / ACCESS DENIED sur fond transparent (NO BLACK SCREEN)
  * - Nouveau mot en fondu (fade-in)
  * - Ignore quiz A/B/C/D
  * - Écoute raw_vote
+ * - Filtre optionnel par préfixe (ex: #)
+ * - Anti-doublons (TTL) pour contrer les "messages fantômes" de Zoom
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -40,7 +41,7 @@ function setBootHidden() {
 function showDenied() {
   elCloud.classList.add("hidden");
   elSecurity.classList.remove("hidden");
-  document.body.style.backgroundColor = "black";
+  document.body.style.backgroundColor = "transparent"; // IMPORTANT: pas d'écran noir
 }
 function showCloud() {
   elSecurity.classList.add("hidden");
@@ -75,30 +76,117 @@ function resetEcran() {
   zone.innerHTML = "";
   dbMots = {};
   globalColorIndex = 0;
+  dedupMap.clear();
 }
 
-/* ✅ traitement message (patch safe) */
+/* --- FILTRE PREFIXE + DEDUP TTL --- */
+/**
+ * Préfixe (par défaut "#")
+ * - si --wc-prefix-mode = "on" : n'accepte que les messages commençant par le préfixe
+ * - si "off" : comportement actuel (compat legacy)
+ */
+function getPrefixConfig() {
+  const mode = (cssVar("--wc-prefix-mode", "on") || "on").toLowerCase(); // on|off
+  const prefix = cssVar("--wc-prefix", "#"); // ex: "#", "#mdi:", "#mdi:cloud"
+  return { enabled: mode !== "off", prefix: String(prefix || "#") };
+}
+
+/**
+ * Dedup TTL
+ * - Si le même token (après extraction) revient dans la fenêtre TTL, on ignore.
+ * - Protège contre les "replays" DOM de Zoom et la re-circulation de vieux messages.
+ */
+const dedupMap = new Map(); // key => lastSeenMs
+function getDedupConfig() {
+  const ttlMs = parseInt(cssVar("--wc-dedup-ttl-ms", "600000"), 10); // 10 min
+  const maxSize = parseInt(cssVar("--wc-dedup-max", "1200"), 10);
+  return {
+    ttlMs: clamp(Number.isFinite(ttlMs) ? ttlMs : 600000, 0, 24 * 60 * 60 * 1000),
+    maxSize: clamp(Number.isFinite(maxSize) ? maxSize : 1200, 50, 20000),
+  };
+}
+
+function dedupShouldDrop(tokenUpper) {
+  const { ttlMs, maxSize } = getDedupConfig();
+  if (ttlMs <= 0) return false;
+
+  const now = Date.now();
+
+  // Purge rapide (lazy) : enlève les entrées expirées
+  // On limite le coût : purge partielle si map devient trop grande
+  if (dedupMap.size > maxSize) {
+    const cutoff = now - ttlMs;
+    for (const [k, t] of dedupMap) {
+      if (t < cutoff) dedupMap.delete(k);
+      if (dedupMap.size <= maxSize) break;
+    }
+  }
+
+  const last = dedupMap.get(tokenUpper);
+  if (last && (now - last) < ttlMs) return true;
+
+  dedupMap.set(tokenUpper, now);
+  return false;
+}
+
+/**
+ * Extrait le contenu si préfixe activé.
+ * Ex:
+ *  "#mot" => "mot"
+ *  "# mot" => "mot"
+ *  "#   hello world" => "hello world"
+ * Si le message ne respecte pas le préfixe => return null
+ */
+function extractIfPrefixed(inputText) {
+  const { enabled, prefix } = getPrefixConfig();
+  const raw = String(inputText || "");
+
+  if (!enabled) return raw;
+
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // match début strict
+  if (!trimmed.startsWith(prefix)) return null;
+
+  let extracted = trimmed.slice(prefix.length);
+
+  // tolère espaces après préfixe
+  extracted = extracted.replace(/^\s+/, "").trim();
+
+  return extracted ? extracted : null;
+}
+
+/* ✅ traitement message (prefix + dedup TTL, safe) */
 function traiterMessage(texteBrut) {
   if (!texteBrut) return;
 
-  let texte = String(texteBrut).trim();
+  let texte = String(texteBrut);
 
-  // Ignore quiz
+  // Ignore quiz (avant tout)
   if (isQuizToken(texte)) return;
+
+  // Filtre préfixe (ex: #)
+  const extracted = extractIfPrefixed(texte);
+  if (extracted === null) return;
+  texte = extracted;
 
   // Normalisation soft (préserve emojis)
   texte = texte.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
-
   if (!texte) return;
 
-  // RESET
+  // RESET (on autorise "#RESET" si prefix on, car après extraction => "RESET")
   if (texte.toUpperCase() === "RESET") { resetEcran(); return; }
 
-  // Limites raisonnables
+  // Limites raisonnables (après extraction)
   if (texte.length > 60) return;
   if (texte.split(" ").filter(Boolean).length > 6) return;
 
+  // Clé canonique pour le nuage (affichage en MAJ comme avant)
   const key = texte.toUpperCase();
+
+  // Dedup TTL contre fantômes
+  if (dedupShouldDrop(key)) return;
 
   if (dbMots[key]) {
     dbMots[key].count++;
@@ -218,7 +306,6 @@ function appliquerAuDom(liste) {
       el.style.transform = "translate(-50%, -50%) scale(0.92)";
       el.style.opacity = 0;
 
-      // ✅ mark new
       el.classList.add("is-new");
       zone.appendChild(el);
     }
@@ -228,12 +315,10 @@ function appliquerAuDom(liste) {
     el.style.fontSize = mot.tempRenderInfo.fontSize + "px";
 
     if (isNew) {
-      // déclenche le fondu après insertion (sinon transition skip)
       requestAnimationFrame(() => {
-        el.classList.add("mdi-in"); // opacity -> 1 / scale -> 1
+        el.classList.add("mdi-in");
       });
 
-      // nettoyage classes après anim (optionnel, mais évite de rester "new")
       setTimeout(() => {
         el.classList.remove("is-new");
         el.classList.remove("mdi-in");
@@ -245,7 +330,6 @@ function appliquerAuDom(liste) {
       el.style.transform = "translate(-50%, -50%)";
     }
 
-    // reset flag
     mot._isNew = false;
   });
 }
@@ -267,7 +351,6 @@ async function init() {
   if (authMode === "strict") {
     if (!room || !key) { showDenied(); return; }
   } else {
-    // Legacy: room seulement (mais on garde un refus si pas de room)
     if (!room) { showDenied(); return; }
   }
 
