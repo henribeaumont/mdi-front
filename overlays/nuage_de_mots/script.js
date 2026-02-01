@@ -1,13 +1,6 @@
 /**
- * MDI WORD CLOUD - V5.7 SaaS (PATCH PREFIX + DEDUP TTL)
- * - ZÉRO FLICKER (invisible tant que state OK)
- * - Auth strict/legacy
- * - Accès refusé : ✖ ACCÈS REFUSÉ / ACCESS DENIED sur fond transparent (NO BLACK SCREEN)
- * - Nouveau mot en fondu (fade-in)
- * - Ignore quiz A/B/C/D
- * - Écoute raw_vote
- * - Filtre optionnel par préfixe (ex: #)
- * - Anti-doublons (TTL) pour contrer les "messages fantômes" de Zoom
+ * MDI WORD CLOUD - V5.7 SaaS (PREFIX FILTER + DEDUP TTL + DEBUG)
+ * Objectif: ne traiter QUE les messages préfixés (ex: #), sans toucher serveur/extension.
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -24,7 +17,6 @@ function cssBool(name, fallback = false) {
   return v === "true" || v === "on" || v === "1";
 }
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
 function isQuizToken(txt) {
   return /^[ABCD]$/.test(String(txt || "").trim().toUpperCase());
 }
@@ -41,7 +33,7 @@ function setBootHidden() {
 function showDenied() {
   elCloud.classList.add("hidden");
   elSecurity.classList.remove("hidden");
-  document.body.style.backgroundColor = "transparent"; // IMPORTANT: pas d'écran noir
+  document.body.style.backgroundColor = "transparent"; // pas d'écran noir
 }
 function showCloud() {
   elSecurity.classList.add("hidden");
@@ -79,26 +71,17 @@ function resetEcran() {
   dedupMap.clear();
 }
 
-/* --- FILTRE PREFIXE + DEDUP TTL --- */
-/**
- * Préfixe (par défaut "#")
- * - si --wc-prefix-mode = "on" : n'accepte que les messages commençant par le préfixe
- * - si "off" : comportement actuel (compat legacy)
- */
+/* --- PREFIX FILTER + DEDUP --- */
 function getPrefixConfig() {
+  // IMPORTANT: on considère "off" comme seul désactivateur.
   const mode = (cssVar("--wc-prefix-mode", "on") || "on").toLowerCase(); // on|off
-  const prefix = cssVar("--wc-prefix", "#"); // ex: "#", "#mdi:", "#mdi:cloud"
-  return { enabled: mode !== "off", prefix: String(prefix || "#") };
+  const prefix = cssVar("--wc-prefix", "#") || "#";
+  return { enabled: mode !== "off", prefix: String(prefix) };
 }
 
-/**
- * Dedup TTL
- * - Si le même token (après extraction) revient dans la fenêtre TTL, on ignore.
- * - Protège contre les "replays" DOM de Zoom et la re-circulation de vieux messages.
- */
 const dedupMap = new Map(); // key => lastSeenMs
 function getDedupConfig() {
-  const ttlMs = parseInt(cssVar("--wc-dedup-ttl-ms", "600000"), 10); // 10 min
+  const ttlMs = parseInt(cssVar("--wc-dedup-ttl-ms", "600000"), 10);
   const maxSize = parseInt(cssVar("--wc-dedup-max", "1200"), 10);
   return {
     ttlMs: clamp(Number.isFinite(ttlMs) ? ttlMs : 600000, 0, 24 * 60 * 60 * 1000),
@@ -111,11 +94,9 @@ function dedupShouldDrop(tokenUpper) {
   if (ttlMs <= 0) return false;
 
   const now = Date.now();
+  const cutoff = now - ttlMs;
 
-  // Purge rapide (lazy) : enlève les entrées expirées
-  // On limite le coût : purge partielle si map devient trop grande
   if (dedupMap.size > maxSize) {
-    const cutoff = now - ttlMs;
     for (const [k, t] of dedupMap) {
       if (t < cutoff) dedupMap.delete(k);
       if (dedupMap.size <= maxSize) break;
@@ -129,63 +110,49 @@ function dedupShouldDrop(tokenUpper) {
   return false;
 }
 
-/**
- * Extrait le contenu si préfixe activé.
- * Ex:
- *  "#mot" => "mot"
- *  "# mot" => "mot"
- *  "#   hello world" => "hello world"
- * Si le message ne respecte pas le préfixe => return null
- */
 function extractIfPrefixed(inputText) {
   const { enabled, prefix } = getPrefixConfig();
   const raw = String(inputText || "");
-
-  if (!enabled) return raw;
-
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  // match début strict
-  if (!trimmed.startsWith(prefix)) return null;
+  // Si enabled => DOIT commencer par prefix
+  if (enabled) {
+    if (!trimmed.startsWith(prefix)) return null;
+    let out = trimmed.slice(prefix.length);
+    out = out.replace(/^\s+/, "").trim();
+    return out ? out : null;
+  }
 
-  let extracted = trimmed.slice(prefix.length);
-
-  // tolère espaces après préfixe
-  extracted = extracted.replace(/^\s+/, "").trim();
-
-  return extracted ? extracted : null;
+  // disabled => passe tout
+  return trimmed;
 }
 
-/* ✅ traitement message (prefix + dedup TTL, safe) */
+/* ✅ traitement message */
 function traiterMessage(texteBrut) {
   if (!texteBrut) return;
 
-  let texte = String(texteBrut);
+  // 1) quiz token out
+  if (isQuizToken(texteBrut)) return;
 
-  // Ignore quiz (avant tout)
-  if (isQuizToken(texte)) return;
+  // 2) prefix filter
+  let texte = extractIfPrefixed(texteBrut);
+  if (texte === null) return;
 
-  // Filtre préfixe (ex: #)
-  const extracted = extractIfPrefixed(texte);
-  if (extracted === null) return;
-  texte = extracted;
-
-  // Normalisation soft (préserve emojis)
-  texte = texte.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
+  // 3) normalisation soft
+  texte = String(texte).replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
   if (!texte) return;
 
-  // RESET (on autorise "#RESET" si prefix on, car après extraction => "RESET")
+  // 4) reset (uniquement après extraction => donc #RESET si prefix on)
   if (texte.toUpperCase() === "RESET") { resetEcran(); return; }
 
-  // Limites raisonnables (après extraction)
+  // 5) limites
   if (texte.length > 60) return;
   if (texte.split(" ").filter(Boolean).length > 6) return;
 
-  // Clé canonique pour le nuage (affichage en MAJ comme avant)
   const key = texte.toUpperCase();
 
-  // Dedup TTL contre fantômes
+  // 6) anti-ghost dup TTL
   if (dedupShouldDrop(key)) return;
 
   if (dbMots[key]) {
@@ -204,7 +171,7 @@ function traiterMessage(texteBrut) {
   requestAnimationFrame(calculerEtAfficherNuage);
 }
 
-// --- Placement spirale (inchangé) ---
+/* --- Placement spirale (inchangé) --- */
 function calculerEtAfficherNuage() {
   let listeMots = Object.values(dbMots);
   listeMots.sort((a, b) => b.count - a.count);
@@ -285,7 +252,6 @@ function trouverPlaceSpirale(w, h, cx, cy, containerW, containerH, obstacles) {
   return null;
 }
 
-/* ✅ DOM apply + fade-in nouveaux mots */
 function appliquerAuDom(liste) {
   liste.forEach(mot => {
     if (!mot.tempRenderInfo) return;
@@ -300,7 +266,6 @@ function appliquerAuDom(liste) {
       el.innerText = mot.text;
       el.style.color = mot.color;
 
-      // Start centered small (safe)
       el.style.left = "50%";
       el.style.top = "50%";
       el.style.transform = "translate(-50%, -50%) scale(0.92)";
@@ -315,10 +280,7 @@ function appliquerAuDom(liste) {
     el.style.fontSize = mot.tempRenderInfo.fontSize + "px";
 
     if (isNew) {
-      requestAnimationFrame(() => {
-        el.classList.add("mdi-in");
-      });
-
+      requestAnimationFrame(() => el.classList.add("mdi-in"));
       setTimeout(() => {
         el.classList.remove("is-new");
         el.classList.remove("mdi-in");
@@ -334,20 +296,24 @@ function appliquerAuDom(liste) {
   });
 }
 
-/* --- CONNEXION SaaS (ZÉRO FLICKER + AUTH MODE) --- */
+/* --- CONNEXION --- */
 const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
 async function init() {
   setBootHidden();
 
-  // Attente OBS injection CSS personnalisé
+  // attente injection CSS OBS
   await new Promise(r => setTimeout(r, 650));
+
+  // DEBUG : affiche ce que l'overlay lit réellement
+  const pcfg = getPrefixConfig();
+  console.log("[MDI WC] prefix-mode:", pcfg.enabled ? "ON" : "OFF", "prefix:", JSON.stringify(pcfg.prefix));
+  console.log("[MDI WC] room:", cssVar("--room-id", ""), "auth:", cssVar("--auth-mode", "strict"));
 
   const authMode = (cssVar("--auth-mode", "strict") || "strict").toLowerCase();
   const room = cssVar("--room-id", "");
   const key  = cssVar("--room-key", "");
 
-  // Strict: room+key obligatoires
   if (authMode === "strict") {
     if (!room || !key) { showDenied(); return; }
   } else {
@@ -356,18 +322,14 @@ async function init() {
 
   socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
 
-  socket.on("overlay:forbidden", () => {
-    showDenied();
-  });
+  socket.on("overlay:forbidden", () => showDenied());
 
   socket.on("overlay:state", (payload) => {
     if (payload?.overlay !== OVERLAY_TYPE) return;
 
-    // Auto reset si demandé
     if (cssBool("--auto-reset", false) === true || cssVar("--auto-reset") === "true") {
       resetEcran();
     }
-
     showCloud();
   });
 
