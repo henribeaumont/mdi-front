@@ -1,27 +1,17 @@
 :root{
   --bg: transparent;
-
-  --panel: rgba(10, 15, 30, 0.72);
-  --border: rgba(255,255,255,0.14);
-
-  --text: rgba(255,255,255,0.94);
-  --muted: rgba(255,255,255,0.72);
-
+  --text: rgba(255,255,255,0.96);
+  --muted: rgba(255,255,255,0.70);
+  --panel: rgba(10,15,30,0.72);          /* #0A0F1E */
+  --border: rgba(255,255,255,0.16);
   --accent: #F9AD48;
   --ok: #2ecc71;
-  --danger: #ff3b30;
-
-  --radius: 18px;
-
-  --shadow: 0 18px 50px rgba(0,0,0,0.55);
-  --inset: 0 0 0 1px rgba(255,255,255,0.06) inset;
-
-  --maxWidth: 980px;
+  --bad: #ff3b30;
 
   --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
-*{ box-sizing:border-box; }
+*{ box-sizing: border-box; }
 
 html, body{
   width:100%;
@@ -32,104 +22,83 @@ html, body{
   font-family: var(--font);
 }
 
-/* ✅ Standard Anti-Flicker : invisible tant que pas prêt */
-body.is-loading{
-  opacity:0;
+/* Anti-flicker: rien ne “saute” au chargement */
+body{
+  opacity: 0;
+}
+body.is-ready{
+  opacity: 1;
 }
 
-.root{
-  width:100%;
-  height:100%;
-  display:flex;
-  align-items:flex-end;
-  justify-content:center;
-  padding: 28px;
+/* Stage plein écran */
+.stage{
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding: 64px;
+  pointer-events: none;
 }
 
-/* Carte commentaire */
-.card{
-  width: min(var(--maxWidth), calc(100% - 20px));
+/* Bulle */
+.bubble{
+  max-width: 1200px;
+  width: fit-content;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow), var(--inset);
-  padding: 16px 18px 18px 18px;
+  border-radius: 20px;
+  padding: 18px 22px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+
   transform: translateY(14px);
   opacity: 0;
-  filter: blur(2px);
-  transition:
-    opacity .22s ease,
-    transform .22s ease,
-    filter .22s ease;
-}
-
-/* Etat visible */
-.card.show{
-  opacity: 1;
-  transform: translateY(0px);
-  filter: blur(0px);
-}
-
-.card.hidden{
-  display:block; /* garder l'espace pour transition */
-}
-
-/* Meta ligne */
-.meta{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  margin-bottom: 10px;
-  flex-wrap:wrap;
-}
-
-.author{
-  font-weight: 900;
-  color: rgba(255,255,255,0.92);
-  letter-spacing: .2px;
-}
-
-.sep{
-  color: rgba(255,255,255,0.35);
-  font-weight: 800;
-}
-
-.badge{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(249,173,72,0.14);
-  border: 1px solid rgba(249,173,72,0.28);
-  color: rgba(255,234,205,0.95);
-  font-weight: 900;
-  font-size: 12px;
-  letter-spacing: .6px;
-  text-transform: uppercase;
+  transition: opacity .18s ease, transform .18s ease;
 }
 
 .text{
-  font-size: 34px;
-  line-height: 1.14;
+  font-size: 46px;
+  line-height: 1.1;
   font-weight: 900;
   color: var(--text);
+  letter-spacing: 0.2px;
   word-break: break-word;
-  text-shadow: 0 3px 18px rgba(0,0,0,0.35);
+  white-space: pre-wrap;
 }
 
-/* Responsive */
-@media (max-width: 720px){
-  .root{ padding: 18px; }
-  .text{ font-size: 26px; }
+.meta{
+  margin-top: 10px;
+  font-size: 16px;
+  color: var(--muted);
+  display:flex;
+  gap:10px;
+  align-items:center;
 }
 
-/* Petite anim d'entrée "pop" */
-@keyframes popIn{
-  0%{ transform: translateY(18px) scale(0.98); opacity:0; filter: blur(3px); }
-  100%{ transform: translateY(0) scale(1); opacity:1; filter: blur(0); }
+/* visible quand show */
+body.is-show .bubble{
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.card.show{
-  animation: popIn .22s ease both;
+/* caché quand idle */
+body.is-idle .bubble{
+  opacity: 0;
+  transform: translateY(14px);
 }
+
+/* Debug overlay (désactive plus tard) */
+.debug{
+  position: fixed;
+  left: 14px;
+  top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.80);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  max-width: 45vw;
+}
+.debug b{ color: rgba(255,255,255,0.92); }
