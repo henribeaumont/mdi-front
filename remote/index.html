@@ -1,277 +1,711 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Télécommande Quiz</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDI Live - Télécommande Unifiée</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
   <style>
-    :root {
-      --bg: #0A0F1E;
-      --panel: rgba(255,255,255,0.06);
-      --text: rgba(255,255,255,0.92);
-      --accent: #F9AD48;
-      --danger: #ff3b30;
-      --ok: #2ecc71;
-      --font: ui-sans-serif, system-ui, sans-serif;
-    }
-
     * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
     }
 
+    :root {
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #3b82f6;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
     body {
-      margin: 0;
-      background: var(--bg);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
       color: var(--text);
-      font-family: var(--font);
-      padding: 18px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }
 
-    .wrap {
-      max-width: 600px;
-      margin: 0 auto;
-      display: grid;
-      gap: 14px;
+    .container {
+      background: var(--bg-card);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
 
-    .card {
-      background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 18px;
-      padding: 14px;
-    }
-
-    .title {
-      font-weight: 800;
+    .header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 99px;
-      background: #555;
-      display: inline-block;
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
-    .dot.ok {
-      background: var(--ok);
-      box-shadow: 0 0 0 4px rgba(46,204,113,0.16);
-    }
-
-    .dot.bad {
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
       background: var(--danger);
+      transition: all 0.3s;
     }
 
-    input,
-    select {
-      width: 100%;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid #444;
-      background: #222;
-      color: #fff;
-      margin-bottom: 8px;
+    .status-dot.connected {
+      background: var(--success);
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    }
+
+    .section {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section:last-child {
+      border-bottom: none;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-group {
+      margin-bottom: 12px;
+    }
+
+    .input-group:last-child {
+      margin-bottom: 0;
     }
 
     label {
-      font-size: 12px;
-      color: #aaa;
       display: block;
-      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
     }
 
-    .btn {
+    input, select {
       width: 100%;
-      padding: 14px;
-      border-radius: 14px;
-      border: none;
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-      font-weight: bold;
-      cursor: pointer;
-      margin-bottom: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-dark);
+      color: var(--text);
+      font-size: 14px;
+      transition: all 0.2s;
     }
 
-    .btn:active {
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:active {
       transform: scale(0.98);
     }
 
-    .btn.primary {
-      background: rgba(249,173,72,0.2);
-      color: var(--accent);
-      border: 1px solid rgba(249,173,72,0.3);
-    }
-
-    .btn.danger {
-      background: rgba(255,59,48,0.2);
-      color: #ff6b6b;
-    }
-
-    .btn:disabled {
-      opacity: 0.4;
+    button:disabled {
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .tv {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 10px;
+    .btn-primary {
+      background: var(--accent);
+      color: white;
     }
 
-    .full {
-      grid-column: 1 / -1;
+    .btn-primary:hover:not(:disabled) {
+      background: #2563eb;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #16a34a;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    /* Toggle Switch */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: var(--bg-dark);
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .toggle-container:last-child {
+      margin-bottom: 0;
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .toggle-label .icon {
+      font-size: 20px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+      background: var(--danger);
+      border-radius: 13px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .toggle-switch.active {
+      background: var(--success);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: left 0.3s;
+    }
+
+    .toggle-switch.active::after {
+      left: 27px;
+    }
+
+    /* Quiz Controls */
+    .quiz-controls {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .quiz-status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 8px;
+    }
+
+    .quiz-status.idle {
+      background: var(--border);
+      color: var(--text-muted);
+    }
+
+    .quiz-status.active {
+      background: var(--success);
+      color: white;
+    }
+
+    .quiz-status.poll {
+      background: var(--warning);
+      color: white;
+    }
+
+    .btn-small {
+      padding: 10px;
+      font-size: 13px;
+    }
+
+    .message {
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .message.show {
+      display: block;
+    }
+
+    .message.success {
+      background: rgba(34, 197, 94, 0.1);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    .message.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger);
+      border: 1px solid var(--danger);
     }
   </style>
 </head>
-
 <body>
-  <div class="wrap">
-    <div class="card title">
-      <span>MDI • Quiz Remote</span>
-      <span id="dot" class="dot"></span>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>
+        🎮 Télécommande MDI
+      </h1>
+      <div id="statusDot" class="status-dot"></div>
     </div>
 
-    <div class="card">
-      <label>ID Client (Room ID)</label>
-      <input id="roomId" placeholder="ex: DEMO_CLIENT" />
-
-      <label>Clé Secrète (Room Key)</label>
-      <input id="roomKey" placeholder="ex: demo_key_123" />
-
-      <button id="btnConnect" class="btn primary">
-        1. Connecter + Charger Catalogue
+    <!-- Auth Section -->
+    <div class="section">
+      <div class="section-title">🔐 Authentification</div>
+      <div class="input-group">
+        <label for="roomId">Room ID</label>
+        <input type="text" id="roomId" placeholder="Ex: DEMO_CLIENT">
+      </div>
+      <div class="input-group">
+        <label for="roomKey">Room Key</label>
+        <input type="password" id="roomKey" placeholder="Votre clé secrète">
+      </div>
+      <button id="btnConnect" class="btn-primary">
+        🔌 Connecter
       </button>
+      <div id="message" class="message"></div>
     </div>
 
-    <div class="card">
-      <label>Choisir une question</label>
-      <select id="questionSelect">
-        <option value="">(Connectez-vous d'abord)</option>
-      </select>
-
-      <div class="tv">
-        <button id="btnLoad" class="btn primary full">
-          2. Afficher la question ❓ (DB)
-        </button>
-
-        <button id="btnOpen" class="btn">Afficher options 🗳️</button>
-        <button id="btnResults" class="btn">Résultats %</button>
-        <button id="btnReveal" class="btn">Réponse ✅</button>
-        <button id="btnWinner" class="btn">Gagnant 🥇</button>
+    <!-- Overlays Section -->
+    <div class="section">
+      <div class="section-title">🎬 Overlays</div>
+      
+      <!-- Nuage de Mots -->
+      <div class="toggle-container">
+        <div class="toggle-label">
+          <span class="icon">☁️</span>
+          <span>Nuage de Mots</span>
+        </div>
+        <div id="toggleNuage" class="toggle-switch" onclick="toggleOverlay('nuage_de_mots')"></div>
       </div>
 
-      <button id="btnReset" class="btn danger" style="margin-top:12px">
-        Reset (Effacer)
-      </button>
+      <!-- Roue Loto -->
+      <div class="toggle-container">
+        <div class="toggle-label">
+          <span class="icon">🎡</span>
+          <span>Roue Loto</span>
+        </div>
+        <div id="toggleRoue" class="toggle-switch" onclick="toggleOverlay('roue_loto')"></div>
+      </div>
+    </div>
+
+    <!-- Quiz Section -->
+    <div class="section">
+      <div class="section-title">
+        ❓ Quiz / Sondage
+        <span id="quizStatus" class="quiz-status idle">Inactif</span>
+      </div>
+
+      <div class="input-group">
+        <label for="questionSelect">Choisir une question</label>
+        <select id="questionSelect">
+          <option value="">-- Connectez-vous d'abord --</option>
+        </select>
+      </div>
+
+      <div class="quiz-controls">
+        <button id="btnLoadQuestion" class="btn-success btn-small" onclick="loadQuestion()">
+          1. ❓ Charger question
+        </button>
+        <button id="btnShowOptions" class="btn-secondary btn-small" onclick="showOptions()" disabled>
+          2. 🗳️ Afficher options
+        </button>
+        <button id="btnShowResults" class="btn-secondary btn-small" onclick="showResults()" disabled>
+          3. 📊 Afficher résultats
+        </button>
+        <button id="btnRevealAnswer" class="btn-secondary btn-small" onclick="revealAnswer()" disabled>
+          4. ✅ Révéler bonne réponse
+        </button>
+        <button id="btnResetQuiz" class="btn-danger btn-small" onclick="resetQuiz()" disabled>
+          5. 🔄 Réinitialiser
+        </button>
+      </div>
     </div>
   </div>
 
   <script>
     const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-    const OVERLAY_NAME = "quiz_ou_sondage";
+    
+    // État global
+    let socket = null;
+    let connected = false;
+    let currentRoom = "";
+    let currentKey = "";
+    let questions = [];
+    let currentQuestionType = null; // "quiz" | "poll" | null
+    let overlayStates = {
+      nuage_de_mots: false,
+      roue_loto: false,
+      quiz_ou_sondage: false
+    };
 
+    // Éléments DOM
     const $ = (id) => document.getElementById(id);
 
-    let socket = null;
-    let questions = [];
-
-    function setStatus(ok) {
-      $("dot").className = ok ? "dot ok" : "dot bad";
+    // --- UTILITAIRES UI ---
+    function setConnectionStatus(isConnected) {
+      connected = isConnected;
+      $("statusDot").className = isConnected ? "status-dot connected" : "status-dot";
     }
 
-    // 1. Connexion + Chargement Catalogue
-    $("btnConnect").onclick = async () => {
+    function showMessage(text, type = "success") {
+      const msg = $("message");
+      msg.textContent = text;
+      msg.className = `message ${type} show`;
+      setTimeout(() => {
+        msg.classList.remove("show");
+      }, 3000);
+    }
+
+    function updateToggle(overlayName, isActive) {
+      overlayStates[overlayName] = isActive;
+      
+      if (overlayName === "nuage_de_mots") {
+        $("toggleNuage").className = isActive ? "toggle-switch active" : "toggle-switch";
+      }
+      if (overlayName === "roue_loto") {
+        $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
+      }
+    }
+
+    function updateQuizUI(isActive, questionType = null) {
+      overlayStates.quiz_ou_sondage = isActive;
+      currentQuestionType = questionType;
+
+      const status = $("quizStatus");
+      const btnOptions = $("btnShowOptions");
+      const btnResults = $("btnShowResults");
+      const btnReveal = $("btnRevealAnswer");
+      const btnReset = $("btnResetQuiz");
+
+      if (isActive) {
+        status.textContent = questionType === "poll" ? "Sondage actif" : "Quiz actif";
+        status.className = questionType === "poll" ? "quiz-status poll" : "quiz-status active";
+        
+        btnOptions.disabled = false;
+        btnResults.disabled = false;
+        btnReset.disabled = false;
+        
+        // Griser "Révéler bonne réponse" si c'est un poll
+        btnReveal.disabled = (questionType === "poll");
+      } else {
+        status.textContent = "Inactif";
+        status.className = "quiz-status idle";
+        
+        btnOptions.disabled = true;
+        btnResults.disabled = true;
+        btnReveal.disabled = true;
+        btnReset.disabled = true;
+      }
+    }
+
+    // --- CONNEXION ---
+    async function connect() {
       const room = $("roomId").value.trim();
       const key = $("roomKey").value.trim();
 
       if (!room || !key) {
-        return alert("Il manque l'ID ou la Clé !");
+        showMessage("⚠️ Room ID et Key requis", "error");
+        return;
       }
 
+      currentRoom = room;
+      currentKey = key;
+
+      // Déconnexion si déjà connecté
       if (socket) socket.disconnect();
-      socket = io(SERVER_URL);
+
+      // Nouvelle connexion
+      socket = io(SERVER_URL, {
+        transports: ["websocket", "polling"],
+        reconnection: true
+      });
 
       socket.on("connect", () => {
-        setStatus(true);
-        socket.emit("overlay:join", {
-          room,
-          key,
-          overlay: OVERLAY_NAME
-        });
+        console.log("✅ Connecté au serveur");
+        setConnectionStatus(true);
+        
+        // Join room
+        socket.emit("rejoindre_salle", currentRoom);
+        
+        // Charger le catalogue de questions
+        loadQuestionCatalog();
+        
+        showMessage("✅ Connecté avec succès", "success");
+      });
+
+      socket.on("connect_error", (err) => {
+        console.error("❌ Erreur connexion:", err);
+        setConnectionStatus(false);
+        showMessage("❌ Erreur de connexion", "error");
+      });
+
+      socket.on("disconnect", () => {
+        console.warn("⚠️ Déconnecté");
+        setConnectionStatus(false);
+      });
+
+      // Écouter les changements d'état
+      socket.on("overlay:state", (payload) => {
+        console.log("📡 État reçu:", payload);
+        handleOverlayState(payload);
       });
 
       socket.on("overlay:forbidden", () => {
-        setStatus(false);
-        alert("Accès refusé ! Vérifiez la clé.");
+        showMessage("❌ Accès refusé - Vérifiez votre clé", "error");
+        setConnectionStatus(false);
       });
+    }
 
-      socket.on("disconnect", () => setStatus(false));
-
+    // --- CATALOGUE QUESTIONS ---
+    async function loadQuestionCatalog() {
       try {
-        const res = await fetch(
-          `${SERVER_URL}/debug/questions?room=${room}`
-        );
+        const res = await fetch(`${SERVER_URL}/debug/questions?room=${currentRoom}`);
         const json = await res.json();
-
+        
         questions = json.data || [];
-
-        const sel = $("questionSelect");
-        sel.innerHTML = '<option value="">-- Choisir --</option>';
-
+        
+        const select = $("questionSelect");
+        select.innerHTML = '<option value="">-- Choisir une question --</option>';
+        
         questions.forEach(q => {
           const opt = document.createElement("option");
           opt.value = q.question_key;
           opt.textContent = `${q.question_key} - ${q.prompt}`;
-          sel.appendChild(opt);
+          opt.dataset.type = q.type; // Stocke le type
+          select.appendChild(opt);
         });
+        
+        console.log(`✅ ${questions.length} questions chargées`);
       } catch (e) {
-        alert("Erreur catalogue: " + e.message);
+        console.error("❌ Erreur chargement catalogue:", e);
+        showMessage("⚠️ Erreur chargement questions", "error");
       }
-    };
-
-    // Helper
-    function send(action, payload = {}) {
-      if (!socket || !socket.connected) {
-        return alert("Pas connecté !");
-      }
-
-      const room = $("roomId").value.trim();
-      const key = $("roomKey").value.trim();
-
-      socket.emit(action, {
-        room,
-        key,
-        overlay: OVERLAY_NAME,
-        ...payload
-      });
     }
 
-    // 2. Afficher Question
-    $("btnLoad").onclick = () => {
-      const qKey = $("questionSelect").value;
-      if (!qKey) return alert("Choisis une question !");
+    // --- GESTION ÉTATS OVERLAYS ---
+    function handleOverlayState(payload) {
+      const { overlay, state, data } = payload;
 
-      console.log("Envoi demande chargement:", qKey);
-      send("control:load_question", { question_key: qKey });
-    };
+      if (overlay === "nuage_de_mots") {
+        updateToggle("nuage_de_mots", state === "active");
+      }
 
-    $("btnOpen").onclick    = () => send("control:show_options");
-    $("btnResults").onclick = () => send("control:set_state", { state: "results" });
-    $("btnReveal").onclick  = () => send("control:set_state", { state: "reveal" });
-    $("btnWinner").onclick  = () => send("control:set_state", { state: "winner" });
-    $("btnReset").onclick   = () => send("control:idle");
+      if (overlay === "roue_loto") {
+        updateToggle("roue_loto", state === "active");
+      }
 
-    // Init URL
-    const u = new URL(location.href);
-    if (u.searchParams.get("room")) $("roomId").value = u.searchParams.get("room");
-    if (u.searchParams.get("key"))  $("roomKey").value = u.searchParams.get("key");
+      if (overlay === "quiz_ou_sondage") {
+        const isActive = (state !== "idle");
+        const questionType = data?.question?.type || null;
+        updateQuizUI(isActive, questionType);
+      }
+    }
+
+    // --- TOGGLE OVERLAYS ---
+    function toggleOverlay(overlayName) {
+      if (!connected) {
+        showMessage("❌ Connectez-vous d'abord", "error");
+        return;
+      }
+
+      const isCurrentlyActive = overlayStates[overlayName];
+
+      if (isCurrentlyActive) {
+        // Désactiver
+        socket.emit("control:deactivate_overlay", {
+          room: currentRoom,
+          overlay: overlayName
+        });
+        console.log(`🔴 Désactivation ${overlayName}`);
+      } else {
+        // Désactiver les autres overlays (exclusion mutuelle)
+        if (overlayName === "nuage_de_mots" && overlayStates.roue_loto) {
+          socket.emit("control:deactivate_overlay", {
+            room: currentRoom,
+            overlay: "roue_loto"
+          });
+        }
+        if (overlayName === "roue_loto" && overlayStates.nuage_de_mots) {
+          socket.emit("control:deactivate_overlay", {
+            room: currentRoom,
+            overlay: "nuage_de_mots"
+          });
+        }
+
+        // Désactiver le quiz si actif
+        if (overlayStates.quiz_ou_sondage) {
+          socket.emit("control:idle", {
+            room: currentRoom,
+            overlay: "quiz_ou_sondage"
+          });
+        }
+
+        // Activer l'overlay demandé
+        socket.emit("control:activate_overlay", {
+          room: currentRoom,
+          overlay: overlayName
+        });
+        console.log(`🟢 Activation ${overlayName}`);
+      }
+    }
+
+    // --- CONTRÔLES QUIZ ---
+    function loadQuestion() {
+      if (!connected) {
+        showMessage("❌ Connectez-vous d'abord", "error");
+        return;
+      }
+
+      const questionKey = $("questionSelect").value;
+      if (!questionKey) {
+        showMessage("⚠️ Choisissez une question", "error");
+        return;
+      }
+
+      // Désactiver nuage et roue (exclusion mutuelle)
+      if (overlayStates.nuage_de_mots) {
+        socket.emit("control:deactivate_overlay", {
+          room: currentRoom,
+          overlay: "nuage_de_mots"
+        });
+      }
+      if (overlayStates.roue_loto) {
+        socket.emit("control:deactivate_overlay", {
+          room: currentRoom,
+          overlay: "roue_loto"
+        });
+      }
+
+      // Charger la question
+      socket.emit("control:load_question", {
+        room: currentRoom,
+        overlay: "quiz_ou_sondage",
+        question_key: questionKey
+      });
+
+      console.log(`❓ Chargement question: ${questionKey}`);
+    }
+
+    function showOptions() {
+      if (!connected) return;
+      
+      socket.emit("control:show_options", {
+        room: currentRoom,
+        overlay: "quiz_ou_sondage"
+      });
+      
+      console.log("🗳️ Affichage options");
+    }
+
+    function showResults() {
+      if (!connected) return;
+      
+      socket.emit("control:set_state", {
+        room: currentRoom,
+        overlay: "quiz_ou_sondage",
+        state: "results"
+      });
+      
+      console.log("📊 Affichage résultats");
+    }
+
+    function revealAnswer() {
+      if (!connected) return;
+      if (currentQuestionType === "poll") return; // Ne devrait pas arriver (bouton grisé)
+      
+      socket.emit("control:set_state", {
+        room: currentRoom,
+        overlay: "quiz_ou_sondage",
+        state: "reveal"
+      });
+      
+      console.log("✅ Révélation bonne réponse");
+    }
+
+    function resetQuiz() {
+      if (!connected) return;
+      
+      socket.emit("control:idle", {
+        room: currentRoom,
+        overlay: "quiz_ou_sondage"
+      });
+      
+      console.log("🔄 Reset quiz");
+    }
+
+    // --- EVENT LISTENERS ---
+    $("btnConnect").onclick = connect;
+
+    // Init depuis URL (pratique pour tests)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("room")) $("roomId").value = urlParams.get("room");
+    if (urlParams.get("key")) $("roomKey").value = urlParams.get("key");
   </script>
 </body>
 </html>
