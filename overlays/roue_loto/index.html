@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Roue Loto V6.6 (FIX Affichage)</title>
+  <title>MDI • Roue Loto V6.7 (Améliorations UX)</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +21,7 @@
       --pointer-size: 34px;
       --pointer-color: #ffffff;
       --pointer-rotate-180: "on";
-      --pointer-overlap: 0.86;
+      --pointer-overlap: 1.15;
       --spin-direction: "cw";
       --winner-confetti: "on";
       --confetti-density: 180;
@@ -67,6 +67,12 @@
       width: 100vw;
       height: 100vh;
       position: relative;
+      opacity: 0;
+      transition: opacity 0.8s ease-in-out;
+    }
+
+    #app.show {
+      opacity: 1;
     }
 
     .stage {
@@ -125,18 +131,19 @@
     }
 
     .winner-panel {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #ffffff;
       padding: 40px 60px;
       border-radius: 20px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
       text-align: center;
+      border: 3px solid #333333;
     }
 
     .winner-name {
       font-size: 48px;
       font-weight: 900;
-      color: white;
-      text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      color: #000000;
+      text-shadow: none;
       display: block;
     }
 
@@ -179,11 +186,12 @@
   <script>
     /**
      * ============================================================
-     * MDI ROUE LOTO - V6.6 (FIX AFFICHAGE + COLLECTE)
+     * MDI ROUE LOTO - V6.7 (AMÉLIORATIONS UX)
      * ============================================================
-     * ✅ FIX : Affichage garanti quand activé
-     * ✅ FIX : Collecte via chat toujours active
-     * ✅ Design original + confettis
+     * ✅ Aiguille chevauche la roue (overlap 1.15)
+     * ✅ Texte retourné 180° si aiguille à gauche
+     * ✅ Panel gagnant blanc + texte noir
+     * ✅ Fondu affichage/masquage
      * ============================================================
      */
 
@@ -339,8 +347,8 @@
 
         const tx = Math.max(120, r*0.26);
 
-        const flipLabel = cssOnOff("--label-rotate-180", false);
-        if (flipLabel) {
+        // ✅ NOUVEAU : Retourner texte 180° si aiguille à gauche
+        if (pointerSide === "left") {
           wheelCtx.rotate(Math.PI);
           wheelCtx.textAlign = "right";
           wheelCtx.strokeText(safeLabel, -tx, 0);
@@ -546,8 +554,11 @@
 
       if (payload.state === "idle") {
         console.log("🔴 [ROUE] Masquage overlay");
-        elApp.classList.add("hidden");
-        clearAll();
+        elApp.classList.remove("show");
+        setTimeout(() => {
+          elApp.classList.add("hidden");
+          clearAll();
+        }, 800);
         return;
       }
 
@@ -555,6 +566,9 @@
         console.log("🟢 [ROUE] Affichage overlay");
         elSecurity.classList.add("hidden");
         elApp.classList.remove("hidden");
+        requestAnimationFrame(() => {
+          elApp.classList.add("show");
+        });
         STATE = "idle";
         drawWheel();
       }
@@ -585,7 +599,6 @@
     socket.on("raw_vote", (data) => {
       if (!data || !data.vote) return;
       if (STATE !== "collecting") {
-        console.log(`⚠️ [ROUE] Message ignoré (état=${STATE}): ${data.vote}`);
         return;
       }
 
@@ -602,8 +615,6 @@
         participants.push({ name, key });
         drawWheel();
         console.log(`➕ [ROUE] Participant: ${name} (total: ${participants.length})`);
-      } else {
-        console.log(`⚠️ [ROUE] Déjà présent: ${name}`);
       }
     });
 
