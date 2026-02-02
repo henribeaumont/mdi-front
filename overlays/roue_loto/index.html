@@ -3,28 +3,146 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Roue Loto</title>
+  <title>MDI • Roue Loto V6.3 (État Unifié)</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* Base transparente OBS */
+    html, body {
+      background-color: transparent;
+      margin: 0; padding: 0; overflow: hidden;
+      height: 100vh; width: 100vw;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Écran sécurité */
+    #security-screen {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      background: rgba(0,0,0,0);
+      color: #ff3b30;
+      z-index: 1000;
+      position: absolute;
+      text-shadow: 0 3px 18px rgba(0,0,0,0.9);
+    }
+    .security-x {
+      font-size: 84px;
+      font-weight: 900;
+      color: #ff3b30;
+    }
+    .security-text {
+      font-size: 34px;
+      font-weight: 900;
+      text-align: center;
+      color: #ff3b30;
+    }
+
+    /* App principal */
+    #app {
+      display: grid;
+      place-items: center;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .stage {
+      position: relative;
+      width: var(--wheel-size, 600px);
+      height: var(--wheel-size, 600px);
+    }
+
+    canvas#wheel {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%; height: 100%;
+    }
+
+    .pointer {
+      position: absolute;
+      top: 50%;
+      right: -5%;
+      transform: translateY(-50%);
+      width: 0; height: 0;
+      border-style: solid;
+      border-width: 30px 0 30px 60px;
+      border-color: transparent transparent transparent #ffffff;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+      z-index: 100;
+    }
+
+    [data-pointer-side="left"] .pointer {
+      right: auto;
+      left: -5%;
+      border-width: 30px 60px 30px 0;
+      border-color: transparent #ffffff transparent transparent;
+    }
+
+    .winner {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 200;
+      display: none;
+    }
+
+    .winner.show {
+      display: block;
+      animation: winnerPop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+
+    @keyframes winnerPop {
+      0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    .winner-panel {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 40px 60px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+
+    .winner-name {
+      font-size: 48px;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      display: block;
+    }
+
+    canvas.confetti {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      pointer-events: none;
+      z-index: 150;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="security-screen" aria-hidden="true">
+  <div id="security-screen" class="hidden">
     <div class="security-x">✖</div>
     <div class="security-text">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
 
-  <div id="app" aria-hidden="true">
+  <div id="app" class="hidden">
     <div class="stage">
       <canvas id="wheel" width="1200" height="1200"></canvas>
-      <div class="pointer" aria-hidden="true"></div>
+      <div class="pointer"></div>
 
-      <div id="winner" class="winner" aria-hidden="true">
+      <div id="winner" class="winner">
         <div class="winner-panel">
           <span id="winnerName" class="winner-name"></span>
         </div>
@@ -34,6 +152,272 @@
     <canvas id="confetti" class="confetti" width="1920" height="1080"></canvas>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    /**
+     * ============================================================
+     * MDI ROUE LOTO - V6.3 (ÉTAT UNIFIÉ - ANTI-POLLUTION)
+     * ============================================================
+     * ✅ NOUVEAU : Écoute overlay:state au lieu de raw_vote
+     * ✅ CORRIGÉ : Plus de pollution (participants fantômes éliminés)
+     * ✅ CONSERVÉ : Auth stricte, boot transparent, CSS OBS pédagogique
+     * ============================================================
+     */
+
+    const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+    const OVERLAY_TYPE = "roue_loto";
+
+    // --- UTILITAIRES CSS VARIABLES ---
+    function cssVar(name, fallback = "") {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+      return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+    }
+
+    // --- ÉLÉMENTS DOM ---
+    const elSecurity = document.getElementById("security-screen");
+    const elApp = document.getElementById("app");
+    const wheelCanvas = document.getElementById("wheel");
+    const wheelCtx = wheelCanvas.getContext("2d");
+    const elWinnerName = document.getElementById("winnerName");
+    const elWinnerDiv = document.getElementById("winner");
+    const confettiCanvas = document.getElementById("confetti");
+    const confettiCtx = confettiCanvas.getContext("2d");
+
+    // --- ÉTAT OVERLAY ---
+    let STATE = "idle"; // "idle" | "active" | "spinning" | "winner"
+    let participants = []; // Liste des noms
+
+    // --- ROUE ---
+    let wheelAngle = 0;
+    let spinning = false;
+    let spinStartTs = 0;
+    let spinDurationMs = 4200;
+    let spinStartAngle = 0;
+    let targetAngle = 0;
+
+    const basePalette = [
+      "#2ecc71","#e74c3c","#3b82f6","#f1c40f",
+      "#9b59b6","#1abc9c","#e67e22","#ec4899",
+      "#22c55e","#ef4444","#60a5fa","#f59e0b"
+    ];
+
+    // --- RENDU ROUE ---
+    function drawWheel() {
+      const cx = wheelCanvas.width / 2;
+      const cy = wheelCanvas.height / 2;
+      const radius = cx * 0.9;
+
+      wheelCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height);
+
+      if (participants.length === 0) {
+        // Roue vide
+        wheelCtx.beginPath();
+        wheelCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        wheelCtx.fillStyle = "#2d3748";
+        wheelCtx.fill();
+        wheelCtx.strokeStyle = "#fff";
+        wheelCtx.lineWidth = 8;
+        wheelCtx.stroke();
+        return;
+      }
+
+      const anglePerSlice = (Math.PI * 2) / participants.length;
+
+      participants.forEach((name, i) => {
+        const startAngle = wheelAngle + i * anglePerSlice;
+        const endAngle = startAngle + anglePerSlice;
+        const color = basePalette[i % basePalette.length];
+
+        // Slice
+        wheelCtx.beginPath();
+        wheelCtx.moveTo(cx, cy);
+        wheelCtx.arc(cx, cy, radius, startAngle, endAngle);
+        wheelCtx.closePath();
+        wheelCtx.fillStyle = color;
+        wheelCtx.fill();
+        wheelCtx.strokeStyle = "#fff";
+        wheelCtx.lineWidth = 4;
+        wheelCtx.stroke();
+
+        // Texte
+        wheelCtx.save();
+        wheelCtx.translate(cx, cy);
+        wheelCtx.rotate(startAngle + anglePerSlice / 2);
+        wheelCtx.textAlign = "center";
+        wheelCtx.textBaseline = "middle";
+        wheelCtx.fillStyle = "#fff";
+        wheelCtx.font = "bold 32px Montserrat";
+        wheelCtx.shadowColor = "rgba(0,0,0,0.5)";
+        wheelCtx.shadowBlur = 8;
+        wheelCtx.fillText(name, radius * 0.65, 0);
+        wheelCtx.restore();
+      });
+    }
+
+    // --- ANIMATION ROUE ---
+    function animateWheel() {
+      if (!spinning) return;
+
+      const elapsed = Date.now() - spinStartTs;
+      const progress = Math.min(elapsed / spinDurationMs, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+
+      const totalRotation = (Math.PI * 2) * 8; // 8 tours
+      wheelAngle = spinStartAngle + totalRotation * eased;
+
+      drawWheel();
+
+      if (progress < 1) {
+        requestAnimationFrame(animateWheel);
+      } else {
+        spinning = false;
+        showWinner();
+      }
+    }
+
+    // --- CONFETTIS ---
+    let confettiParticles = [];
+
+    function createConfetti() {
+      confettiParticles = [];
+      for (let i = 0; i < 150; i++) {
+        confettiParticles.push({
+          x: Math.random() * confettiCanvas.width,
+          y: -20,
+          vx: (Math.random() - 0.5) * 4,
+          vy: Math.random() * 3 + 2,
+          color: basePalette[Math.floor(Math.random() * basePalette.length)],
+          size: Math.random() * 8 + 4
+        });
+      }
+      animateConfetti();
+    }
+
+    function animateConfetti() {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+      confettiParticles = confettiParticles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.2; // gravité
+
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.fillRect(p.x, p.y, p.size, p.size);
+
+        return p.y < confettiCanvas.height;
+      });
+
+      if (confettiParticles.length > 0) {
+        requestAnimationFrame(animateConfetti);
+      }
+    }
+
+    // --- GAGNANT ---
+    function showWinner() {
+      if (participants.length === 0) return;
+
+      const anglePerSlice = (Math.PI * 2) / participants.length;
+      const pointerAngle = 0; // Pointeur à droite (0 rad)
+      const normalizedAngle = (wheelAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      const winnerIndex = Math.floor((Math.PI * 2 - normalizedAngle + pointerAngle) / anglePerSlice) % participants.length;
+
+      const winner = participants[winnerIndex];
+      elWinnerName.textContent = winner;
+      elWinnerDiv.classList.add("show");
+      createConfetti();
+
+      setTimeout(() => {
+        elWinnerDiv.classList.remove("show");
+      }, 5000);
+    }
+
+    // --- CONNEXION SOCKET ---
+    const socket = io(SERVER_URL, {
+      transports: ["websocket", "polling"],
+      reconnection: true
+    });
+
+    socket.on("connect", () => {
+      console.log("✅ [ROUE] Connecté au serveur");
+    });
+
+    socket.on("connect_error", (err) => {
+      console.warn("⚠️ [ROUE] Erreur connexion:", err.message);
+    });
+
+    // --- GESTION ÉTAT OVERLAY ---
+    socket.on("overlay:state", (payload) => {
+      if (payload.overlay !== OVERLAY_TYPE) return;
+
+      console.log(`📡 [ROUE] État reçu:`, payload.state, payload.data);
+
+      STATE = payload.state;
+
+      if (STATE === "idle") {
+        // Désactivation : masquer la roue
+        elApp.classList.add("hidden");
+        participants = [];
+        drawWheel();
+        return;
+      }
+
+      if (STATE === "active") {
+        // Activation : afficher la roue
+        elSecurity.classList.add("hidden");
+        elApp.classList.remove("hidden");
+
+        // Synchroniser avec les données serveur
+        if (payload.data && payload.data.participants) {
+          participants = payload.data.participants;
+          drawWheel();
+        }
+      }
+    });
+
+    // --- GESTION ACCÈS REFUSÉ ---
+    socket.on("overlay:forbidden", (payload) => {
+      console.error("❌ [ROUE] Accès refusé:", payload.reason);
+      elSecurity.classList.remove("hidden");
+      elApp.classList.add("hidden");
+    });
+
+    // --- INITIALISATION ---
+    async function init() {
+      // Attendre que le CSS OBS soit appliqué
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const authMode = cssVar("--auth-mode", "strict");
+      const room = cssVar("--room-id", "").trim();
+      const key = cssVar("--room-key", "").trim();
+
+      console.log(`🔐 [ROUE] Auth mode: ${authMode}, Room: ${room}`);
+
+      if (!room) {
+        console.error("❌ [ROUE] Aucun room-id fourni");
+        elSecurity.classList.remove("hidden");
+        return;
+      }
+
+      // Envoi de l'auth au serveur
+      if (authMode === "strict") {
+        if (!key) {
+          console.error("❌ [ROUE] Mode strict mais aucune room-key");
+          elSecurity.classList.remove("hidden");
+          return;
+        }
+        socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+      } else {
+        // Mode legacy (debug uniquement)
+        socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
+      }
+
+      console.log("✅ [ROUE] Authentification envoyée, en attente de overlay:state...");
+    }
+
+    // Démarrage quand Socket.io est connecté
+    socket.on("connect", init);
+
+    // Dessiner la roue initiale
+    drawWheel();
+  </script>
 </body>
 </html>
