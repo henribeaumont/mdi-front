@@ -1338,6 +1338,9 @@
       });
       
       timerRunning = false;
+      timerSeconds = 60; // Reset à 1 minute
+      timerUpdateDisplay(); // ✅ Mettre à jour l'aperçu
+      
       showMessage("Timer", "🔄 Reset", "success");
       console.log("🔄 [TIMER] Reset");
     }
