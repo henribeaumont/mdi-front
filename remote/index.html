@@ -673,13 +673,11 @@
 
     <!-- Contenu Timer -->
     <div id="tabTimer" class="tab-content">
-      <!-- Toggle ON/OFF Timer -->
-      <div class="toggle-container">
-        <div class="toggle-label">
-          <span class="icon">⏱️</span>
-          <span>Timer / Chrono</span>
-        </div>
-        <div id="toggleTimer" class="toggle-switch" onclick="toggleOverlay('timer_chrono')"></div>
+      <!-- Bouton Statut Timer (toujours actif, non cliquable) -->
+      <div style="margin-bottom: 12px;">
+        <button class="btn-success" style="cursor: default; opacity: 0.9; pointer-events: none;">
+          ✅ Timer / Chrono Actif
+        </button>
       </div>
 
       <div class="timer-separator"></div>
@@ -698,6 +696,19 @@
       <div class="timer-preview-box">
         <div class="timer-preview-label">Temps configuré</div>
         <div class="timer-preview-time" id="timerPreview">00:00</div>
+      </div>
+
+      <!-- ✅ CONTRÔLES (déplacés ici, juste après l'aperçu) -->
+      <div class="timer-controls">
+        <button class="btn-success" onclick="timerStart()">
+          ▶️ Start
+        </button>
+        <button class="btn-secondary" onclick="timerPause()">
+          ⏸️ Pause
+        </button>
+        <button class="btn-danger timer-reset-btn" onclick="timerReset()">
+          🔄 Reset
+        </button>
       </div>
 
       <div class="timer-separator"></div>
@@ -773,21 +784,6 @@
         </div>
       </div>
 
-      <div class="timer-separator"></div>
-
-      <!-- Contrôles -->
-      <div class="timer-controls">
-        <button class="btn-success" onclick="timerStart()">
-          ▶️ Start
-        </button>
-        <button class="btn-secondary" onclick="timerPause()">
-          ⏸️ Pause
-        </button>
-        <button class="btn-danger timer-reset-btn" onclick="timerReset()">
-          🔄 Reset
-        </button>
-      </div>
-
       <div id="messageTimer" class="message"></div>
     </div>
   </div>
@@ -814,6 +810,7 @@
     let timerMode = "timer";
     let timerSeconds = 60;
     let timerRunning = false;
+    let timerDisplayBeforeStart = false; // Affichage avant démarrage
 
     const $ = (id) => document.getElementById(id);
 
@@ -928,6 +925,15 @@
         socket.emit("rejoindre_salle", currentRoom);
         loadQuestionCatalog();
         showMessage("Quiz", "✅ Connecté", "success");
+        
+        // Activer automatiquement l'overlay timer
+        setTimeout(() => {
+          socket.emit("control:activate_overlay", {
+            room: currentRoom,
+            overlay: "timer_chrono"
+          });
+          console.log("✅ [TIMER] Overlay activé automatiquement");
+        }, 500);
       });
 
       socket.on("connect_error", (err) => {
@@ -1334,6 +1340,28 @@
       timerRunning = false;
       showMessage("Timer", "🔄 Reset", "success");
       console.log("🔄 [TIMER] Reset");
+    }
+
+    // --- TOGGLE AFFICHAGE AVANT DÉMARRAGE ---
+    function toggleTimerDisplay() {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      timerDisplayBeforeStart = !timerDisplayBeforeStart;
+      
+      $("toggleTimerDisplay").className = timerDisplayBeforeStart ? "toggle-switch active" : "toggle-switch";
+      
+      // Envoyer au serveur pour afficher/masquer
+      socket.emit("control:timer_toggle_display", {
+        room: currentRoom,
+        display: timerDisplayBeforeStart
+      });
+      
+      const msg = timerDisplayBeforeStart ? "👁️ Affichage activé" : "👁️ Affichage masqué";
+      showMessage("Timer", msg, "success");
+      console.log(`👁️ [TIMER] Affichage: ${timerDisplayBeforeStart}`);
     }
 
     // --- INIT ---
