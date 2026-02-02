@@ -2,10 +2,13 @@
  * ============================================================
  * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
  * ============================================================
- * ✅ Écart taille : 30px (min) → 120px (max)
+ * ✅ Écart taille : par défaut 30px (min) → 120px (max)
+ * ✅ MAIS configurable via CSS OBS :
+ *    --cloud-font-min: 42px;
+ *    --cloud-font-max: 92px;
  * ✅ Fondu affichage/masquage
  * ✅ Anti-collision
- * ✅ FIX OBS (lié à tes demandes) : render différé si container mesuré à 0x0
+ * ✅ FIX OBS : render différé si container mesuré à 0x0
  * ============================================================
  */
 
@@ -21,6 +24,17 @@ function cssOnOff(name, fallbackOn = true) {
   const v = (cssVar(name, "") || "").toLowerCase();
   if (!v) return fallbackOn;
   return v === "on" || v === "true" || v === "1";
+}
+
+/* ✅ NEW (lié à ta demande) : lire un nombre (px) depuis CSS OBS */
+function cssPx(name, fallbackPx) {
+  const raw = cssVar(name, "");
+  // tolère virgule FR "42,5px"
+  const n = parseFloat(String(raw).replace(",", "."));
+  return Number.isFinite(n) ? n : fallbackPx;
+}
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
 }
 
 /* -------- DOM -------- */
@@ -121,12 +135,9 @@ function render() {
   const H = container.clientHeight;
 
   /**
-   * ✅ FIX OBS (lié à tes demandes)
+   * ✅ FIX OBS (lié à ta demande)
    * Dans OBS, juste après avoir retiré .hidden, le container peut être mesuré à 0x0.
-   * Si on calcule les tailles/positions à ce moment-là :
-   *  - l’algo collision “fait n’importe quoi”
-   *  - l’update de taille semble “ne pas marcher”
-   * Donc : on re-tente au frame suivant.
+   * On re-tente au frame suivant.
    */
   if (!W || !H) {
     scheduleRender();
@@ -148,13 +159,18 @@ function render() {
   const maxCount = Math.max(...words.map(w => w.count), 1);
   const minCount = Math.min(...words.map(w => w.count), 1);
 
+  /* ✅ NEW (lié à ta demande) : tailles configurables via CSS OBS */
+  const minPx = clamp(cssPx("--cloud-font-min", 30), 10, 300);
+  const maxPx = clamp(cssPx("--cloud-font-max", 120), 10, 300);
+  const safeMax = Math.max(minPx, maxPx);
+
   words.forEach((mot) => {
     const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
     let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
 
-    // ✅ Taille basée sur le suffrage (30px → 120px)
+    // ✅ Taille basée sur le suffrage (minPx → safeMax)
     const ratio = maxCount > minCount ? (mot.count - minCount) / (maxCount - minCount) : 1;
-    const fontSize = Math.floor(30 + (ratio * 90));
+    const fontSize = Math.floor(minPx + (ratio * (safeMax - minPx)));
 
     const { width, height } = measureText(displayText, fontSize);
 
