@@ -1,309 +1,380 @@
 /**
- * MDI TIMER/CHRONO - V1
- * - ZÉRO FLICKER : UI cachée tant que overlay:state OK + auth OK
- * - Sécurité : écran "ACCÈS REFUSÉ"
- * - Mode : chrono | timer (countdown)
- * - Paramétrage via CSS OBS
- * - Contrôle : socket "control:timer_chrono" + fallback triggers raw_vote
- */
+ * ============================================================
+ * MDI TIMER/CHRONO V2.0
+ * ============================================================
+ * ✅ Auth stricte hardcodée (pas de --auth-mode)
+ * ✅ Mode TIMER : MM:SS (compte à rebours)
+ * ✅ Mode CHRONO : MM:SS:CC (centièmes haute précision 10ms)
+ * ✅ Pilotage télécommande + Stream Deck
+ * ✅ Boutons +/- désactivés pendant run
+ * ✅ Panel responsive au contenu
+ * ✅ Fondu entrée/sortie
+ * ============================================================ */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "timer_chrono";
 
-/* ---------- CSS utils ---------- */
+/* ============================================================
+   HELPERS CSS OBS
+   ============================================================ */
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
 }
-function cssNum(name, fallback) {
-  const n = Number(cssVar(name, ""));
-  return Number.isFinite(n) ? n : fallback;
-}
-function cssOnOff(name, fallbackOn = true) {
-  const v = (cssVar(name, "") || "").toLowerCase();
-  if (!v) return fallbackOn;
-  return v === "on" || v === "true" || v === "1";
-}
-function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
 
-/* ---------- UI ---------- */
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+/* ============================================================
+   DOM ELEMENTS
+   ============================================================ */
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
 const elPanel = document.getElementById("panel");
 const elTime = document.getElementById("time");
 
-function setBootHidden(){
-  elApp.classList.add("hidden");
-  elSecurity.classList.add("hidden");
-  document.body.style.backgroundColor = "transparent";
-}
-function showDenied(){
+function showDenied() {
   elApp.classList.add("hidden");
   elSecurity.classList.remove("hidden");
   document.body.style.backgroundColor = "black";
 }
-function showReady(){
+
+function showReady() {
   elSecurity.classList.add("hidden");
   elApp.classList.remove("hidden");
+  elApp.classList.add("show");
   document.body.style.backgroundColor = "transparent";
 }
 
-/* ---------- Config (CSS OBS) ---------- */
-let AUTH_MODE = "strict";
-let ROOM_ID = "";
-let ROOM_KEY = "";
+/* ============================================================
+   STATE
+   ============================================================ */
+let MODE = "timer"; // "timer" | "chrono"
+let STATE = "idle"; // "idle" | "running" | "paused" | "done"
 
-let MODE = "timer"; // timer | chrono
-let START_SECONDS = 60;
+// Timer : remainingMs (millisecondes restantes)
+// Chrono : elapsedMs (millisecondes écoulées)
+let remainingMs = 60000; // 1 minute par défaut
+let elapsedMs = 0;
 
-let TRG_START = "START";
-let TRG_PAUSE = "PAUSE";
-let TRG_RESET = "RESET";
-let CMD_MATCH_MODE = "exact"; // exact | startswith | contains
+let lastTickTime = 0;
+let animationFrameId = null;
 
-function readAuthVars(){
-  AUTH_MODE = (cssVar("--auth-mode","strict") || "strict").toLowerCase();
-  ROOM_ID = cssVar("--room-id","");
-  ROOM_KEY = cssVar("--room-key","");
+/* ============================================================
+   FORMATTING
+   ============================================================ */
+function pad2(n) {
+  return String(n).padStart(2, "0");
 }
-function parseTimeToSeconds(raw){
-  const t = (raw || "").toString().trim();
-  if (!t) return 0;
 
-  // format numérique pur => secondes
-  if (/^\d+$/.test(t)) return clamp(parseInt(t,10), 0, 99*3600 + 59*60 + 59);
+function formatTimer(ms) {
+  // TIMER : MM:SS (toujours)
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  return `${pad2(mm)}:${pad2(ss)}`;
+}
 
-  // formats MM:SS ou HH:MM:SS
-  const parts = t.split(":").map(p => p.trim());
-  if (parts.some(p => !/^\d+$/.test(p))) return 0;
+function formatChrono(ms) {
+  // CHRONO : MM:SS:CC (centièmes plus petits)
+  const totalMs = Math.max(0, Math.floor(ms));
+  const totalSec = Math.floor(totalMs / 1000);
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  const cc = Math.floor((totalMs % 1000) / 10); // Centièmes (0-99)
+  
+  return `${pad2(mm)}:${pad2(ss)}:<span class="centimes">${pad2(cc)}</span>`;
+}
 
-  if (parts.length === 2){
-    const mm = parseInt(parts[0],10);
-    const ss = parseInt(parts[1],10);
-    return clamp(mm*60 + ss, 0, 99*3600 + 59*60 + 59);
+function updateDisplay() {
+  if (MODE === "timer") {
+    elTime.textContent = formatTimer(remainingMs);
+  } else {
+    elTime.innerHTML = formatChrono(elapsedMs);
   }
-  if (parts.length === 3){
-    const hh = parseInt(parts[0],10);
-    const mm = parseInt(parts[1],10);
-    const ss = parseInt(parts[2],10);
-    return clamp(hh*3600 + mm*60 + ss, 0, 99*3600 + 59*60 + 59);
+}
+
+/* ============================================================
+   ENGINE (HAUTE PRÉCISION 10ms)
+   ============================================================ */
+function resetEngine() {
+  STATE = "idle";
+  elapsedMs = 0;
+  remainingMs = 60000; // Reset au temps par défaut (sera écrasé par serveur)
+  
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
   }
-  return 0;
-}
-function readConfig(){
-  MODE = (cssVar("--mode","timer") || "timer").toLowerCase();
-  MODE = (MODE === "chrono") ? "chrono" : "timer";
-
-  START_SECONDS = parseTimeToSeconds(cssVar("--start-time","60"));
-  if (!Number.isFinite(START_SECONDS)) START_SECONDS = 60;
-
-  TRG_START = (cssVar("--trigger-start","START") || "START").trim();
-  TRG_PAUSE = (cssVar("--trigger-pause","PAUSE") || "PAUSE").trim();
-  TRG_RESET = (cssVar("--trigger-reset","RESET") || "RESET").trim();
-
-  CMD_MATCH_MODE = (cssVar("--cmd-match-mode","exact") || "exact").trim().toLowerCase();
-  if (!["exact","startswith","contains"].includes(CMD_MATCH_MODE)) CMD_MATCH_MODE = "exact";
-}
-
-function normalizeText(raw){
-  return String(raw||"").replace(/\u00A0/g," ").replace(/\s+/g," ").trim();
-}
-function normKey(raw){ return normalizeText(raw).toUpperCase(); }
-function cmdMatch(message, trigger){
-  const msg = normKey(message);
-  const trg = normKey(trigger);
-  if (!msg || !trg) return false;
-  if (CMD_MATCH_MODE === "exact") return msg === trg;
-  if (CMD_MATCH_MODE === "startswith") return msg.startsWith(trg);
-  return msg.includes(trg);
-}
-
-/* ---------- Time formatting ---------- */
-function pad2(n){ return String(n).padStart(2,"0"); }
-function formatSeconds(total){
-  total = Math.max(0, Math.floor(total));
-  const hh = Math.floor(total/3600);
-  const mm = Math.floor((total%3600)/60);
-  const ss = total%60;
-
-  // Responsive au contenu : auto (HH:MM:SS si besoin)
-  if (hh > 0) return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}`;
-  if (mm > 0) return `${pad2(mm)}:${pad2(ss)}`;
-  return `${ss}`; // SS seul
-}
-
-/* ---------- Engine ---------- */
-let running = false;
-let done = false;
-
-// Chrono : elapsedSec
-// Timer  : remainingSec
-let elapsedSec = 0;
-let remainingSec = START_SECONDS;
-
-let lastTickPerf = 0;
-let carryMs = 0;
-
-function applyDisplay(){
-  const val = (MODE === "chrono") ? elapsedSec : remainingSec;
-  elTime.textContent = formatSeconds(val);
-}
-
-function resetEngine(){
-  running = false;
-  done = false;
-  carryMs = 0;
-  lastTickPerf = 0;
-
-  elapsedSec = 0;
-  remainingSec = START_SECONDS;
-
+  
   elPanel.classList.remove("is-done");
-  applyDisplay();
+  elApp.classList.remove("state-running", "state-paused");
+  elApp.classList.add("state-idle");
+  
+  updateDisplay();
+  console.log("🔄 [TIMER] Reset engine");
 }
 
-function startEngine(){
-  if (done && MODE === "timer") return; // timer fini => reset d'abord
-  if (running) return;
-  running = true;
-  lastTickPerf = performance.now();
-  requestAnimationFrame(loop);
-}
-
-function pauseEngine(){
-  running = false;
-}
-
-function togglePause(){
-  if (running) pauseEngine();
-  else startEngine();
-}
-
-function finishTimer(){
-  done = true;
-  running = false;
-  remainingSec = 0;
-  applyDisplay();
-
-  if (cssOnOff("--done-pulse", true)){
-    elPanel.classList.remove("is-done");
-    // reflow
-    void elPanel.offsetWidth;
-    elPanel.classList.add("is-done");
-  }
-}
-
-function loop(ts){
-  if (!running) return;
-
-  const dt = ts - lastTickPerf;
-  lastTickPerf = ts;
-
-  carryMs += dt;
-
-  // tick à la seconde (robuste)
-  while (carryMs >= 1000){
-    carryMs -= 1000;
-
-    if (MODE === "chrono"){
-      elapsedSec += 1;
-      if (elapsedSec > 99*3600 + 59*60 + 59) elapsedSec = 99*3600 + 59*60 + 59;
-    } else {
-      remainingSec -= 1;
-      if (remainingSec <= 0){
-        finishTimer();
-        return;
-      }
-    }
-  }
-
-  applyDisplay();
-  requestAnimationFrame(loop);
-}
-
-/* ---------- Socket / Control ---------- */
-let socket = null;
-
-function handleControl(payload){
-  const action = (payload?.action || "").toString().toLowerCase();
-
-  // action: set { mode?, startTime? }
-  if (action === "set"){
-    if (payload?.mode){
-      MODE = (String(payload.mode).toLowerCase() === "chrono") ? "chrono" : "timer";
-    }
-    if (payload?.startTime != null){
-      START_SECONDS = parseTimeToSeconds(String(payload.startTime));
-    }
-    resetEngine();
+function startEngine() {
+  if (STATE === "running") return;
+  if (STATE === "done" && MODE === "timer") {
+    console.warn("⚠️ [TIMER] Timer fini, reset d'abord");
     return;
   }
+  
+  STATE = "running";
+  elApp.classList.remove("state-idle", "state-paused");
+  elApp.classList.add("state-running");
+  
+  lastTickTime = performance.now();
+  animationFrameId = requestAnimationFrame(loop);
+  
+  console.log("▶️ [TIMER] Start");
+}
 
-  if (action === "start"){
+function pauseEngine() {
+  if (STATE !== "running") return;
+  
+  STATE = "paused";
+  elApp.classList.remove("state-running");
+  elApp.classList.add("state-paused");
+  
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  
+  console.log("⏸️ [TIMER] Pause");
+}
+
+function togglePause() {
+  if (STATE === "running") {
+    pauseEngine();
+  } else if (STATE === "paused" || STATE === "idle") {
+    startEngine();
+  }
+}
+
+function finishTimer() {
+  STATE = "done";
+  remainingMs = 0;
+  
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  
+  updateDisplay();
+  
+  // Animation pulse
+  elPanel.classList.remove("is-done");
+  void elPanel.offsetWidth; // Force reflow
+  elPanel.classList.add("is-done");
+  
+  console.log("🏁 [TIMER] Fini !");
+}
+
+function loop(timestamp) {
+  if (STATE !== "running") return;
+  
+  const dt = timestamp - lastTickTime;
+  lastTickTime = timestamp;
+  
+  if (MODE === "timer") {
+    // Timer : décrémenter
+    remainingMs -= dt;
+    
+    if (remainingMs <= 0) {
+      finishTimer();
+      return;
+    }
+  } else {
+    // Chrono : incrémenter
+    elapsedMs += dt;
+    
+    // Limite max : 99:59:99
+    const MAX_MS = (99 * 60 + 59) * 1000 + 990; // 99:59:99
+    if (elapsedMs > MAX_MS) {
+      elapsedMs = MAX_MS;
+    }
+  }
+  
+  updateDisplay();
+  animationFrameId = requestAnimationFrame(loop);
+}
+
+/* ============================================================
+   SOCKET.IO CONTROL HANDLERS
+   ============================================================ */
+function handleControl(payload) {
+  const action = String(payload?.action || "").toLowerCase();
+  
+  console.log(`🎮 [TIMER] Control: ${action}`, payload);
+  
+  // === MODE ===
+  if (action === "set_mode") {
+    const newMode = String(payload?.mode || "").toLowerCase();
+    if (newMode === "chrono" || newMode === "timer") {
+      MODE = newMode;
+      resetEngine();
+      console.log(`🔄 [TIMER] Mode changé: ${MODE}`);
+    }
+    return;
+  }
+  
+  // === SET TIME (en secondes) ===
+  if (action === "set_time") {
+    const seconds = parseInt(payload?.seconds, 10);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      const ms = clamp(seconds * 1000, 0, 99 * 60 * 1000 + 59 * 1000); // Max 99:59
+      
+      if (MODE === "timer") {
+        remainingMs = ms;
+      } else {
+        elapsedMs = 0; // Chrono démarre toujours à 0
+      }
+      
+      // Si en cours, on garde running, sinon idle
+      if (STATE !== "running") {
+        STATE = "idle";
+      }
+      
+      updateDisplay();
+      console.log(`⏱️ [TIMER] Temps configuré: ${seconds}s`);
+    }
+    return;
+  }
+  
+  // === INCREMENT/DECREMENT (désactivé si running) ===
+  if (action === "increment_time" || action === "decrement_time") {
+    if (STATE === "running") {
+      console.warn("⚠️ [TIMER] Modification interdite pendant run");
+      return;
+    }
+    
+    const deltaSeconds = parseInt(payload?.seconds, 10);
+    if (Number.isFinite(deltaSeconds)) {
+      const deltaMs = deltaSeconds * 1000;
+      
+      if (MODE === "timer") {
+        remainingMs = clamp(remainingMs + deltaMs, 0, 99 * 60 * 1000 + 59 * 1000);
+      }
+      // Chrono : pas d'incrément (démarre toujours à 0)
+      
+      updateDisplay();
+      console.log(`➕➖ [TIMER] Ajusté: ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s`);
+    }
+    return;
+  }
+  
+  // === START ===
+  if (action === "start") {
     startEngine();
     return;
   }
-
-  if (action === "pause" || action === "toggle"){
+  
+  // === PAUSE ===
+  if (action === "pause") {
+    pauseEngine();
+    return;
+  }
+  
+  // === TOGGLE PAUSE ===
+  if (action === "toggle_pause") {
     togglePause();
     return;
   }
-
-  if (action === "reset"){
+  
+  // === RESET ===
+  if (action === "reset") {
     resetEngine();
     return;
   }
 }
 
-async function init(){
-  setBootHidden();
+/* ============================================================
+   SOCKET.IO CONNECTION
+   ============================================================ */
+let socket = null;
 
-  // attendre injection OBS
-  await new Promise(r => setTimeout(r, 650));
-
-  readAuthVars();
-  readConfig();
-
-  if (AUTH_MODE === "strict"){
-    if (!ROOM_ID || !ROOM_KEY) { showDenied(); return; }
-  } else {
-    if (!ROOM_ID) { showDenied(); return; }
+async function init() {
+  // Attendre injection CSS OBS
+  await new Promise(resolve => setTimeout(resolve, 800));
+  
+  // Auth stricte TOUJOURS (hardcodée)
+  const room = cssVar("--room-id", "").trim();
+  const key = cssVar("--room-key", "").trim();
+  
+  console.log(`🔐 [TIMER] Auth: Room=${room}`);
+  
+  if (!room || !key) {
+    console.error("❌ [TIMER] Room ou Key manquante");
+    showDenied();
+    return;
   }
-
+  
+  // Reset initial
   resetEngine();
-
-  socket = io(SERVER_URL, { transports: ["websocket","polling"] });
-
-  socket.emit("overlay:join", { room: ROOM_ID, key: ROOM_KEY, overlay: OVERLAY_TYPE });
-
-  socket.on("overlay:forbidden", () => showDenied());
-
+  
+  // Connexion Socket.io
+  socket = io(SERVER_URL, {
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: 20
+  });
+  
+  socket.on("connect", () => {
+    console.log("✅ [TIMER] Connecté au serveur");
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  });
+  
+  socket.on("overlay:forbidden", (payload) => {
+    console.error("❌ [TIMER] Accès refusé:", payload?.reason);
+    showDenied();
+  });
+  
   socket.on("overlay:state", (payload) => {
     if (payload?.overlay !== OVERLAY_TYPE) return;
-
-    // relire config à chaque state (OBS peut changer les vars)
-    readConfig();
-    resetEngine();
-    showReady();
+    
+    console.log("📡 [TIMER] État reçu:", payload.state, payload.data);
+    
+    // Si idle, masquer
+    if (payload.state === "idle") {
+      elApp.classList.remove("show");
+      setTimeout(() => {
+        resetEngine();
+      }, 800);
+      return;
+    }
+    
+    // Si active, afficher
+    if (payload.state === "active") {
+      showReady();
+      
+      // Appliquer config serveur si présente
+      if (payload.data) {
+        if (payload.data.mode) {
+          MODE = payload.data.mode;
+        }
+        if (payload.data.seconds != null) {
+          const ms = payload.data.seconds * 1000;
+          if (MODE === "timer") {
+            remainingMs = ms;
+          } else {
+            elapsedMs = 0;
+          }
+        }
+      }
+      
+      resetEngine();
+      updateDisplay();
+    }
   });
-
-  // Contrôle “propre” (Stream Deck -> server -> socket)
+  
+  // Event control dédié timer
   socket.on("control:timer_chrono", (payload) => {
     handleControl(payload || {});
-  });
-
-  // Fallback via chat (si tu veux)
-  socket.on("raw_vote", (data) => {
-    const msg = normalizeText(data?.vote ?? "");
-    if (!msg) return;
-
-    // si tu veux désactiver le fallback chat : mets --chat-control: "off"
-    const chatControl = cssOnOff("--chat-control", false); // défaut OFF
-    if (!chatControl) return;
-
-    if (cmdMatch(msg, TRG_START)) { startEngine(); return; }
-    if (cmdMatch(msg, TRG_PAUSE)) { togglePause(); return; }
-    if (cmdMatch(msg, TRG_RESET)) { resetEngine(); return; }
   });
 }
 
