@@ -673,6 +673,17 @@
 
     <!-- Contenu Timer -->
     <div id="tabTimer" class="tab-content">
+      <!-- Toggle ON/OFF Timer -->
+      <div class="toggle-container">
+        <div class="toggle-label">
+          <span class="icon">⏱️</span>
+          <span>Timer / Chrono</span>
+        </div>
+        <div id="toggleTimer" class="toggle-switch" onclick="toggleOverlay('timer_chrono')"></div>
+      </div>
+
+      <div class="timer-separator"></div>
+
       <!-- Toggle Mode -->
       <div class="timer-mode-toggle">
         <button class="timer-mode-btn active" data-mode="timer" onclick="timerSetMode('timer')">
@@ -852,6 +863,9 @@
           }, 300);
         }
       }
+      if (overlayName === "timer_chrono") {
+        $("toggleTimer").className = isActive ? "toggle-switch active" : "toggle-switch";
+      }
     }
 
     function updateCollecteToggle(isActive) {
@@ -984,6 +998,10 @@
         const isActive = (state !== "idle");
         const questionType = data?.question?.type || null;
         updateQuizUI(isActive, questionType);
+      }
+
+      if (overlay === "timer_chrono") {
+        updateToggle("timer_chrono", state === "active");
       }
     }
 
