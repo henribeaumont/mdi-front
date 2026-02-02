@@ -1,7 +1,17 @@
-const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_NAME = "roue_loto";
+/**
+ * ============================================================
+ * MDI ROUE LOTO - V6.7 (AMÉLIORATIONS UX)
+ * ============================================================
+ * ✅ Aiguille chevauche la roue (overlap 1.15)
+ * ✅ Texte retourné 180° si aiguille à gauche
+ * ✅ Panel gagnant blanc + texte noir
+ * ✅ Fondu affichage/masquage
+ * ============================================================
+ */
 
-/* ---------------- CSS Vars ---------------- */
+const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+const OVERLAY_TYPE = "roue_loto";
+
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
@@ -15,190 +25,48 @@ function cssOnOff(name, fallbackOn = true) {
   if (!v) return fallbackOn;
   return v === "on" || v === "true" || v === "1";
 }
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
 
-/* ---------------- Boot / Security ---------------- */
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
-const elWinnerName = document.getElementById("winnerName");
-
-function setBootTransparent(){
-  elSecurity.style.display = "none";
-  elApp.style.display = "none";
-  document.documentElement.classList.remove(
-    "mdi-ready","mdi-denied","mdi-confetti","mdi-show-winner","mdi-pointer-flip"
-  );
-  document.documentElement.removeAttribute("data-pointer-side");
-}
-function showDenied(){
-  document.documentElement.classList.remove("mdi-ready");
-  document.documentElement.classList.add("mdi-denied");
-  elApp.style.display = "none";
-  elSecurity.style.display = "flex";
-  document.body.style.backgroundColor = "black";
-}
-function showReady(){
-  document.documentElement.classList.remove("mdi-denied");
-  document.documentElement.classList.add("mdi-ready");
-  elSecurity.style.display = "none";
-  elApp.style.display = "grid";
-  document.body.style.backgroundColor = "transparent";
-}
-function hideWinner(){
-  document.documentElement.classList.remove("mdi-show-winner");
-  elWinnerName.textContent = "";
-}
-
-/* ---------------- Config ---------------- */
-let spinTrigger = "SPIN";
-let resetTrigger = "RESET";
-let collectStartTrigger = "INSCRIVEZ UN PSEUDO";
-let collectStopTrigger  = "PRET?";
-let collectClearTrigger = "CLEAR INSCRIPTION";
-
-let cmdMatchMode = "exact"; // exact | startsWith | contains
-let spinCooldownMs = 1800;
-let blockSpinWhileCollecting = true;
-let clearOnStart = true;
-
-let minNameLen = 1;
-let maxNameLen = 18;
-let maxParticipants = 48;
-
-/* Anti-reliquat robust: baseline index size */
-let baselineMaxMessages = 6000;
-
-/* Sens de rotation: cw (droite) / ccw (gauche) */
-let spinDirection = "cw"; // cw | ccw
-
-let pointerSide = "right";
-
-function readConfig(){
-  spinTrigger  = (cssVar("--spin-trigger","SPIN") || "SPIN").trim();
-  resetTrigger = (cssVar("--reset-trigger","RESET") || "RESET").trim();
-
-  collectStartTrigger = (cssVar("--collect-start-trigger","INSCRIVEZ UN PSEUDO") || "INSCRIVEZ UN PSEUDO").trim();
-  collectStopTrigger  = (cssVar("--collect-stop-trigger","PRET?") || "PRET?").trim();
-  collectClearTrigger = (cssVar("--collect-clear-trigger","CLEAR INSCRIPTION") || "CLEAR INSCRIPTION").trim();
-
-  cmdMatchMode = (cssVar("--cmd-match-mode","exact") || "exact").trim().toLowerCase();
-  if (!["exact","startswith","contains"].includes(cmdMatchMode)) cmdMatchMode = "exact";
-
-  spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
-  blockSpinWhileCollecting = cssOnOff("--block-spin-while-collecting", true);
-  clearOnStart = cssOnOff("--clear-on-start", true);
-
-  minNameLen = clamp(cssNum("--min-name-length", 1), 1, 6);
-  maxNameLen = clamp(cssNum("--max-name-length", 18), 6, 40);
-  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
-
-  baselineMaxMessages = clamp(cssNum("--baseline-max-messages", 6000), 500, 20000);
-
-  spinDirection = (cssVar("--spin-direction","cw") || "cw").trim().toLowerCase();
-  spinDirection = (spinDirection === "ccw") ? "ccw" : "cw";
-
-  pointerSide = (cssVar("--pointer-side","right") || "right").trim().toLowerCase();
-  pointerSide = (pointerSide === "left") ? "left" : "right";
-  document.documentElement.setAttribute("data-pointer-side", pointerSide);
-
-  const flip = cssOnOff("--pointer-rotate-180", true);
-  document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
-}
-
-/* ---------------- Text normalization / command match ---------------- */
-function normalizeText(raw){
-  let t = String(raw || "");
-  t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
-  return t;
-}
-function normKey(raw){
-  return normalizeText(raw).toUpperCase();
-}
-function extractPayload(text){
-  const t = normalizeText(text);
-  const m = t.match(/^.{1,24}:\s*(.+)$/); // "Name: payload"
-  if (m && m[1]) return m[1].trim();
-  return t;
-}
-function cmdMatch(message, trigger){
-  const msg = normKey(extractPayload(message));
-  const trg = normKey(trigger);
-  if (!msg || !trg) return false;
-
-  if (cmdMatchMode === "exact") return msg === trg;
-  if (cmdMatchMode === "startswith") return msg.startsWith(trg);
-  return msg.includes(trg); // contains
-}
-
-/* ---------------- Robust anti-reliquat baseline ---------------- */
-class LRUSet {
-  constructor(max = 5000){
-    this.max = max;
-    this.map = new Map(); // key -> true (in insertion order)
-  }
-  has(key){ return this.map.has(key); }
-  add(key){
-    if (!key) return;
-    if (this.map.has(key)) {
-      // refresh order
-      this.map.delete(key);
-      this.map.set(key, true);
-      return;
-    }
-    this.map.set(key, true);
-    while (this.map.size > this.max){
-      const oldest = this.map.keys().next().value;
-      this.map.delete(oldest);
-    }
-  }
-  clear(){ this.map.clear(); }
-  snapshotSet(){
-    return new Set(this.map.keys());
-  }
-  setMax(n){
-    this.max = n;
-    while (this.map.size > this.max){
-      const oldest = this.map.keys().next().value;
-      this.map.delete(oldest);
-    }
-  }
-}
-
-const preStartIndex = new LRUSet(6000);
-let baselineSet = new Set();
-
-/* ---------------- Names ---------------- */
-function keyOfName(name){ return normalizeText(name).toLowerCase(); }
-
-function isValidName(raw){
-  const t = normalizeText(extractPayload(raw));
-  if (!t) return false;
-
-  // Interdit si commande
-  if (cmdMatch(t, collectStartTrigger)) return false;
-  if (cmdMatch(t, collectStopTrigger))  return false;
-  if (cmdMatch(t, spinTrigger))         return false;
-  if (cmdMatch(t, collectClearTrigger)) return false;
-  if (cmdMatch(t, resetTrigger))        return false;
-
-  if (t.length < minNameLen || t.length > maxNameLen) return false;
-  if (t.split(" ").filter(Boolean).length > 2) return false;
-
-  if (!/^[0-9A-Za-zÀ-ÖØ-öø-ÿ _'’-]+$/.test(t)) return false;
-
-  return true;
-}
-
-/* ---------------- Wheel render ---------------- */
 const wheelCanvas = document.getElementById("wheel");
 const wheelCtx = wheelCanvas.getContext("2d");
+const elWinnerName = document.getElementById("winnerName");
+const confettiCanvas = document.getElementById("confetti");
+const confettiCtx = confettiCanvas.getContext("2d");
 
+let STATE = "idle";
+let participants = [];
+let winnerIndex = -1;
 let wheelAngle = 0;
 let spinning = false;
 let spinStartTs = 0;
 let spinDurationMs = 4200;
 let spinStartAngle = 0;
 let targetAngle = 0;
+let lastSpinAt = 0;
+
+let spinDirection = "cw";
+let pointerSide = "left";
+let maxParticipants = 48;
+let spinCooldownMs = 1800;
+
+function readConfig() {
+  spinDirection = cssVar("--spin-direction", "cw").toLowerCase();
+  spinDirection = (spinDirection === "ccw") ? "ccw" : "cw";
+
+  pointerSide = cssVar("--pointer-side", "left").toLowerCase();
+  pointerSide = (pointerSide === "right") ? "right" : "left";
+  document.documentElement.setAttribute("data-pointer-side", pointerSide);
+
+  const flip = cssOnOff("--pointer-rotate-180", true);
+  document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
+
+  maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
+  spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
+}
 
 const basePalette = [
   "#2ecc71","#e74c3c","#3b82f6","#f1c40f",
@@ -206,10 +74,7 @@ const basePalette = [
   "#22c55e","#ef4444","#60a5fa","#f59e0b"
 ];
 
-let participants = [];
-let winnerIndex = -1;
-
-function resizeWheelCanvas(){
+function resizeWheelCanvas() {
   const cssSize = cssNum("--wheel-size", 820);
   const dpr = Math.max(1, window.devicePixelRatio || 1);
 
@@ -222,7 +87,7 @@ function resizeWheelCanvas(){
   drawWheel();
 }
 
-function drawWheel(){
+function drawWheel() {
   const cssSize = cssNum("--wheel-size", 820);
   const stroke = cssNum("--wheel-stroke", 16);
   const textSize = cssNum("--wheel-text-size", 30);
@@ -232,15 +97,15 @@ function drawWheel(){
   const cx = W/2, cy = H/2;
   const r = (W/2) - stroke - 6;
 
-  wheelCtx.clearRect(0,0,W,H);
+  wheelCtx.clearRect(0, 0, W, H);
 
   wheelCtx.save();
   wheelCtx.translate(cx, cy);
   wheelCtx.rotate(wheelAngle);
 
-  if (participants.length === 0){
+  if (participants.length === 0) {
     wheelCtx.beginPath();
-    wheelCtx.arc(0,0,r,0,Math.PI*2);
+    wheelCtx.arc(0, 0, r, 0, Math.PI*2);
     wheelCtx.fillStyle = "rgba(10,15,30,0.65)";
     wheelCtx.fill();
     wheelCtx.lineWidth = stroke;
@@ -253,19 +118,19 @@ function drawWheel(){
   const n = participants.length;
   const slice = (Math.PI*2) / n;
 
-  for (let i=0;i<n;i++){
-    const a0 = i*slice;
+  for (let i = 0; i < n; i++) {
+    const a0 = i * slice;
     const a1 = a0 + slice;
 
     wheelCtx.beginPath();
-    wheelCtx.moveTo(0,0);
-    wheelCtx.arc(0,0,r,a0,a1);
+    wheelCtx.moveTo(0, 0);
+    wheelCtx.arc(0, 0, r, a0, a1);
     wheelCtx.closePath();
 
     wheelCtx.fillStyle = basePalette[i % basePalette.length];
     wheelCtx.fill();
 
-    if (i === winnerIndex){
+    if (i === winnerIndex) {
       wheelCtx.save();
       wheelCtx.shadowColor = "rgba(255,255,255,0.65)";
       wheelCtx.shadowBlur = 22;
@@ -279,13 +144,12 @@ function drawWheel(){
       wheelCtx.stroke();
     }
 
-    const label = participants[i].name;
+    const label = participants[i].name || participants[i];
     const mid = a0 + slice/2;
 
     wheelCtx.save();
     wheelCtx.rotate(mid);
 
-    // ✅ (inchangé) style texte EXACT comme avant
     wheelCtx.fillStyle = "rgba(255,255,255,0.96)";
     wheelCtx.font = `${textWeight} ${textSize}px Montserrat, sans-serif`;
     wheelCtx.textBaseline = "middle";
@@ -293,13 +157,12 @@ function drawWheel(){
     wheelCtx.strokeStyle = "rgba(0,0,0,0.35)";
 
     const maxChars = 14;
-    const safeLabel = label.length > maxChars ? (label.slice(0, maxChars-1) + "…") : label;
+    const safeLabel = String(label).length > maxChars ? (String(label).slice(0, maxChars-1) + "…") : label;
 
     const tx = Math.max(120, r*0.26);
 
-    // ✅ PATCH 1 : rotation 180° DU TEXTE SANS CHANGER DE CAMEMBERT
-    const flipLabel = cssOnOff("--label-rotate-180", false);
-    if (flipLabel) {
+    // ✅ Retourner texte 180° si aiguille à gauche
+    if (pointerSide === "left") {
       wheelCtx.rotate(Math.PI);
       wheelCtx.textAlign = "right";
       wheelCtx.strokeText(safeLabel, -tx, 0);
@@ -314,7 +177,7 @@ function drawWheel(){
   }
 
   wheelCtx.beginPath();
-  wheelCtx.arc(0,0,r,0,Math.PI*2);
+  wheelCtx.arc(0, 0, r, 0, Math.PI*2);
   wheelCtx.lineWidth = stroke;
   wheelCtx.strokeStyle = "rgba(255,255,255,0.22)";
   wheelCtx.stroke();
@@ -322,26 +185,23 @@ function drawWheel(){
   wheelCtx.restore();
 }
 
-/* ---------------- Confetti ---------------- */
-const confettiCanvas = document.getElementById("confetti");
-const confettiCtx = confettiCanvas.getContext("2d");
 let confetti = [];
 let confettiEndTs = 0;
 
-function resizeConfetti(){
+function resizeConfetti() {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   confettiCanvas.width = Math.floor(window.innerWidth * dpr);
   confettiCanvas.height = Math.floor(window.innerHeight * dpr);
-  confettiCtx.setTransform(dpr,0,0,dpr,0,0);
+  confettiCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function rand01(){
+function rand01() {
   const u = new Uint32Array(1);
   crypto.getRandomValues(u);
   return u[0] / 0xFFFFFFFF;
 }
 
-function startConfetti(){
+function startConfetti() {
   if (!cssOnOff("--winner-confetti", true)) return;
 
   document.documentElement.classList.add("mdi-confetti");
@@ -353,7 +213,7 @@ function startConfetti(){
   confetti = [];
   confettiEndTs = performance.now() + dur;
 
-  for (let i=0;i<density;i++){
+  for (let i = 0; i < density; i++) {
     const x = rand01() * window.innerWidth;
     const y = -20 - rand01()*200;
     const s = 6 + rand01()*10;
@@ -362,19 +222,19 @@ function startConfetti(){
     const rot = rand01()*Math.PI*2;
     const vr = (rand01()-0.5)*0.25;
     const col = basePalette[i % basePalette.length];
-    confetti.push({x,y,s,vx,vy,rot,vr,col});
+    confetti.push({x, y, s, vx, vy, rot, vr, col});
   }
   requestAnimationFrame(tickConfetti);
 }
 
-function tickConfetti(ts){
-  confettiCtx.clearRect(0,0,window.innerWidth, window.innerHeight);
-  if (ts >= confettiEndTs){
+function tickConfetti(ts) {
+  confettiCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  if (ts >= confettiEndTs) {
     document.documentElement.classList.remove("mdi-confetti");
     confetti = [];
     return;
   }
-  for (const p of confetti){
+  for (const p of confetti) {
     p.x += p.vx * 3.2;
     p.y += p.vy * 3.6;
     p.rot += p.vr;
@@ -392,69 +252,47 @@ function tickConfetti(ts){
   requestAnimationFrame(tickConfetti);
 }
 
-/* ---------------- Session helpers ---------------- */
-function clearAllForNewSession(){
-  participants = [];
-  winnerIndex = -1;
-  spinning = false;
-  wheelAngle = 0;
-  hideWinner();
-  drawWheel();
+function normalizeText(raw) {
+  let t = String(raw || "");
+  t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
+  return t;
 }
 
-/* ---------------- Participants ---------------- */
-function addParticipant(message){
-  const payload = extractPayload(message);
-  if (!isValidName(payload)) return;
-
-  const msgKey = normKey(payload);
-
-  if (baselineSet.has(msgKey)) return;
-
-  const clean = normalizeText(payload);
-  const k = keyOfName(clean);
-  if (participants.some(p => p.key === k)) return;
-  if (participants.length >= maxParticipants) return;
-
-  participants.push({ name: clean, key: k });
-  winnerIndex = -1;
-  hideWinner();
-  drawWheel();
+function keyOfName(name) {
+  return normalizeText(name).toLowerCase();
 }
 
-/* ---------------- Spin (blindé) ---------------- */
-let phase = "IDLE"; // IDLE | COLLECTING | READY
-let lastSpinAt = 0;
-
-function normalizeAngle(a){
+function normalizeAngle(a) {
   let x = a % (Math.PI*2);
   if (x < 0) x += Math.PI*2;
   return x;
 }
-function pickRandomIndex(n){
+
+function pickRandomIndex(n) {
   const u = new Uint32Array(1);
   crypto.getRandomValues(u);
   return u[0] % n;
 }
-function pointerTargetAngle(){
+
+function pointerTargetAngle() {
   return (pointerSide === "left") ? Math.PI : 0;
 }
 
-function spin(){
+function spin() {
   const now = Date.now();
   if (spinning) return;
-  if (phase !== "READY") return;
+  if (STATE !== "ready") return;
   if (participants.length < 2) return;
   if (now - lastSpinAt < spinCooldownMs) return;
 
   lastSpinAt = now;
-  hideWinner();
   spinning = true;
+  STATE = "spinning";
 
   const n = participants.length;
   const selected = pickRandomIndex(n);
-  const slice = (Math.PI*2)/n;
-  const selectedCenter = selected*slice + slice/2;
+  const slice = (Math.PI*2) / n;
+  const selectedCenter = selected * slice + slice/2;
 
   const pointerAngle = pointerTargetAngle();
   const desired = pointerAngle - selectedCenter;
@@ -462,7 +300,6 @@ function spin(){
   const extraTurns = 6 + Math.floor(rand01()*4);
   const extra = extraTurns * Math.PI*2;
 
-  // ✅ PATCH 2 : cw = horaire, ccw = anti-horaire
   const dir = (spinDirection === "cw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
@@ -472,14 +309,14 @@ function spin(){
 
   requestAnimationFrame(tickSpin);
 
-  function tickSpin(ts){
-    const t = clamp((ts - spinStartTs)/spinDurationMs, 0, 1);
+  function tickSpin(ts) {
+    const t = clamp((ts - spinStartTs) / spinDurationMs, 0, 1);
     const e = 1 - Math.pow(1 - t, 3);
 
     wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
     drawWheel();
 
-    if (t < 1){
+    if (t < 1) {
       requestAnimationFrame(tickSpin);
       return;
     }
@@ -491,154 +328,154 @@ function spin(){
     winnerIndex = (idx + n) % n;
 
     drawWheel();
-    elWinnerName.textContent = participants[winnerIndex]?.name || "";
+    const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
+    elWinnerName.textContent = winnerName;
     document.documentElement.classList.add("mdi-show-winner");
+    STATE = "winner";
     startConfetti();
   }
 }
 
-/* ---------------- Socket / Auth ---------------- */
-let socket = null;
-let AUTH_MODE = "strict";
-let ROOM_ID = "";
-let ROOM_KEY = "";
-
-function readAuthVars(){
-  const s = getComputedStyle(document.documentElement);
-  AUTH_MODE = (s.getPropertyValue("--auth-mode").trim().replace(/"/g,"") || "strict").toLowerCase();
-  ROOM_ID = s.getPropertyValue("--room-id").trim().replace(/"/g,"") || "";
-  ROOM_KEY = s.getPropertyValue("--room-key").trim().replace(/"/g,"") || "";
+function hideWinner() {
+  document.documentElement.classList.remove("mdi-show-winner");
+  elWinnerName.textContent = "";
+  winnerIndex = -1;
 }
 
-function initSocket(){
-  socket = io(SERVER_URL, { transports: ["websocket","polling"] });
-
-  socket.on("connect", () => {
-    if (AUTH_MODE === "strict"){
-      socket.emit("overlay:join", { room: ROOM_ID, key: ROOM_KEY, overlay: OVERLAY_NAME });
-    } else {
-      socket.emit("rejoindre_salle", ROOM_ID);
-    }
-  });
-
-  socket.on("overlay:forbidden", () => showDenied());
-
-  socket.on("overlay:state", (payload) => {
-    if (!payload || payload.overlay !== OVERLAY_NAME) return;
-
-    showReady();
-    readConfig();
-    preStartIndex.setMax(baselineMaxMessages);
-
-    if ((cssVar("--auto-reset","false") || "false") === "true"){
-      clearAllForNewSession();
-      preStartIndex.clear();
-    } else {
-      hideWinner();
-      drawWheel();
-    }
-
-    phase = "IDLE";
-    baselineSet = new Set();
-  });
-
-  socket.on("raw_vote", (data) => {
-    if (!data) return;
-
-    readConfig();
-    preStartIndex.setMax(baselineMaxMessages);
-
-    const raw = String(data.vote || "");
-    const msg = normalizeText(raw);
-    if (!msg) return;
-
-    const msgKey = normKey(extractPayload(msg));
-
-    // En IDLE, on indexe tout ce qui passe (anti-reliquat)
-    if (phase === "IDLE") {
-      preStartIndex.add(msgKey);
-    }
-
-    // --- Commandes
-    if (cmdMatch(msg, collectClearTrigger) || cmdMatch(msg, resetTrigger)) {
-      clearAllForNewSession();
-      preStartIndex.clear();
-      baselineSet = new Set();
-      phase = "IDLE";
-      return;
-    }
-
-    if (cmdMatch(msg, collectStartTrigger)) {
-      if (clearOnStart) clearAllForNewSession();
-
-      // Baseline = tous les messages vus AVANT START (LRU)
-      baselineSet = preStartIndex.snapshotSet();
-      baselineSet.add(msgKey);
-
-      phase = "COLLECTING";
-      hideWinner();
-      return;
-    }
-
-    if (cmdMatch(msg, collectStopTrigger)) {
-      if (phase === "COLLECTING") phase = "READY";
-      return;
-    }
-
-    if (cmdMatch(msg, spinTrigger)) {
-      if (blockSpinWhileCollecting && phase === "COLLECTING") return;
-      if (phase !== "READY") return;
-      spin();
-      return;
-    }
-
-    // --- Collecte
-    if (phase !== "COLLECTING") return;
-    addParticipant(msg);
-  });
-}
-
-/* ---------------- Init ---------------- */
-function init(){
-  setBootTransparent();
-
-  const poll = setInterval(() => {
-    readAuthVars();
-    readConfig();
-
-    if (AUTH_MODE === "legacy"){
-      if (!ROOM_ID) return;
-      clearInterval(poll);
-      resizeWheelCanvas();
-      resizeConfetti();
-      initSocket();
-      return;
-    }
-
-    if (ROOM_ID && ROOM_KEY){
-      clearInterval(poll);
-      resizeWheelCanvas();
-      resizeConfetti();
-      initSocket();
-    }
-  }, 200);
-
-  setTimeout(() => {
-    readAuthVars();
-    if (AUTH_MODE === "strict" && (!ROOM_ID || !ROOM_KEY)){
-      showDenied();
-    }
-  }, 1400);
-
-  window.addEventListener("resize", () => {
-    resizeWheelCanvas();
-    resizeConfetti();
-  });
-
-  resizeWheelCanvas();
-  resizeConfetti();
+function clearAll() {
+  participants = [];
+  winnerIndex = -1;
+  spinning = false;
+  wheelAngle = 0;
+  STATE = "idle";
   hideWinner();
   drawWheel();
 }
 
-init();
+const socket = io(SERVER_URL, {
+  transports: ["websocket", "polling"],
+  reconnection: true
+});
+
+socket.on("connect", () => {
+  console.log("✅ [ROUE] Connecté");
+});
+
+socket.on("overlay:state", (payload) => {
+  if (payload.overlay !== OVERLAY_TYPE) return;
+
+  console.log("📡 [ROUE] État:", payload.state, payload.data);
+
+  if (payload.state === "idle") {
+    console.log("🔴 [ROUE] Masquage overlay");
+    elApp.classList.remove("show");
+    setTimeout(() => {
+      elApp.classList.add("hidden");
+      clearAll();
+    }, 800);
+    return;
+  }
+
+  if (payload.state === "active") {
+    console.log("🟢 [ROUE] Affichage overlay");
+    elSecurity.classList.add("hidden");
+    elApp.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      elApp.classList.add("show");
+    });
+    STATE = "idle";
+    drawWheel();
+  }
+});
+
+socket.on("roue:start_collect", () => {
+  console.log("📝 [ROUE] Démarrage collecte");
+  clearAll();
+  STATE = "collecting";
+  drawWheel();
+});
+
+socket.on("roue:stop_collect", () => {
+  console.log("🔒 [ROUE] Fermeture collecte");
+  if (STATE === "collecting") STATE = "ready";
+});
+
+socket.on("roue:spin", () => {
+  console.log("🎡 [ROUE] SPIN");
+  spin();
+});
+
+socket.on("roue:reset", () => {
+  console.log("🔄 [ROUE] Reset");
+  clearAll();
+});
+
+socket.on("raw_vote", (data) => {
+  if (!data || !data.vote) return;
+  if (STATE !== "collecting") return;
+
+  const name = normalizeText(data.vote);
+  const key = keyOfName(name);
+
+  if (!name) return;
+  if (participants.length >= maxParticipants) return;
+
+  if (!participants.some(p => {
+    const pName = p.name || p;
+    return keyOfName(pName) === key;
+  })) {
+    participants.push({ name, key });
+    drawWheel();
+    console.log(`➕ [ROUE] Participant: ${name} (total: ${participants.length})`);
+  }
+});
+
+socket.on("overlay:forbidden", () => {
+  console.error("❌ [ROUE] Accès refusé");
+  elSecurity.classList.remove("hidden");
+  elApp.classList.add("hidden");
+});
+
+async function init() {
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  const authMode = cssVar("--auth-mode", "strict");
+  const room = cssVar("--room-id", "").trim();
+  const key = cssVar("--room-key", "").trim();
+
+  readConfig();
+  resizeWheelCanvas();
+  resizeConfetti();
+
+  console.log(`🔐 [ROUE] Auth: ${authMode}, Room: ${room}`);
+
+  if (!room) {
+    console.error("❌ [ROUE] Aucun room-id");
+    elSecurity.classList.remove("hidden");
+    return;
+  }
+
+  if (authMode === "strict") {
+    if (!key) {
+      console.error("❌ [ROUE] Mode strict sans key");
+      elSecurity.classList.remove("hidden");
+      return;
+    }
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  } else {
+    socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
+  }
+
+  socket.emit("rejoindre_salle", room);
+
+  console.log("✅ [ROUE] Init terminée");
+}
+
+socket.on("connect", init);
+
+window.addEventListener("resize", () => {
+  resizeWheelCanvas();
+  resizeConfetti();
+});
+
+drawWheel();
