@@ -1,106 +1,279 @@
 /**
- * MDI WORD CLOUD - V6.2 (HOTFIX FLUX)
- * Réconciliation Extension (Legacy) + Overlay (SaaS)
+ * ============================================================
+ * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
+ * ============================================================
+ * ✅ Écart taille : 30px (min) → 120px (max)
+ * ✅ Fondu affichage/masquage
+ * ✅ Anti-collision
+ * ✅ FIX OBS (lié à tes demandes) : render différé si container mesuré à 0x0
+ * ============================================================
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_TYPE = "word_cloud";
+const OVERLAY_TYPE = "nuage_de_mots";
 
+/* -------- Helpers CSS Vars (OBS) -------- */
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
 }
+function cssOnOff(name, fallbackOn = true) {
+  const v = (cssVar(name, "") || "").toLowerCase();
+  if (!v) return fallbackOn;
+  return v === "on" || v === "true" || v === "1";
+}
 
+/* -------- DOM -------- */
 const zone = document.getElementById("word-zone");
 const container = document.getElementById("cloud-container");
+const securityScreen = document.getElementById("security-screen");
+const measureZone = document.getElementById("measure-zone");
 
-/* --- MOTEUR --- */
+/* -------- State -------- */
+let STATE = "idle";
 let dbMots = {};
-let dedupeCache = new Map();
 let globalColorIndex = 0;
+let wordPositions = [];
+
+/* ✅ Anti-spam render (utile quand tu reçois beaucoup d’updates) */
+let renderScheduled = false;
+function scheduleRender() {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  requestAnimationFrame(() => {
+    renderScheduled = false;
+    render();
+  });
+}
+
+function getPalette() {
+  return [
+    cssVar("--color-1", "#F054A2"),
+    cssVar("--color-2", "#2ecc71"),
+    cssVar("--color-3", "#F9AD48"),
+    cssVar("--color-4", "#3b82f6"),
+    cssVar("--color-5", "#ffffff")
+  ];
+}
 
 function resetEcran() {
   zone.innerHTML = "";
   dbMots = {};
-  dedupeCache.clear();
+  globalColorIndex = 0;
+  wordPositions = [];
+  console.log("🔄 [NUAGE] Reset complet");
 }
 
-function traiterMessage(v) {
-  let texte = String(v || "").trim();
-  const prefixMode = cssVar("--wc-prefix-mode", "on");
-  const prefix = cssVar("--wc-prefix", "#");
+function measureText(text, fontSize) {
+  measureZone.style.fontSize = fontSize + "px";
+  measureZone.textContent = text;
+  return {
+    width: measureZone.offsetWidth,
+    height: measureZone.offsetHeight
+  };
+}
 
-  // FILTRE PREFIXE
-  if (prefixMode === "on") {
-    if (!texte.startsWith(prefix)) return;
-    texte = texte.substring(prefix.length).trim();
+function hasCollision(x, y, width, height) {
+  const margin = 15;
+
+  for (const pos of wordPositions) {
+    const overlapX = !(x + width + margin < pos.x || x > pos.x + pos.width + margin);
+    const overlapY = !(y + height + margin < pos.y || y > pos.y + pos.height + margin);
+    if (overlapX && overlapY) return true;
   }
-  
-  if (!texte || texte.toUpperCase() === "RESET") { if(texte) resetEcran(); return; }
+  return false;
+}
 
-  // DEDUP (10 sec par défaut pour test)
-  const key = texte.toUpperCase();
-  if (dedupeCache.has(key)) return;
-  dedupeCache.set(key, true);
-  setTimeout(() => dedupeCache.delete(key), 10000);
+function findFreePosition(width, height) {
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+  const cx = W / 2;
+  const cy = H / 2;
 
-  if (dbMots[key]) {
-    dbMots[key].count++;
-  } else {
-    const palette = [cssVar("--color-1", "#F054A2"), cssVar("--color-2", "#2ecc71"), cssVar("--color-3", "#F9AD48"), cssVar("--color-4", "#3b82f6"), cssVar("--color-5", "#ffffff")];
-    dbMots[key] = { text: texte, count: 1, color: palette[globalColorIndex % 5] };
-    globalColorIndex++;
+  const maxAttempts = 800;
+  let angle = Math.random() * Math.PI * 2;
+  let radius = 20;
+  const radiusStep = 10;
+  const angleStep = 0.3;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const x = cx + Math.cos(angle) * radius - width / 2;
+    const y = cy + Math.sin(angle) * radius - height / 2;
+
+    if (x >= 0 && x + width <= W && y >= 0 && y + height <= H) {
+      if (!hasCollision(x, y, width, height)) {
+        return { x, y };
+      }
+    }
+
+    angle += angleStep;
+    radius += radiusStep * (angleStep / (Math.PI * 2));
   }
-  render();
+
+  return {
+    x: Math.max(0, Math.min(W - width, cx - width / 2 + (Math.random() - 0.5) * 100)),
+    y: Math.max(0, Math.min(H - height, cy - height / 2 + (Math.random() - 0.5) * 100))
+  };
 }
 
 function render() {
   const W = container.clientWidth;
   const H = container.clientHeight;
-  Object.values(dbMots).forEach((mot, i) => {
+
+  /**
+   * ✅ FIX OBS (lié à tes demandes)
+   * Dans OBS, juste après avoir retiré .hidden, le container peut être mesuré à 0x0.
+   * Si on calcule les tailles/positions à ce moment-là :
+   *  - l’algo collision “fait n’importe quoi”
+   *  - l’update de taille semble “ne pas marcher”
+   * Donc : on re-tente au frame suivant.
+   */
+  if (!W || !H) {
+    scheduleRender();
+    return;
+  }
+
+  const words = Object.values(dbMots);
+
+  if (!words.length) {
+    zone.innerHTML = "";
+    wordPositions = [];
+    return;
+  }
+
+  const uppercase = cssOnOff("--uppercase", false);
+  words.sort((a, b) => b.count - a.count);
+  wordPositions = [];
+
+  const maxCount = Math.max(...words.map(w => w.count), 1);
+  const minCount = Math.min(...words.map(w => w.count), 1);
+
+  words.forEach((mot) => {
+    const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
     let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
+
+    // ✅ Taille basée sur le suffrage (30px → 120px)
+    const ratio = maxCount > minCount ? (mot.count - minCount) / (maxCount - minCount) : 1;
+    const fontSize = Math.floor(30 + (ratio * 90));
+
+    const { width, height } = measureText(displayText, fontSize);
+
     if (!el) {
       el = document.createElement("div");
       el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
-      el.className = "mot mdi-in";
-      el.innerText = mot.text;
+      el.className = "mot is-new";
       el.style.color = mot.color;
+      el.style.fontSize = `${fontSize}px`;
       zone.appendChild(el);
+
+      requestAnimationFrame(() => {
+        el.classList.add("mdi-in");
+      });
+    } else {
+      el.style.fontSize = `${fontSize}px`;
     }
-    el.style.left = `${(W/2) + (Math.cos(i) * (i * 20))}px`;
-    el.style.top = `${(H/2) + (Math.sin(i) * (i * 20))}px`;
-    el.style.fontSize = `${Math.max(20, 70 - (i * 2))}px`;
+
+    el.textContent = displayText;
+
+    const pos = findFreePosition(width, height);
+    el.style.left = `${pos.x}px`;
+    el.style.top = `${pos.y}px`;
+
+    wordPositions.push({
+      x: pos.x,
+      y: pos.y,
+      width,
+      height,
+      element: el
+    });
   });
 }
 
-/* --- CONNEXION --- */
-const socket = io(SERVER_URL, { transports: ["websocket"] });
+/* -------- Socket.io -------- */
+const socket = io(SERVER_URL, {
+  transports: ["websocket", "polling"],
+  reconnection: true
+});
 
+socket.on("connect", () => {
+  console.log("✅ [NUAGE] Connecté");
+});
+
+socket.on("overlay:state", (payload) => {
+  if (payload.overlay !== OVERLAY_TYPE) return;
+
+  console.log(`📡 [NUAGE] État:`, payload.state, payload.data);
+  STATE = payload.state;
+
+  if (STATE === "idle") {
+    container.classList.remove("show");
+    setTimeout(() => {
+      container.classList.add("hidden");
+      resetEcran();
+    }, 800);
+    return;
+  }
+
+  if (STATE === "active") {
+    securityScreen.classList.add("hidden");
+    container.classList.remove("hidden");
+    requestAnimationFrame(() => container.classList.add("show"));
+
+    if (payload.data && payload.data.words) {
+      const serverWords = payload.data.words;
+      const palette = getPalette();
+
+      dbMots = {};
+      Object.keys(serverWords).forEach((key, index) => {
+        dbMots[key] = {
+          text: key,
+          count: serverWords[key],
+          color: palette[index % 5]
+        };
+      });
+
+      globalColorIndex = Object.keys(dbMots).length;
+
+      // ✅ Render fiable même si OBS n’a pas encore mesuré le container
+      scheduleRender();
+    }
+  }
+});
+
+socket.on("overlay:forbidden", (payload) => {
+  console.error("❌ [NUAGE] Accès refusé:", payload.reason);
+  securityScreen.classList.remove("hidden");
+  container.classList.add("hidden");
+});
+
+/* -------- Auth (OBS CSS vars) -------- */
 async function init() {
-  await new Promise(r => setTimeout(r, 1000));
-  const room = cssVar("--room-id");
-  const key = cssVar("--room-key");
+  await new Promise(resolve => setTimeout(resolve, 800));
 
-  if (!room) return;
+  const authMode = cssVar("--auth-mode", "strict");
+  const room = cssVar("--room-id", "").trim();
+  const key = cssVar("--room-key", "").trim();
 
-  // 1. Join SaaS (pour l'auth et l'état)
-  socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
-  
-  // 2. IMPORTANT : Join Legacy (pour entendre l'extension content.js)
-  // C'est ici que ton server.js attend l'extension
-  socket.emit("rejoindre_salle", room);
+  console.log(`🔐 [NUAGE] Auth: ${authMode}, Room: ${room}`);
 
-  socket.on("overlay:state", (p) => {
-    if (p.overlay === OVERLAY_TYPE) {
-        document.getElementById("security-screen").classList.add("hidden");
-        container.classList.remove("hidden");
+  if (!room) {
+    console.error("❌ [NUAGE] Aucun room-id");
+    securityScreen.classList.remove("hidden");
+    return;
+  }
+
+  if (authMode === "strict") {
+    if (!key) {
+      console.error("❌ [NUAGE] Mode strict sans key");
+      securityScreen.classList.remove("hidden");
+      return;
     }
-  });
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  } else {
+    socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
+  }
 
-  // Écoute le canal de l'extension
-  socket.on("raw_vote", (data) => {
-    traiterMessage(data.vote);
-  });
+  console.log("✅ [NUAGE] Auth envoyée");
 }
 
-init();
+socket.on("connect", init);
