@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Roue Loto V6.5 (Télécommande)</title>
+  <title>MDI • Roue Loto V6.6 (FIX Affichage)</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -179,12 +179,11 @@
   <script>
     /**
      * ============================================================
-     * MDI ROUE LOTO - V6.5 (TÉLÉCOMMANDE)
+     * MDI ROUE LOTO - V6.6 (FIX AFFICHAGE + COLLECTE)
      * ============================================================
-     * ✅ Piloté uniquement par télécommande (plus de triggers chat)
-     * ✅ Design original conservé
-     * ✅ Confettis gagnant
-     * ✅ Masquage/affichage automatique
+     * ✅ FIX : Affichage garanti quand activé
+     * ✅ FIX : Collecte via chat toujours active
+     * ✅ Design original + confettis
      * ============================================================
      */
 
@@ -543,18 +542,21 @@
     socket.on("overlay:state", (payload) => {
       if (payload.overlay !== OVERLAY_TYPE) return;
 
-      console.log("📡 [ROUE] État:", payload.state);
+      console.log("📡 [ROUE] État:", payload.state, payload.data);
 
       if (payload.state === "idle") {
+        console.log("🔴 [ROUE] Masquage overlay");
         elApp.classList.add("hidden");
         clearAll();
         return;
       }
 
       if (payload.state === "active") {
+        console.log("🟢 [ROUE] Affichage overlay");
         elSecurity.classList.add("hidden");
         elApp.classList.remove("hidden");
         STATE = "idle";
+        drawWheel();
       }
     });
 
@@ -562,6 +564,7 @@
       console.log("📝 [ROUE] Démarrage collecte");
       clearAll();
       STATE = "collecting";
+      drawWheel();
     });
 
     socket.on("roue:stop_collect", () => {
@@ -579,27 +582,12 @@
       clearAll();
     });
 
-    socket.on("roue:participant_added", (data) => {
-      if (STATE === "collecting" && data.name) {
-        const name = normalizeText(data.name);
-        const key = keyOfName(name);
-        
-        if (!participants.some(p => {
-          const pName = p.name || p;
-          return keyOfName(pName) === key;
-        })) {
-          if (participants.length < maxParticipants) {
-            participants.push({ name, key });
-            drawWheel();
-            console.log(`➕ [ROUE] Participant: ${name}`);
-          }
-        }
-      }
-    });
-
     socket.on("raw_vote", (data) => {
       if (!data || !data.vote) return;
-      if (STATE !== "collecting") return;
+      if (STATE !== "collecting") {
+        console.log(`⚠️ [ROUE] Message ignoré (état=${STATE}): ${data.vote}`);
+        return;
+      }
 
       const name = normalizeText(data.vote);
       const key = keyOfName(name);
@@ -613,7 +601,9 @@
       })) {
         participants.push({ name, key });
         drawWheel();
-        console.log(`➕ [ROUE] Participant (chat): ${name}`);
+        console.log(`➕ [ROUE] Participant: ${name} (total: ${participants.length})`);
+      } else {
+        console.log(`⚠️ [ROUE] Déjà présent: ${name}`);
       }
     });
 
