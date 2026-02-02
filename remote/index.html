@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDI Live - Télécommande V3</title>
+  <title>MDI Live - Télécommande V3.1</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     * {
@@ -325,16 +325,14 @@
     /* Roue */
     .roue-controls {
       display: none;
+      margin-top: 12px;
     }
 
     .roue-controls.active {
       display: block;
     }
 
-    .roue-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    .roue-action-btn {
       margin-bottom: 8px;
     }
 
@@ -438,16 +436,25 @@
           <span class="icon">🎡</span>
           <span>Roue Loto</span>
         </div>
-        <div id="toggleRoue" class="toggle-switch" onclick="toggleOverlay('roue_loto')"></div>
+        <div id="toggleRoue" class="toggle-switch" onclick="toggleRoueOverlay()"></div>
       </div>
 
       <div id="roueControls" class="roue-controls">
-        <div class="roue-grid">
-          <button class="btn-success" onclick="startCollect()">📝 Démarrer<br>Collecte</button>
-          <button class="btn-secondary" onclick="stopCollect()">🔒 Fermer<br>Collecte</button>
+        <!-- Toggle Collecte -->
+        <div class="toggle-container" style="margin-bottom: 12px;">
+          <div class="toggle-label">
+            <span style="font-size: 13px;">📝 Collecte</span>
+          </div>
+          <div id="toggleCollecte" class="toggle-switch" onclick="toggleCollecte()"></div>
         </div>
-        <button class="btn-success" onclick="spinRoue()" style="margin-bottom: 8px;">🎡 SPIN</button>
-        <button class="btn-danger" onclick="resetRoue()">🔄 Reset Roue</button>
+
+        <!-- Boutons actions -->
+        <button class="btn-success roue-action-btn" onclick="spinRoue()">
+          🎡 Lancer la roue
+        </button>
+        <button class="btn-danger" onclick="resetRoue()">
+          🔄 Reset Roue
+        </button>
       </div>
 
       <div id="messageRoue" class="message"></div>
@@ -467,6 +474,7 @@
     let overlayStates = {
       nuage_de_mots: false,
       roue_loto: false,
+      roue_collecte: false,
       quiz_ou_sondage: false
     };
 
@@ -505,7 +513,19 @@
       if (overlayName === "roue_loto") {
         $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
         $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
+        
+        // Auto-démarrer collecte si roue activée
+        if (isActive && !overlayStates.roue_collecte) {
+          setTimeout(() => {
+            startCollect();
+          }, 300);
+        }
       }
+    }
+
+    function updateCollecteToggle(isActive) {
+      overlayStates.roue_collecte = isActive;
+      $("toggleCollecte").className = isActive ? "toggle-switch active" : "toggle-switch";
     }
 
     function updateQuizUI(isActive, questionType = null) {
@@ -676,6 +696,88 @@
       }
     }
 
+    // --- ROUE SPÉCIFIQUE ---
+    function toggleRoueOverlay() {
+      if (!connected) {
+        showMessage("Roue", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      const isActive = overlayStates.roue_loto;
+
+      if (isActive) {
+        // Désactiver roue
+        socket.emit("control:deactivate_overlay", {
+          room: currentRoom,
+          overlay: "roue_loto"
+        });
+        updateCollecteToggle(false);
+      } else {
+        // Désactiver autres overlays
+        if (overlayStates.nuage_de_mots) {
+          socket.emit("control:deactivate_overlay", {
+            room: currentRoom,
+            overlay: "nuage_de_mots"
+          });
+        }
+        if (overlayStates.quiz_ou_sondage) {
+          socket.emit("control:idle", {
+            room: currentRoom,
+            overlay: "quiz_ou_sondage"
+          });
+        }
+
+        // Activer roue
+        socket.emit("control:activate_overlay", {
+          room: currentRoom,
+          overlay: "roue_loto"
+        });
+      }
+    }
+
+    function toggleCollecte() {
+      if (!connected || !overlayStates.roue_loto) return;
+
+      const isActive = overlayStates.roue_collecte;
+
+      if (isActive) {
+        stopCollect();
+      } else {
+        startCollect();
+      }
+    }
+
+    function startCollect() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:start_collect", { room: currentRoom });
+      updateCollecteToggle(true);
+      showMessage("Roue", "📝 Collecte ouverte", "success");
+      console.log("📝 Collecte ouverte");
+    }
+
+    function stopCollect() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:stop_collect", { room: currentRoom });
+      updateCollecteToggle(false);
+      showMessage("Roue", "🔒 Collecte fermée", "success");
+      console.log("🔒 Collecte fermée");
+    }
+
+    function spinRoue() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:spin", { room: currentRoom });
+      showMessage("Roue", "🎡 Roue lancée !", "success");
+      console.log("🎡 SPIN");
+    }
+
+    function resetRoue() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:reset", { room: currentRoom });
+      updateCollecteToggle(false);
+      showMessage("Roue", "🔄 Roue réinitialisée", "success");
+      console.log("🔄 Reset");
+    }
+
     // --- QUIZ ---
     function loadQuestion() {
       if (!connected) {
@@ -748,35 +850,6 @@
         room: currentRoom,
         overlay: "quiz_ou_sondage"
       });
-      console.log("🔄 Reset");
-    }
-
-    // --- ROUE ---
-    function startCollect() {
-      if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:start_collect", { room: currentRoom });
-      showMessage("Roue", "📝 Collecte démarrée", "success");
-      console.log("📝 Démarrage collecte");
-    }
-
-    function stopCollect() {
-      if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:stop_collect", { room: currentRoom });
-      showMessage("Roue", "🔒 Collecte fermée", "success");
-      console.log("🔒 Fermeture collecte");
-    }
-
-    function spinRoue() {
-      if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:spin", { room: currentRoom });
-      showMessage("Roue", "🎡 Roue lancée !", "success");
-      console.log("🎡 SPIN");
-    }
-
-    function resetRoue() {
-      if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:reset", { room: currentRoom });
-      showMessage("Roue", "🔄 Roue réinitialisée", "success");
       console.log("🔄 Reset");
     }
 
