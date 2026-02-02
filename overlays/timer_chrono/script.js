@@ -2,7 +2,7 @@
  * ============================================================
  * MDI TIMER/CHRONO V2.0
  * ============================================================
- * Pattern EXACT du nuage de mots V6.7
+ * Structure EXACTE du nuage_de_mots.js V6.7
  * ============================================================ */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -19,8 +19,8 @@ function clamp(n, a, b) {
 }
 
 /* -------- DOM -------- */
-const elSecurity = document.getElementById("security-screen");
-const elApp = document.getElementById("app");
+const container = document.getElementById("timer-container");
+const securityScreen = document.getElementById("security-screen");
 const elPanel = document.getElementById("panel");
 const elTime = document.getElementById("time");
 
@@ -74,21 +74,14 @@ function resetEngine() {
   }
   
   elPanel.classList.remove("is-done");
-  elApp.classList.remove("state-running", "state-paused");
-  elApp.classList.add("state-idle");
-  
   updateDisplay();
-  console.log("🔄 [TIMER] Reset engine");
+  console.log("🔄 [TIMER] Reset");
 }
 
 function startEngine() {
   if (STATE === "running") return;
-  if (STATE === "done" && MODE === "timer") return;
   
   STATE = "running";
-  elApp.classList.remove("state-idle", "state-paused");
-  elApp.classList.add("state-running");
-  
   lastTickTime = performance.now();
   animationFrameId = requestAnimationFrame(loop);
   
@@ -99,8 +92,6 @@ function pauseEngine() {
   if (STATE !== "running") return;
   
   STATE = "paused";
-  elApp.classList.remove("state-running");
-  elApp.classList.add("state-paused");
   
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
@@ -113,7 +104,7 @@ function pauseEngine() {
 function togglePause() {
   if (STATE === "running") {
     pauseEngine();
-  } else if (STATE === "paused" || STATE === "idle") {
+  } else {
     startEngine();
   }
 }
@@ -133,7 +124,7 @@ function finishTimer() {
   void elPanel.offsetWidth;
   elPanel.classList.add("is-done");
   
-  console.log("🏁 [TIMER] Fini !");
+  console.log("🏁 [TIMER] Fini");
 }
 
 function loop(timestamp) {
@@ -166,14 +157,13 @@ function loop(timestamp) {
 function handleControl(payload) {
   const action = String(payload?.action || "").toLowerCase();
   
-  console.log(`🎮 [TIMER] Control: ${action}`, payload);
+  console.log(`🎮 [TIMER] Control: ${action}`);
   
   if (action === "set_mode") {
     const newMode = String(payload?.mode || "").toLowerCase();
     if (newMode === "chrono" || newMode === "timer") {
       MODE = newMode;
       resetEngine();
-      console.log(`🔄 [TIMER] Mode changé: ${MODE}`);
     }
     return;
   }
@@ -189,22 +179,12 @@ function handleControl(payload) {
         elapsedMs = 0;
       }
       
-      if (STATE !== "running") {
-        STATE = "idle";
-      }
-      
       updateDisplay();
-      console.log(`⏱️ [TIMER] Temps configuré: ${seconds}s`);
     }
     return;
   }
   
   if (action === "increment_time" || action === "decrement_time") {
-    if (STATE === "running") {
-      console.warn("⚠️ [TIMER] Modification interdite pendant run");
-      return;
-    }
-    
     const deltaSeconds = parseInt(payload?.seconds, 10);
     if (Number.isFinite(deltaSeconds)) {
       const deltaMs = deltaSeconds * 1000;
@@ -214,7 +194,6 @@ function handleControl(payload) {
       }
       
       updateDisplay();
-      console.log(`➕➖ [TIMER] Ajusté: ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s`);
     }
     return;
   }
@@ -243,29 +222,32 @@ function handleControl(payload) {
 /* -------- Socket.io -------- */
 const socket = io(SERVER_URL, {
   transports: ["websocket", "polling"],
-  reconnection: true,
-  reconnectionAttempts: 20
+  reconnection: true
+});
+
+socket.on("connect", () => {
+  console.log("✅ [TIMER] Connecté");
 });
 
 socket.on("overlay:state", (payload) => {
-  if (payload?.overlay !== OVERLAY_TYPE) return;
+  if (payload.overlay !== OVERLAY_TYPE) return;
 
-  console.log(`📡 [TIMER] État:`, payload.state, payload.data);
+  console.log(`📡 [TIMER] État:`, payload.state);
   STATE = payload.state;
 
   if (STATE === "idle") {
-    elApp.classList.remove("show");
+    container.classList.remove("show");
     setTimeout(() => {
-      elApp.classList.add("hidden");
+      container.classList.add("hidden");
       resetEngine();
     }, 800);
     return;
   }
 
   if (STATE === "active") {
-    elSecurity.classList.add("hidden");
-    elApp.classList.remove("hidden");
-    requestAnimationFrame(() => elApp.classList.add("show"));
+    securityScreen.classList.add("hidden");
+    container.classList.remove("hidden");
+    requestAnimationFrame(() => container.classList.add("show"));
 
     if (payload.data) {
       if (payload.data.mode) {
@@ -290,9 +272,9 @@ socket.on("control:timer_chrono", (payload) => {
 });
 
 socket.on("overlay:forbidden", (payload) => {
-  console.error("❌ [TIMER] Accès refusé:", payload?.reason);
-  elSecurity.classList.remove("hidden");
-  elApp.classList.add("hidden");
+  console.error("❌ [TIMER] Accès refusé:", payload.reason);
+  securityScreen.classList.remove("hidden");
+  container.classList.add("hidden");
 });
 
 /* -------- Auth (OBS CSS vars) -------- */
@@ -307,14 +289,14 @@ async function init() {
 
   if (!room) {
     console.error("❌ [TIMER] Aucun room-id");
-    elSecurity.classList.remove("hidden");
+    securityScreen.classList.remove("hidden");
     return;
   }
 
   if (authMode === "strict") {
     if (!key) {
       console.error("❌ [TIMER] Mode strict sans key");
-      elSecurity.classList.remove("hidden");
+      securityScreen.classList.remove("hidden");
       return;
     }
     socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
