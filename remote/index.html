@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDI Live - Télécommande V3.1</title>
+  <title>MDI Live - Télécommande V3.2</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     * {
@@ -120,6 +120,7 @@
       display: flex;
       border-bottom: 1px solid var(--border);
       background: var(--bg-dark);
+      overflow-x: auto;
     }
 
     .tab {
@@ -133,6 +134,7 @@
       cursor: pointer;
       transition: all 0.2s;
       border-bottom: 2px solid transparent;
+      white-space: nowrap;
     }
 
     .tab:hover {
@@ -360,6 +362,214 @@
       color: var(--danger);
       border: 1px solid var(--danger);
     }
+
+    /* ===== TIMER STYLES ===== */
+    .timer-mode-toggle {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .timer-mode-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid var(--border);
+      background: var(--bg-dark);
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .timer-mode-btn.active {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+
+    .timer-mode-btn:hover:not(.active) {
+      background: var(--border);
+    }
+
+    .timer-preview-box {
+      background: var(--bg-dark);
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .timer-preview-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .timer-preview-time {
+      font-size: 36px;
+      font-weight: 900;
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer-presets {
+      margin-bottom: 12px;
+    }
+
+    .timer-presets-title {
+      font-size: 11px;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .timer-preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .timer-preset-btn {
+      flex: 1;
+      min-width: 60px;
+      padding: 8px 10px;
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+
+    .timer-preset-btn:hover {
+      background: var(--border);
+      border-color: var(--accent);
+    }
+
+    .timer-custom {
+      margin-bottom: 12px;
+    }
+
+    .timer-custom-title {
+      font-size: 11px;
+      margin-bottom: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .timer-digits {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-dark);
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    .timer-digit-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .timer-digit-value {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      min-width: 32px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer-digit-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .timer-digit-btn {
+      width: 32px;
+      height: 24px;
+      padding: 0;
+      background: var(--border);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timer-digit-btn:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .timer-digit-btn:active {
+      transform: scale(0.95);
+    }
+
+    .timer-digit-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .timer-digit-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 2px;
+    }
+
+    .timer-colon {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--border);
+      margin: 0 2px;
+      padding-bottom: 28px;
+    }
+
+    .timer-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .timer-controls button {
+      font-size: 12px;
+    }
+
+    .timer-reset-btn {
+      grid-column: 1 / -1;
+    }
+
+    .timer-separator {
+      height: 1px;
+      background: var(--border);
+      margin: 12px 0;
+    }
   </style>
 </head>
 <body>
@@ -381,6 +591,7 @@
       <button class="tab active" onclick="switchTab('quiz')">❓ QUIZ</button>
       <button class="tab" onclick="switchTab('nuage')">☁️ NUAGE</button>
       <button class="tab" onclick="switchTab('roue')">🎡 ROUE</button>
+      <button class="tab" onclick="switchTab('timer')">⏱️ TIMER</button>
     </div>
 
     <!-- Contenu Quiz -->
@@ -443,7 +654,7 @@
         <!-- Toggle Collecte -->
         <div class="toggle-container" style="margin-bottom: 12px;">
           <div class="toggle-label">
-            <span style="font-size: 13px;">📝 Collecte</span>
+            <span style="font-size: 13px;">📝 Fermer la collecte pour lancer la roue</span>
           </div>
           <div id="toggleCollecte" class="toggle-switch" onclick="toggleCollecte()"></div>
         </div>
@@ -458,6 +669,115 @@
       </div>
 
       <div id="messageRoue" class="message"></div>
+    </div>
+
+    <!-- Contenu Timer -->
+    <div id="tabTimer" class="tab-content">
+      <!-- Toggle Mode -->
+      <div class="timer-mode-toggle">
+        <button class="timer-mode-btn active" data-mode="timer" onclick="timerSetMode('timer')">
+          ⏱️ TIMER
+        </button>
+        <button class="timer-mode-btn" data-mode="chrono" onclick="timerSetMode('chrono')">
+          ⏲️ CHRONO
+        </button>
+      </div>
+
+      <!-- Aperçu -->
+      <div class="timer-preview-box">
+        <div class="timer-preview-label">Temps configuré</div>
+        <div class="timer-preview-time" id="timerPreview">00:00</div>
+      </div>
+
+      <div class="timer-separator"></div>
+
+      <!-- Presets -->
+      <div class="timer-presets">
+        <div class="timer-presets-title">⚡ Presets rapides</div>
+        <div class="timer-preset-row">
+          <button class="timer-preset-btn" onclick="timerPreset(10)">10s</button>
+          <button class="timer-preset-btn" onclick="timerPreset(20)">20s</button>
+          <button class="timer-preset-btn" onclick="timerPreset(30)">30s</button>
+        </div>
+        <div class="timer-preset-row">
+          <button class="timer-preset-btn" onclick="timerPreset(60)">1min</button>
+          <button class="timer-preset-btn" onclick="timerPreset(120)">2min</button>
+          <button class="timer-preset-btn" onclick="timerPreset(300)">5min</button>
+        </div>
+        <div class="timer-preset-row">
+          <button class="timer-preset-btn" onclick="timerPreset(900)">15min</button>
+          <button class="timer-preset-btn" onclick="timerPreset(1200)">20min</button>
+          <button class="timer-preset-btn" onclick="timerPreset(1800)">30min</button>
+        </div>
+      </div>
+
+      <div class="timer-separator"></div>
+
+      <!-- Custom -->
+      <div class="timer-custom">
+        <div class="timer-custom-title">🎛️ Personnalisé</div>
+        <div class="timer-digits">
+          <!-- Dizaine minutes -->
+          <div class="timer-digit-group">
+            <div class="timer-digit-btns">
+              <button class="timer-digit-btn" onclick="timerAdjust(600)">+</button>
+              <button class="timer-digit-btn" onclick="timerAdjust(-600)">−</button>
+            </div>
+            <div class="timer-digit-value" id="timerDigitM10">0</div>
+            <div class="timer-digit-label">Diz min</div>
+          </div>
+
+          <!-- Unité minutes -->
+          <div class="timer-digit-group">
+            <div class="timer-digit-btns">
+              <button class="timer-digit-btn" onclick="timerAdjust(60)">+</button>
+              <button class="timer-digit-btn" onclick="timerAdjust(-60)">−</button>
+            </div>
+            <div class="timer-digit-value" id="timerDigitM1">0</div>
+            <div class="timer-digit-label">Unit min</div>
+          </div>
+
+          <!-- Colon -->
+          <div class="timer-colon">:</div>
+
+          <!-- Dizaine secondes -->
+          <div class="timer-digit-group">
+            <div class="timer-digit-btns">
+              <button class="timer-digit-btn" onclick="timerAdjust(10)">+</button>
+              <button class="timer-digit-btn" onclick="timerAdjust(-10)">−</button>
+            </div>
+            <div class="timer-digit-value" id="timerDigitS10">0</div>
+            <div class="timer-digit-label">Diz sec</div>
+          </div>
+
+          <!-- Unité secondes -->
+          <div class="timer-digit-group">
+            <div class="timer-digit-btns">
+              <button class="timer-digit-btn" onclick="timerAdjust(1)">+</button>
+              <button class="timer-digit-btn" onclick="timerAdjust(-1)">−</button>
+            </div>
+            <div class="timer-digit-value" id="timerDigitS1">0</div>
+            <div class="timer-digit-label">Unit sec</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="timer-separator"></div>
+
+      <!-- Contrôles -->
+      <div class="timer-controls">
+        <button class="btn-success" onclick="timerStart()">
+          ▶️ Start
+        </button>
+        <button class="btn-secondary" onclick="timerPause()">
+          ⏸️ Pause
+        </button>
+        <button class="btn-danger timer-reset-btn" onclick="timerReset()">
+          🔄 Reset
+        </button>
+      </div>
+
+      <div id="messageTimer" class="message"></div>
     </div>
   </div>
 
@@ -475,10 +795,21 @@
       nuage_de_mots: false,
       roue_loto: false,
       roue_collecte: false,
-      quiz_ou_sondage: false
+      quiz_ou_sondage: false,
+      timer_chrono: false
     };
 
+    // Timer state
+    let timerMode = "timer";
+    let timerSeconds = 60;
+    let timerRunning = false;
+
     const $ = (id) => document.getElementById(id);
+
+    // --- HELPERS ---
+    function pad2(n) {
+      return String(n).padStart(2, "0");
+    }
 
     // --- ONGLETS ---
     function switchTab(tab) {
@@ -605,6 +936,11 @@
         showMessage("Quiz", "❌ Accès refusé", "error");
         setConnectionStatus(false);
       });
+
+      // Event timer
+      socket.on("control:timer_chrono", (payload) => {
+        console.log("⏱️ Timer event:", payload);
+      });
     }
 
     // --- CATALOGUE ---
@@ -651,7 +987,7 @@
       }
     }
 
-    // --- TOGGLE OVERLAYS ---
+    // --- TOGGLE OVERLAYS (AVEC FONDU) ---
     function toggleOverlay(overlayName) {
       if (!connected) {
         const tab = overlayName === "nuage_de_mots" ? "Nuage" : "Roue";
@@ -668,7 +1004,7 @@
         });
         console.log(`🔴 OFF ${overlayName}`);
       } else {
-        // Désactiver les autres overlays
+        // Désactiver les autres overlays (SAUF TIMER)
         if (overlayName === "nuage_de_mots" && overlayStates.roue_loto) {
           socket.emit("control:deactivate_overlay", {
             room: currentRoom,
@@ -713,7 +1049,7 @@
         });
         updateCollecteToggle(false);
       } else {
-        // Désactiver autres overlays
+        // Désactiver autres overlays (SAUF TIMER)
         if (overlayStates.nuage_de_mots) {
           socket.emit("control:deactivate_overlay", {
             room: currentRoom,
@@ -791,7 +1127,7 @@
         return;
       }
 
-      // Désactiver autres overlays
+      // Désactiver autres overlays (SAUF TIMER)
       if (overlayStates.nuage_de_mots) {
         socket.emit("control:deactivate_overlay", {
           room: currentRoom,
@@ -853,12 +1189,143 @@
       console.log("🔄 Reset");
     }
 
+    // --- TIMER FUNCTIONS ---
+    function timerUpdateDisplay() {
+      const mm = Math.floor(timerSeconds / 60);
+      const ss = timerSeconds % 60;
+      
+      $("timerPreview").textContent = `${pad2(mm)}:${pad2(ss)}`;
+      
+      const m10 = Math.floor(mm / 10);
+      const m1 = mm % 10;
+      const s10 = Math.floor(ss / 10);
+      const s1 = ss % 10;
+      
+      $("timerDigitM10").textContent = m10;
+      $("timerDigitM1").textContent = m1;
+      $("timerDigitS10").textContent = s10;
+      $("timerDigitS1").textContent = s1;
+    }
+
+    function timerSetMode(mode) {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      timerMode = mode;
+      
+      document.querySelectorAll(".timer-mode-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.mode === mode);
+      });
+      
+      socket.emit("control:timer_set_mode", {
+        room: currentRoom,
+        mode: mode
+      });
+      
+      if (mode === "chrono") {
+        timerSeconds = 0;
+        timerUpdateDisplay();
+      }
+      
+      showMessage("Timer", `Mode: ${mode === "timer" ? "Timer" : "Chrono"}`, "success");
+      console.log(`🔄 [TIMER] Mode: ${mode}`);
+    }
+
+    function timerPreset(seconds) {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      timerSeconds = Math.max(0, Math.min(seconds, 99 * 60 + 59));
+      timerUpdateDisplay();
+      
+      socket.emit("control:timer_set_time", {
+        room: currentRoom,
+        seconds: timerSeconds
+      });
+      
+      showMessage("Timer", `Temps: ${timerSeconds}s`, "success");
+      console.log(`⏱️ [TIMER] Preset: ${seconds}s`);
+    }
+
+    function timerAdjust(deltaSeconds) {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      if (timerRunning) {
+        showMessage("Timer", "⚠️ Pause d'abord", "error");
+        return;
+      }
+      
+      timerSeconds = Math.max(0, Math.min(timerSeconds + deltaSeconds, 99 * 60 + 59));
+      timerUpdateDisplay();
+      
+      socket.emit("control:timer_increment_time", {
+        room: currentRoom,
+        seconds: deltaSeconds
+      });
+      
+      console.log(`➕➖ [TIMER] Ajusté: ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s → ${timerSeconds}s`);
+    }
+
+    function timerStart() {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      socket.emit("control:timer_start", {
+        room: currentRoom
+      });
+      
+      timerRunning = true;
+      showMessage("Timer", "▶️ Démarré", "success");
+      console.log("▶️ [TIMER] Start");
+    }
+
+    function timerPause() {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      socket.emit("control:timer_toggle_pause", {
+        room: currentRoom
+      });
+      
+      timerRunning = false;
+      showMessage("Timer", "⏸️ Pause", "success");
+      console.log("⏸️ [TIMER] Pause");
+    }
+
+    function timerReset() {
+      if (!connected) {
+        showMessage("Timer", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      socket.emit("control:timer_reset", {
+        room: currentRoom
+      });
+      
+      timerRunning = false;
+      showMessage("Timer", "🔄 Reset", "success");
+      console.log("🔄 [TIMER] Reset");
+    }
+
     // --- INIT ---
     $("btnConnect").onclick = connect;
 
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("room")) $("roomId").value = urlParams.get("room");
     if (urlParams.get("key")) $("roomKey").value = urlParams.get("key");
+
+    timerUpdateDisplay();
   </script>
 </body>
 </html>
