@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MDI Nuage - V6.6 (Anti-Collision FIX)</title>
+  <title>MDI Nuage - V6.7 (Écart taille)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
@@ -50,7 +50,12 @@
       height: var(--cloud-height, 850px);
       background-color: rgba(88, 88, 88, 0);
       overflow: hidden;
-      transition: opacity 0.6s ease-in-out;
+      opacity: 0;
+      transition: opacity 0.8s ease-in-out;
+    }
+
+    #cloud-container.show {
+      opacity: 1;
     }
 
     #word-zone { width: 100%; height: 100%; position: relative; }
@@ -104,11 +109,11 @@
   <script>
     /**
      * ============================================================
-     * MDI NUAGE DE MOTS - V6.6 (FIX ANTI-COLLISION)
+     * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
      * ============================================================
-     * ✅ FIX : Anti-collision qui fonctionne vraiment
-     * ✅ FIX : Positions des mots sans transform CSS
-     * ✅ Option majuscules
+     * ✅ Écart taille : 30px (min) → 120px (max)
+     * ✅ Fondu affichage/masquage
+     * ✅ Anti-collision
      * ============================================================
      */
 
@@ -218,14 +223,17 @@
 
       wordPositions = [];
 
+      // ✅ Calcul écart de taille important
+      const maxCount = Math.max(...words.map(w => w.count), 1);
+      const minCount = Math.min(...words.map(w => w.count), 1);
+
       words.forEach((mot, i) => {
         const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
         let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
         
-        const baseSize = 70;
-        const sizeDecrease = i * 2;
-        const countBonus = (mot.count - 1) * 5;
-        const fontSize = Math.max(20, baseSize - sizeDecrease + countBonus);
+        // ✅ Taille basée sur le count (30px → 120px)
+        const ratio = maxCount > minCount ? (mot.count - minCount) / (maxCount - minCount) : 1;
+        const fontSize = Math.floor(30 + (ratio * 90)); // 30px (min) → 120px (max)
 
         const { width, height } = measureText(displayText, fontSize);
 
@@ -278,14 +286,20 @@
       STATE = payload.state;
 
       if (STATE === "idle") {
-        container.classList.add("hidden");
-        resetEcran();
+        container.classList.remove("show");
+        setTimeout(() => {
+          container.classList.add("hidden");
+          resetEcran();
+        }, 800);
         return;
       }
 
       if (STATE === "active") {
         securityScreen.classList.add("hidden");
         container.classList.remove("hidden");
+        requestAnimationFrame(() => {
+          container.classList.add("show");
+        });
 
         if (payload.data && payload.data.words) {
           const serverWords = payload.data.words;
