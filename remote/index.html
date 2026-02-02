@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDI Live - Télécommande Unifiée</title>
+  <title>MDI Live - Télécommande V3</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     * {
@@ -39,30 +39,52 @@
       background: var(--bg-card);
       border-radius: 16px;
       border: 1px solid var(--border);
-      max-width: 500px;
+      max-width: 420px;
       width: 100%;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
 
+    /* Header compact 2 colonnes */
     .header {
-      padding: 20px;
+      padding: 14px 16px;
       border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
     }
 
-    .header h1 {
-      font-size: 20px;
-      font-weight: 700;
+    .auth-inputs {
       display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .auth-inputs input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-dark);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .auth-inputs input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .header-connect {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
       align-items: center;
-      gap: 10px;
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--danger);
       transition: all 0.3s;
@@ -70,133 +92,79 @@
 
     .status-dot.connected {
       background: var(--success);
-      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
     }
 
-    .section {
-      padding: 20px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .section:last-child {
-      border-bottom: none;
-    }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .input-group {
-      margin-bottom: 12px;
-    }
-
-    .input-group:last-child {
-      margin-bottom: 0;
-    }
-
-    label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    input, select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--bg-dark);
-      color: var(--text);
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
+    .btn-connect {
+      padding: 10px 16px;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
     }
 
-    button:active {
-      transform: scale(0.98);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-    }
-
-    .btn-primary:hover:not(:disabled) {
+    .btn-connect:hover {
       background: #2563eb;
     }
 
-    .btn-success {
-      background: var(--success);
-      color: white;
+    .btn-connect:active {
+      transform: scale(0.98);
     }
 
-    .btn-success:hover:not(:disabled) {
-      background: #16a34a;
+    /* Onglets */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-dark);
     }
 
-    .btn-danger {
-      background: var(--danger);
-      color: white;
+    .tab {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
     }
 
-    .btn-danger:hover:not(:disabled) {
-      background: #dc2626;
-    }
-
-    .btn-secondary {
-      background: var(--border);
+    .tab:hover {
       color: var(--text);
+      background: rgba(255,255,255,0.05);
     }
 
-    .btn-secondary:hover:not(:disabled) {
-      background: #475569;
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: var(--bg-card);
     }
 
-    /* Toggle Switch */
+    /* Contenu onglets */
+    .tab-content {
+      display: none;
+      padding: 16px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Toggle */
     .toggle-container {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px;
+      padding: 14px;
       background: var(--bg-dark);
       border-radius: 8px;
       margin-bottom: 12px;
-    }
-
-    .toggle-container:last-child {
-      margin-bottom: 0;
     }
 
     .toggle-label {
@@ -208,12 +176,12 @@
     }
 
     .toggle-label .icon {
-      font-size: 20px;
+      font-size: 24px;
     }
 
     .toggle-switch {
       position: relative;
-      width: 50px;
+      width: 48px;
       height: 26px;
       background: var(--danger);
       border-radius: 13px;
@@ -238,25 +206,82 @@
     }
 
     .toggle-switch.active::after {
-      left: 27px;
+      left: 25px;
     }
 
-    /* Quiz Controls */
-    .quiz-controls {
-      display: grid;
-      gap: 8px;
-      margin-top: 12px;
+    /* Boutons */
+    button {
+      width: 100%;
+      padding: 11px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #16a34a;
+    }
+
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    /* Quiz */
+    .quiz-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
     }
 
     .quiz-status {
       display: inline-block;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-left: 8px;
     }
 
     .quiz-status.idle {
@@ -274,15 +299,50 @@
       color: white;
     }
 
-    .btn-small {
-      padding: 10px;
-      font-size: 13px;
+    select {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-dark);
+      color: var(--text);
+      font-size: 12px;
+      margin-bottom: 10px;
     }
 
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .quiz-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    /* Roue */
+    .roue-controls {
+      display: none;
+    }
+
+    .roue-controls.active {
+      display: block;
+    }
+
+    .roue-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    /* Message */
     .message {
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 13px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 12px;
       margin-top: 12px;
       display: none;
     }
@@ -306,36 +366,60 @@
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
+    <!-- Header compact -->
     <div class="header">
-      <h1>
-        🎮 Télécommande MDI
-      </h1>
-      <div id="statusDot" class="status-dot"></div>
+      <div class="auth-inputs">
+        <input type="text" id="roomId" placeholder="Room ID (ex: DEMO_CLIENT)">
+        <input type="password" id="roomKey" placeholder="Room Key (clé secrète)">
+      </div>
+      <div class="header-connect">
+        <div id="statusDot" class="status-dot"></div>
+        <button id="btnConnect" class="btn-connect">Connecter</button>
+      </div>
     </div>
 
-    <!-- Auth Section -->
-    <div class="section">
-      <div class="section-title">🔐 Authentification</div>
-      <div class="input-group">
-        <label for="roomId">Room ID</label>
-        <input type="text" id="roomId" placeholder="Ex: DEMO_CLIENT">
+    <!-- Onglets -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('quiz')">❓ QUIZ</button>
+      <button class="tab" onclick="switchTab('nuage')">☁️ NUAGE</button>
+      <button class="tab" onclick="switchTab('roue')">🎡 ROUE</button>
+    </div>
+
+    <!-- Contenu Quiz -->
+    <div id="tabQuiz" class="tab-content active">
+      <div class="quiz-header">
+        <div class="section-title">Quiz / Sondage</div>
+        <span id="quizStatus" class="quiz-status idle">Inactif</span>
       </div>
-      <div class="input-group">
-        <label for="roomKey">Room Key</label>
-        <input type="password" id="roomKey" placeholder="Votre clé secrète">
+
+      <select id="questionSelect">
+        <option value="">-- Connectez-vous d'abord --</option>
+      </select>
+
+      <div class="quiz-grid">
+        <button id="btnLoadQuestion" class="btn-success" onclick="loadQuestion()">
+          1. ❓ Charger
+        </button>
+        <button id="btnShowOptions" class="btn-secondary" onclick="showOptions()" disabled>
+          2. 🗳️ Options
+        </button>
+        <button id="btnShowResults" class="btn-secondary" onclick="showResults()" disabled>
+          3. 📊 Résultats
+        </button>
+        <button id="btnRevealAnswer" class="btn-secondary" onclick="revealAnswer()" disabled>
+          4. ✅ Réponse
+        </button>
       </div>
-      <button id="btnConnect" class="btn-primary">
-        🔌 Connecter
+
+      <button id="btnResetQuiz" class="btn-danger" onclick="resetQuiz()" disabled>
+        5. 🔄 Réinitialiser
       </button>
-      <div id="message" class="message"></div>
+
+      <div id="messageQuiz" class="message"></div>
     </div>
 
-    <!-- Overlays Section -->
-    <div class="section">
-      <div class="section-title">🎬 Overlays</div>
-      
-      <!-- Nuage de Mots -->
+    <!-- Contenu Nuage -->
+    <div id="tabNuage" class="tab-content">
       <div class="toggle-container">
         <div class="toggle-label">
           <span class="icon">☁️</span>
@@ -344,7 +428,11 @@
         <div id="toggleNuage" class="toggle-switch" onclick="toggleOverlay('nuage_de_mots')"></div>
       </div>
 
-      <!-- Roue Loto -->
+      <div id="messageNuage" class="message"></div>
+    </div>
+
+    <!-- Contenu Roue -->
+    <div id="tabRoue" class="tab-content">
       <div class="toggle-container">
         <div class="toggle-label">
           <span class="icon">🎡</span>
@@ -352,69 +440,55 @@
         </div>
         <div id="toggleRoue" class="toggle-switch" onclick="toggleOverlay('roue_loto')"></div>
       </div>
-    </div>
 
-    <!-- Quiz Section -->
-    <div class="section">
-      <div class="section-title">
-        ❓ Quiz / Sondage
-        <span id="quizStatus" class="quiz-status idle">Inactif</span>
+      <div id="roueControls" class="roue-controls">
+        <div class="roue-grid">
+          <button class="btn-success" onclick="startCollect()">📝 Démarrer<br>Collecte</button>
+          <button class="btn-secondary" onclick="stopCollect()">🔒 Fermer<br>Collecte</button>
+        </div>
+        <button class="btn-success" onclick="spinRoue()" style="margin-bottom: 8px;">🎡 SPIN</button>
+        <button class="btn-danger" onclick="resetRoue()">🔄 Reset Roue</button>
       </div>
 
-      <div class="input-group">
-        <label for="questionSelect">Choisir une question</label>
-        <select id="questionSelect">
-          <option value="">-- Connectez-vous d'abord --</option>
-        </select>
-      </div>
-
-      <div class="quiz-controls">
-        <button id="btnLoadQuestion" class="btn-success btn-small" onclick="loadQuestion()">
-          1. ❓ Charger question
-        </button>
-        <button id="btnShowOptions" class="btn-secondary btn-small" onclick="showOptions()" disabled>
-          2. 🗳️ Afficher options
-        </button>
-        <button id="btnShowResults" class="btn-secondary btn-small" onclick="showResults()" disabled>
-          3. 📊 Afficher résultats
-        </button>
-        <button id="btnRevealAnswer" class="btn-secondary btn-small" onclick="revealAnswer()" disabled>
-          4. ✅ Révéler bonne réponse
-        </button>
-        <button id="btnResetQuiz" class="btn-danger btn-small" onclick="resetQuiz()" disabled>
-          5. 🔄 Réinitialiser
-        </button>
-      </div>
+      <div id="messageRoue" class="message"></div>
     </div>
   </div>
 
   <script>
     const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
     
-    // État global
     let socket = null;
     let connected = false;
     let currentRoom = "";
     let currentKey = "";
     let questions = [];
-    let currentQuestionType = null; // "quiz" | "poll" | null
+    let currentQuestionType = null;
+    
     let overlayStates = {
       nuage_de_mots: false,
       roue_loto: false,
       quiz_ou_sondage: false
     };
 
-    // Éléments DOM
     const $ = (id) => document.getElementById(id);
 
-    // --- UTILITAIRES UI ---
+    // --- ONGLETS ---
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      $('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+    }
+
+    // --- UI ---
     function setConnectionStatus(isConnected) {
       connected = isConnected;
       $("statusDot").className = isConnected ? "status-dot connected" : "status-dot";
     }
 
-    function showMessage(text, type = "success") {
-      const msg = $("message");
+    function showMessage(tabId, text, type = "success") {
+      const msg = $("message" + tabId);
       msg.textContent = text;
       msg.className = `message ${type} show`;
       setTimeout(() => {
@@ -430,6 +504,7 @@
       }
       if (overlayName === "roue_loto") {
         $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
+        $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
       }
     }
 
@@ -444,14 +519,12 @@
       const btnReset = $("btnResetQuiz");
 
       if (isActive) {
-        status.textContent = questionType === "poll" ? "Sondage actif" : "Quiz actif";
+        status.textContent = questionType === "poll" ? "Sondage" : "Quiz";
         status.className = questionType === "poll" ? "quiz-status poll" : "quiz-status active";
         
         btnOptions.disabled = false;
         btnResults.disabled = false;
         btnReset.disabled = false;
-        
-        // Griser "Révéler bonne réponse" si c'est un poll
         btnReveal.disabled = (questionType === "poll");
       } else {
         status.textContent = "Inactif";
@@ -470,39 +543,32 @@
       const key = $("roomKey").value.trim();
 
       if (!room || !key) {
-        showMessage("⚠️ Room ID et Key requis", "error");
+        showMessage("Quiz", "⚠️ Room ID et Key requis", "error");
         return;
       }
 
       currentRoom = room;
       currentKey = key;
 
-      // Déconnexion si déjà connecté
       if (socket) socket.disconnect();
 
-      // Nouvelle connexion
       socket = io(SERVER_URL, {
         transports: ["websocket", "polling"],
         reconnection: true
       });
 
       socket.on("connect", () => {
-        console.log("✅ Connecté au serveur");
+        console.log("✅ Connecté");
         setConnectionStatus(true);
-        
-        // Join room
         socket.emit("rejoindre_salle", currentRoom);
-        
-        // Charger le catalogue de questions
         loadQuestionCatalog();
-        
-        showMessage("✅ Connecté avec succès", "success");
+        showMessage("Quiz", "✅ Connecté", "success");
       });
 
       socket.on("connect_error", (err) => {
-        console.error("❌ Erreur connexion:", err);
+        console.error("❌ Erreur:", err);
         setConnectionStatus(false);
-        showMessage("❌ Erreur de connexion", "error");
+        showMessage("Quiz", "❌ Erreur connexion", "error");
       });
 
       socket.on("disconnect", () => {
@@ -510,19 +576,18 @@
         setConnectionStatus(false);
       });
 
-      // Écouter les changements d'état
       socket.on("overlay:state", (payload) => {
-        console.log("📡 État reçu:", payload);
+        console.log("📡 État:", payload);
         handleOverlayState(payload);
       });
 
       socket.on("overlay:forbidden", () => {
-        showMessage("❌ Accès refusé - Vérifiez votre clé", "error");
+        showMessage("Quiz", "❌ Accès refusé", "error");
         setConnectionStatus(false);
       });
     }
 
-    // --- CATALOGUE QUESTIONS ---
+    // --- CATALOGUE ---
     async function loadQuestionCatalog() {
       try {
         const res = await fetch(`${SERVER_URL}/debug/questions?room=${currentRoom}`);
@@ -531,24 +596,23 @@
         questions = json.data || [];
         
         const select = $("questionSelect");
-        select.innerHTML = '<option value="">-- Choisir une question --</option>';
+        select.innerHTML = '<option value="">-- Choisir --</option>';
         
         questions.forEach(q => {
           const opt = document.createElement("option");
           opt.value = q.question_key;
           opt.textContent = `${q.question_key} - ${q.prompt}`;
-          opt.dataset.type = q.type; // Stocke le type
+          opt.dataset.type = q.type;
           select.appendChild(opt);
         });
         
-        console.log(`✅ ${questions.length} questions chargées`);
+        console.log(`✅ ${questions.length} questions`);
       } catch (e) {
-        console.error("❌ Erreur chargement catalogue:", e);
-        showMessage("⚠️ Erreur chargement questions", "error");
+        console.error("❌ Erreur catalogue:", e);
       }
     }
 
-    // --- GESTION ÉTATS OVERLAYS ---
+    // --- ÉTATS ---
     function handleOverlayState(payload) {
       const { overlay, state, data } = payload;
 
@@ -570,21 +634,21 @@
     // --- TOGGLE OVERLAYS ---
     function toggleOverlay(overlayName) {
       if (!connected) {
-        showMessage("❌ Connectez-vous d'abord", "error");
+        const tab = overlayName === "nuage_de_mots" ? "Nuage" : "Roue";
+        showMessage(tab, "❌ Connectez-vous", "error");
         return;
       }
 
       const isCurrentlyActive = overlayStates[overlayName];
 
       if (isCurrentlyActive) {
-        // Désactiver
         socket.emit("control:deactivate_overlay", {
           room: currentRoom,
           overlay: overlayName
         });
-        console.log(`🔴 Désactivation ${overlayName}`);
+        console.log(`🔴 OFF ${overlayName}`);
       } else {
-        // Désactiver les autres overlays (exclusion mutuelle)
+        // Désactiver les autres overlays
         if (overlayName === "nuage_de_mots" && overlayStates.roue_loto) {
           socket.emit("control:deactivate_overlay", {
             room: currentRoom,
@@ -597,8 +661,6 @@
             overlay: "nuage_de_mots"
           });
         }
-
-        // Désactiver le quiz si actif
         if (overlayStates.quiz_ou_sondage) {
           socket.emit("control:idle", {
             room: currentRoom,
@@ -606,29 +668,28 @@
           });
         }
 
-        // Activer l'overlay demandé
         socket.emit("control:activate_overlay", {
           room: currentRoom,
           overlay: overlayName
         });
-        console.log(`🟢 Activation ${overlayName}`);
+        console.log(`🟢 ON ${overlayName}`);
       }
     }
 
-    // --- CONTRÔLES QUIZ ---
+    // --- QUIZ ---
     function loadQuestion() {
       if (!connected) {
-        showMessage("❌ Connectez-vous d'abord", "error");
+        showMessage("Quiz", "❌ Connectez-vous", "error");
         return;
       }
 
       const questionKey = $("questionSelect").value;
       if (!questionKey) {
-        showMessage("⚠️ Choisissez une question", "error");
+        showMessage("Quiz", "⚠️ Choisissez une question", "error");
         return;
       }
 
-      // Désactiver nuage et roue (exclusion mutuelle)
+      // Désactiver autres overlays
       if (overlayStates.nuage_de_mots) {
         socket.emit("control:deactivate_overlay", {
           room: currentRoom,
@@ -642,67 +703,86 @@
         });
       }
 
-      // Charger la question
       socket.emit("control:load_question", {
         room: currentRoom,
         overlay: "quiz_ou_sondage",
         question_key: questionKey
       });
 
-      console.log(`❓ Chargement question: ${questionKey}`);
+      console.log(`❓ Question: ${questionKey}`);
     }
 
     function showOptions() {
       if (!connected) return;
-      
       socket.emit("control:show_options", {
         room: currentRoom,
         overlay: "quiz_ou_sondage"
       });
-      
-      console.log("🗳️ Affichage options");
+      console.log("🗳️ Options");
     }
 
     function showResults() {
       if (!connected) return;
-      
       socket.emit("control:set_state", {
         room: currentRoom,
         overlay: "quiz_ou_sondage",
         state: "results"
       });
-      
-      console.log("📊 Affichage résultats");
+      console.log("📊 Résultats");
     }
 
     function revealAnswer() {
       if (!connected) return;
-      if (currentQuestionType === "poll") return; // Ne devrait pas arriver (bouton grisé)
-      
+      if (currentQuestionType === "poll") return;
       socket.emit("control:set_state", {
         room: currentRoom,
         overlay: "quiz_ou_sondage",
         state: "reveal"
       });
-      
-      console.log("✅ Révélation bonne réponse");
+      console.log("✅ Réponse");
     }
 
     function resetQuiz() {
       if (!connected) return;
-      
       socket.emit("control:idle", {
         room: currentRoom,
         overlay: "quiz_ou_sondage"
       });
-      
-      console.log("🔄 Reset quiz");
+      console.log("🔄 Reset");
     }
 
-    // --- EVENT LISTENERS ---
+    // --- ROUE ---
+    function startCollect() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:start_collect", { room: currentRoom });
+      showMessage("Roue", "📝 Collecte démarrée", "success");
+      console.log("📝 Démarrage collecte");
+    }
+
+    function stopCollect() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:stop_collect", { room: currentRoom });
+      showMessage("Roue", "🔒 Collecte fermée", "success");
+      console.log("🔒 Fermeture collecte");
+    }
+
+    function spinRoue() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:spin", { room: currentRoom });
+      showMessage("Roue", "🎡 Roue lancée !", "success");
+      console.log("🎡 SPIN");
+    }
+
+    function resetRoue() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:reset", { room: currentRoom });
+      showMessage("Roue", "🔄 Roue réinitialisée", "success");
+      console.log("🔄 Reset");
+    }
+
+    // --- INIT ---
     $("btnConnect").onclick = connect;
 
-    // Init depuis URL (pratique pour tests)
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("room")) $("roomId").value = urlParams.get("room");
     if (urlParams.get("key")) $("roomKey").value = urlParams.get("key");
