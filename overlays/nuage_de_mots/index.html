@@ -1,361 +1,38 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MDI Nuage - V6.7 (Écart taille)</title>
+
+  <!-- Police -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
+
+  <!-- Socket.io -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  
-  <style>
-    html, body {
-      background-color: transparent;
-      margin: 0; padding: 0; overflow: hidden;
-      height: 100vh; width: 100vw;
-      font-family: 'Montserrat', sans-serif;
-    }
 
-    .hidden { display: none !important; }
-
-    .mdi-security {
-      width: 100%; height: 100%;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column;
-      background: rgba(0,0,0,0);
-      color: #ff3b30;
-      z-index: 1000;
-      position: absolute;
-      text-shadow: 0 3px 18px rgba(0,0,0,0.9);
-    }
-    .mdi-security .mdi-x {
-      font-size: 84px;
-      font-weight: 900;
-      color: #ff3b30;
-    }
-    .mdi-security .mdi-msg {
-      font-size: 34px;
-      font-weight: 900;
-      text-align: center;
-      color: #ff3b30;
-    }
-
-    #cloud-container {
-      position: absolute;
-      right: var(--cloud-right, 50px);
-      top: 50%;
-      transform: translateY(-50%);
-      width: var(--cloud-width, 650px);
-      height: var(--cloud-height, 850px);
-      background-color: rgba(88, 88, 88, 0);
-      overflow: hidden;
-      opacity: 0;
-      transition: opacity 0.8s ease-in-out;
-    }
-
-    #cloud-container.show {
-      opacity: 1;
-    }
-
-    #word-zone { width: 100%; height: 100%; position: relative; }
-
-    #measure-zone {
-      position: absolute; top: -9999px; left: -9999px;
-      visibility: hidden; white-space: nowrap;
-      font-weight: 900; line-height: 1;
-      font-family: 'Montserrat', sans-serif;
-    }
-
-    .mot {
-      position: absolute;
-      line-height: 1;
-      white-space: nowrap;
-      font-weight: 900;
-      transition: left 0.6s cubic-bezier(0.19, 1, 0.22, 1),
-                  top 0.6s cubic-bezier(0.19, 1, 0.22, 1),
-                  font-size 0.6s cubic-bezier(0.19, 1, 0.22, 1),
-                  opacity 0.45s ease;
-      -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.85);
-      paint-order: stroke fill;
-      filter: drop-shadow(3px 3px 0px rgba(0, 0, 0, 0.2));
-      will-change: left, top, font-size, opacity;
-      user-select: none;
-      z-index: 10;
-    }
-
-    .mot.is-new {
-      opacity: 0;
-      transform: scale(0.92);
-    }
-    .mot.is-new.mdi-in {
-      opacity: 1;
-      transform: scale(1);
-    }
-  </style>
+  <!-- ✅ CSS externe (versionné pour forcer OBS à recharger) -->
+  <link rel="stylesheet" href="./style.css?v=6.7.1">
 </head>
+
 <body>
+  <!-- Écran sécurité -->
   <div id="security-screen" class="mdi-security hidden">
     <div class="mdi-x">✖</div>
     <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
 
+  <!-- Conteneur nuage -->
   <div id="cloud-container" class="hidden">
     <div id="word-zone"></div>
   </div>
 
+  <!-- Zone de mesure (hors écran) -->
   <div id="measure-zone"></div>
 
-  <script>
-    /**
-     * ============================================================
-     * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
-     * ============================================================
-     * ✅ Écart taille : 30px (min) → 120px (max)
-     * ✅ Fondu affichage/masquage
-     * ✅ Anti-collision
-     * ============================================================
-     */
-
-    const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-    const OVERLAY_TYPE = "nuage_de_mots";
-
-    function cssVar(name, fallback = "") {
-      const v = getComputedStyle(document.documentElement).getPropertyValue(name);
-      return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
-    }
-    function cssOnOff(name, fallbackOn = true) {
-      const v = (cssVar(name, "") || "").toLowerCase();
-      if (!v) return fallbackOn;
-      return v === "on" || v === "true" || v === "1";
-    }
-
-    const zone = document.getElementById("word-zone");
-    const container = document.getElementById("cloud-container");
-    const securityScreen = document.getElementById("security-screen");
-    const measureZone = document.getElementById("measure-zone");
-
-    let STATE = "idle";
-    let dbMots = {};
-    let globalColorIndex = 0;
-    let wordPositions = [];
-
-    function getPalette() {
-      return [
-        cssVar("--color-1", "#F054A2"),
-        cssVar("--color-2", "#2ecc71"),
-        cssVar("--color-3", "#F9AD48"),
-        cssVar("--color-4", "#3b82f6"),
-        cssVar("--color-5", "#ffffff")
-      ];
-    }
-
-    function resetEcran() {
-      zone.innerHTML = "";
-      dbMots = {};
-      globalColorIndex = 0;
-      wordPositions = [];
-      console.log("🔄 [NUAGE] Reset complet");
-    }
-
-    function measureText(text, fontSize) {
-      measureZone.style.fontSize = fontSize + "px";
-      measureZone.textContent = text;
-      return {
-        width: measureZone.offsetWidth,
-        height: measureZone.offsetHeight
-      };
-    }
-
-    function hasCollision(x, y, width, height) {
-      const margin = 15;
-      
-      for (const pos of wordPositions) {
-        const overlapX = !(x + width + margin < pos.x || x > pos.x + pos.width + margin);
-        const overlapY = !(y + height + margin < pos.y || y > pos.y + pos.height + margin);
-        
-        if (overlapX && overlapY) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    function findFreePosition(width, height) {
-      const W = container.clientWidth;
-      const H = container.clientHeight;
-      const cx = W / 2;
-      const cy = H / 2;
-
-      const maxAttempts = 800;
-      let angle = Math.random() * Math.PI * 2;
-      let radius = 20;
-      const radiusStep = 10;
-      const angleStep = 0.3;
-
-      for (let i = 0; i < maxAttempts; i++) {
-        const x = cx + Math.cos(angle) * radius - width/2;
-        const y = cy + Math.sin(angle) * radius - height/2;
-
-        if (x >= 0 && x + width <= W && y >= 0 && y + height <= H) {
-          if (!hasCollision(x, y, width, height)) {
-            return { x, y };
-          }
-        }
-
-        angle += angleStep;
-        radius += radiusStep * (angleStep / (Math.PI * 2));
-      }
-
-      return {
-        x: Math.max(0, Math.min(W - width, cx - width/2 + (Math.random() - 0.5) * 100)),
-        y: Math.max(0, Math.min(H - height, cy - height/2 + (Math.random() - 0.5) * 100))
-      };
-    }
-
-    function render() {
-      const W = container.clientWidth;
-      const H = container.clientHeight;
-      const words = Object.values(dbMots);
-      const uppercase = cssOnOff("--uppercase", false);
-
-      words.sort((a, b) => b.count - a.count);
-
-      wordPositions = [];
-
-      // ✅ Calcul écart de taille important
-      const maxCount = Math.max(...words.map(w => w.count), 1);
-      const minCount = Math.min(...words.map(w => w.count), 1);
-
-      words.forEach((mot, i) => {
-        const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
-        let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
-        
-        // ✅ Taille basée sur le count (30px → 120px)
-        const ratio = maxCount > minCount ? (mot.count - minCount) / (maxCount - minCount) : 1;
-        const fontSize = Math.floor(30 + (ratio * 90)); // 30px (min) → 120px (max)
-
-        const { width, height } = measureText(displayText, fontSize);
-
-        if (!el) {
-          el = document.createElement("div");
-          el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
-          el.className = "mot is-new";
-          el.style.color = mot.color;
-          el.style.fontSize = `${fontSize}px`;
-          zone.appendChild(el);
-
-          requestAnimationFrame(() => {
-            el.classList.add("mdi-in");
-          });
-        } else {
-          el.style.fontSize = `${fontSize}px`;
-        }
-
-        el.textContent = displayText;
-
-        const pos = findFreePosition(width, height);
-        
-        el.style.left = `${pos.x}px`;
-        el.style.top = `${pos.y}px`;
-
-        wordPositions.push({
-          x: pos.x,
-          y: pos.y,
-          width,
-          height,
-          element: el
-        });
-      });
-    }
-
-    const socket = io(SERVER_URL, { 
-      transports: ["websocket", "polling"],
-      reconnection: true
-    });
-
-    socket.on("connect", () => {
-      console.log("✅ [NUAGE] Connecté");
-    });
-
-    socket.on("overlay:state", (payload) => {
-      if (payload.overlay !== OVERLAY_TYPE) return;
-
-      console.log(`📡 [NUAGE] État:`, payload.state, payload.data);
-
-      STATE = payload.state;
-
-      if (STATE === "idle") {
-        container.classList.remove("show");
-        setTimeout(() => {
-          container.classList.add("hidden");
-          resetEcran();
-        }, 800);
-        return;
-      }
-
-      if (STATE === "active") {
-        securityScreen.classList.add("hidden");
-        container.classList.remove("hidden");
-        requestAnimationFrame(() => {
-          container.classList.add("show");
-        });
-
-        if (payload.data && payload.data.words) {
-          const serverWords = payload.data.words;
-          const palette = getPalette();
-
-          dbMots = {};
-          Object.keys(serverWords).forEach((key, index) => {
-            dbMots[key] = {
-              text: key,
-              count: serverWords[key],
-              color: palette[index % 5]
-            };
-          });
-
-          globalColorIndex = Object.keys(dbMots).length;
-          render();
-        }
-      }
-    });
-
-    socket.on("overlay:forbidden", (payload) => {
-      console.error("❌ [NUAGE] Accès refusé:", payload.reason);
-      securityScreen.classList.remove("hidden");
-      container.classList.add("hidden");
-    });
-
-    async function init() {
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      const authMode = cssVar("--auth-mode", "strict");
-      const room = cssVar("--room-id", "").trim();
-      const key = cssVar("--room-key", "").trim();
-
-      console.log(`🔐 [NUAGE] Auth: ${authMode}, Room: ${room}`);
-
-      if (!room) {
-        console.error("❌ [NUAGE] Aucun room-id");
-        securityScreen.classList.remove("hidden");
-        return;
-      }
-
-      if (authMode === "strict") {
-        if (!key) {
-          console.error("❌ [NUAGE] Mode strict sans key");
-          securityScreen.classList.remove("hidden");
-          return;
-        }
-        socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
-      } else {
-        socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
-      }
-
-      console.log("✅ [NUAGE] Auth envoyée");
-    }
-
-    socket.on("connect", init);
-  </script>
+  <!-- ✅ JS externe (versionné pour forcer OBS à recharger) -->
+  <script src="./script.js?v=6.7.1"></script>
 </body>
 </html>
