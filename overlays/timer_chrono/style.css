@@ -1,129 +1,93 @@
-/* ============================================================
-   MDI TIMER/CHRONO V2 - STYLES
-   ============================================================ */
-
 html, body {
   background-color: transparent;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  height: 100vh;
-  width: 100vw;
-  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  margin: 0; padding: 0; overflow: hidden;
+  height: 100vh; width: 100vw;
+  font-family: 'Montserrat', sans-serif;
 }
 
-.hidden {
-  display: none !important;
-}
+.hidden { display: none !important; }
 
-/* ============================================================
-   ÉCRAN SÉCURITÉ STANDARD MDI
-   ============================================================ */
+/* Écran sécurité standard MDI (fond transparent) */
 .mdi-security {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0); /* Transparent pour OBS */
+  background: rgba(0,0,0,0);
   color: #ff3b30;
   z-index: 1000;
   position: absolute;
-  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 3px 18px rgba(0,0,0,0.9);
 }
-
 .mdi-security .mdi-x {
-  font-size: 120px;
+  font-size: 84px;
   font-weight: 900;
   color: #ff3b30;
 }
-
 .mdi-security .mdi-msg {
-  font-size: 54px;
+  font-size: 34px;
   font-weight: 900;
   text-align: center;
   color: #ff3b30;
 }
 
-/* ============================================================
-   APP CONTAINER
-   ============================================================ */
-#app {
+/* Conteneur principal (valeurs pilotées via CSS OBS) */
+#timer-container {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  
-  /* Fondu géré par JS */
+
+  /* Fondu géré par JS via .show */
   opacity: 0;
   transition: opacity 0.8s ease-in-out;
 }
-
-#app.show {
+#timer-container.show {
   opacity: 1;
 }
 
-/* ============================================================
-   PANEL TIMER/CHRONO (RESPONSIVE AU CONTENU)
-   ============================================================ */
+/* Panel timer/chrono */
 .panel {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   
-  /* Couleur + opacité depuis CSS OBS */
   background: var(--panel-bg-color, #0A0F1E);
   opacity: var(--panel-opacity, 0.78);
-  
-  /* Forme */
   border-radius: var(--panel-radius, 22px);
   padding: var(--panel-pad-y, 18px) var(--panel-pad-x, 28px);
   
-  /* Effets visuels */
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
   
-  /* Responsive : s'adapte au contenu */
   min-width: fit-content;
-  
-  /* Transition smooth pour redimensionnement */
   transition: all 0.4s cubic-bezier(0.19, 1, 0.22, 1);
 }
 
-/* ============================================================
-   TEMPS (TIMER/CHRONO)
-   ============================================================ */
+/* Temps */
 .time {
   color: var(--time-color, #ffffff);
-  font-family: var(--time-font-family, "Montserrat"), system-ui, sans-serif;
+  font-family: var(--time-font-family, "Montserrat"), sans-serif;
   font-weight: 900;
   font-size: var(--time-font-size, 72px);
   letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
-  
-  /* Chiffres tabulaires (largeur fixe) */
   font-variant-numeric: tabular-nums;
-  
-  /* Anti-aliasing */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* Centièmes (plus petits pour chrono) */
 .time .centimes {
-  font-size: 0.67em; /* 67% de la taille principale */
+  font-size: 0.67em;
   opacity: 0.92;
   margin-left: 0.05em;
 }
 
-/* ============================================================
-   ANIMATION PULSE (FIN DE TIMER)
-   ============================================================ */
+/* Animation pulse (fin de timer) */
 @keyframes mdiPulse {
   0%   { transform: scale(1); }
   35%  { transform: scale(1.08); }
@@ -133,34 +97,4 @@ html, body {
 
 .panel.is-done {
   animation: mdiPulse 600ms ease-in-out 0ms 3;
-}
-
-/* ============================================================
-   STATES VISUELS
-   ============================================================ */
-
-/* État IDLE : caché */
-#app.state-idle {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* État RUNNING : visible */
-#app.state-running {
-  opacity: 1;
-}
-
-/* État PAUSED : visible avec indicateur visuel subtil */
-#app.state-paused {
-  opacity: 1;
-}
-
-#app.state-paused .panel {
-  /* Très subtil clignotement pour indiquer pause */
-  animation: pauseBlink 2s ease-in-out infinite;
-}
-
-@keyframes pauseBlink {
-  0%, 100% { opacity: var(--panel-opacity, 0.78); }
-  50% { opacity: calc(var(--panel-opacity, 0.78) * 0.85); }
 }
