@@ -1,14 +1,12 @@
 /**
  * ============================================================
- * MDI TIMER/CHRONO V2.0
+ * MDI TIMER/CHRONO V2.0 - CORRIGÉ
  * ============================================================
  * ✅ Auth stricte hardcodée (pas de --auth-mode)
+ * ✅ Activation/désactivation overlay
  * ✅ Mode TIMER : MM:SS (compte à rebours)
  * ✅ Mode CHRONO : MM:SS:CC (centièmes haute précision 10ms)
  * ✅ Pilotage télécommande + Stream Deck
- * ✅ Boutons +/- désactivés pendant run
- * ✅ Panel responsive au contenu
- * ✅ Fondu entrée/sortie
  * ============================================================ */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
@@ -42,22 +40,18 @@ function showDenied() {
 
 function showReady() {
   elSecurity.classList.add("hidden");
-  elApp.classList.remove("hidden");
-  elApp.classList.add("show");
   document.body.style.backgroundColor = "transparent";
 }
 
 /* ============================================================
    STATE
    ============================================================ */
-let MODE = "timer"; // "timer" | "chrono"
-let STATE = "idle"; // "idle" | "running" | "paused" | "done"
+let MODE = "timer";
+let STATE = "idle";
+let OVERLAY_ACTIVE = false;
 
-// Timer : remainingMs (millisecondes restantes)
-// Chrono : elapsedMs (millisecondes écoulées)
-let remainingMs = 60000; // 1 minute par défaut
+let remainingMs = 60000;
 let elapsedMs = 0;
-
 let lastTickTime = 0;
 let animationFrameId = null;
 
@@ -69,7 +63,6 @@ function pad2(n) {
 }
 
 function formatTimer(ms) {
-  // TIMER : MM:SS (toujours)
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const mm = Math.floor(totalSec / 60);
   const ss = totalSec % 60;
@@ -77,12 +70,11 @@ function formatTimer(ms) {
 }
 
 function formatChrono(ms) {
-  // CHRONO : MM:SS:CC (centièmes plus petits)
   const totalMs = Math.max(0, Math.floor(ms));
   const totalSec = Math.floor(totalMs / 1000);
   const mm = Math.floor(totalSec / 60);
   const ss = totalSec % 60;
-  const cc = Math.floor((totalMs % 1000) / 10); // Centièmes (0-99)
+  const cc = Math.floor((totalMs % 1000) / 10);
   
   return `${pad2(mm)}:${pad2(ss)}:<span class="centimes">${pad2(cc)}</span>`;
 }
@@ -96,12 +88,12 @@ function updateDisplay() {
 }
 
 /* ============================================================
-   ENGINE (HAUTE PRÉCISION 10ms)
+   ENGINE
    ============================================================ */
 function resetEngine() {
   STATE = "idle";
   elapsedMs = 0;
-  remainingMs = 60000; // Reset au temps par défaut (sera écrasé par serveur)
+  remainingMs = 60000;
   
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId);
@@ -167,9 +159,8 @@ function finishTimer() {
   
   updateDisplay();
   
-  // Animation pulse
   elPanel.classList.remove("is-done");
-  void elPanel.offsetWidth; // Force reflow
+  void elPanel.offsetWidth;
   elPanel.classList.add("is-done");
   
   console.log("🏁 [TIMER] Fini !");
@@ -182,7 +173,6 @@ function loop(timestamp) {
   lastTickTime = timestamp;
   
   if (MODE === "timer") {
-    // Timer : décrémenter
     remainingMs -= dt;
     
     if (remainingMs <= 0) {
@@ -190,11 +180,9 @@ function loop(timestamp) {
       return;
     }
   } else {
-    // Chrono : incrémenter
     elapsedMs += dt;
     
-    // Limite max : 99:59:99
-    const MAX_MS = (99 * 60 + 59) * 1000 + 990; // 99:59:99
+    const MAX_MS = (99 * 60 + 59) * 1000 + 990;
     if (elapsedMs > MAX_MS) {
       elapsedMs = MAX_MS;
     }
@@ -205,14 +193,13 @@ function loop(timestamp) {
 }
 
 /* ============================================================
-   SOCKET.IO CONTROL HANDLERS
+   CONTROL HANDLERS
    ============================================================ */
 function handleControl(payload) {
   const action = String(payload?.action || "").toLowerCase();
   
   console.log(`🎮 [TIMER] Control: ${action}`, payload);
   
-  // === MODE ===
   if (action === "set_mode") {
     const newMode = String(payload?.mode || "").toLowerCase();
     if (newMode === "chrono" || newMode === "timer") {
@@ -223,19 +210,17 @@ function handleControl(payload) {
     return;
   }
   
-  // === SET TIME (en secondes) ===
   if (action === "set_time") {
     const seconds = parseInt(payload?.seconds, 10);
     if (Number.isFinite(seconds) && seconds >= 0) {
-      const ms = clamp(seconds * 1000, 0, 99 * 60 * 1000 + 59 * 1000); // Max 99:59
+      const ms = clamp(seconds * 1000, 0, 99 * 60 * 1000 + 59 * 1000);
       
       if (MODE === "timer") {
         remainingMs = ms;
       } else {
-        elapsedMs = 0; // Chrono démarre toujours à 0
+        elapsedMs = 0;
       }
       
-      // Si en cours, on garde running, sinon idle
       if (STATE !== "running") {
         STATE = "idle";
       }
@@ -246,7 +231,6 @@ function handleControl(payload) {
     return;
   }
   
-  // === INCREMENT/DECREMENT (désactivé si running) ===
   if (action === "increment_time" || action === "decrement_time") {
     if (STATE === "running") {
       console.warn("⚠️ [TIMER] Modification interdite pendant run");
@@ -260,7 +244,6 @@ function handleControl(payload) {
       if (MODE === "timer") {
         remainingMs = clamp(remainingMs + deltaMs, 0, 99 * 60 * 1000 + 59 * 1000);
       }
-      // Chrono : pas d'incrément (démarre toujours à 0)
       
       updateDisplay();
       console.log(`➕➖ [TIMER] Ajusté: ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s`);
@@ -268,29 +251,56 @@ function handleControl(payload) {
     return;
   }
   
-  // === START ===
   if (action === "start") {
     startEngine();
     return;
   }
   
-  // === PAUSE ===
   if (action === "pause") {
     pauseEngine();
     return;
   }
   
-  // === TOGGLE PAUSE ===
   if (action === "toggle_pause") {
     togglePause();
     return;
   }
   
-  // === RESET ===
   if (action === "reset") {
     resetEngine();
     return;
   }
+}
+
+/* ============================================================
+   AFFICHAGE/MASQUAGE OVERLAY
+   ============================================================ */
+function showOverlay() {
+  OVERLAY_ACTIVE = true;
+  
+  // Retire .hidden puis ajoute .show au prochain frame
+  elApp.classList.remove("hidden");
+  requestAnimationFrame(() => {
+    elApp.classList.add("show");
+  });
+  
+  updateDisplay();
+  console.log("✅ [TIMER] Overlay affiché");
+}
+
+function hideOverlay() {
+  OVERLAY_ACTIVE = false;
+  
+  // Retire .show (fondu sortie)
+  elApp.classList.remove("show");
+  
+  // Après le fondu, masque complètement
+  setTimeout(() => {
+    elApp.classList.add("hidden");
+    resetEngine();
+  }, 800);
+  
+  console.log("🔴 [TIMER] Overlay masqué");
 }
 
 /* ============================================================
@@ -299,10 +309,8 @@ function handleControl(payload) {
 let socket = null;
 
 async function init() {
-  // Attendre injection CSS OBS
   await new Promise(resolve => setTimeout(resolve, 800));
   
-  // Auth stricte TOUJOURS (hardcodée)
   const room = cssVar("--room-id", "").trim();
   const key = cssVar("--room-key", "").trim();
   
@@ -314,10 +322,8 @@ async function init() {
     return;
   }
   
-  // Reset initial
   resetEngine();
   
-  // Connexion Socket.io
   socket = io(SERVER_URL, {
     transports: ["websocket", "polling"],
     reconnection: true,
@@ -339,20 +345,14 @@ async function init() {
     
     console.log("📡 [TIMER] État reçu:", payload.state, payload.data);
     
-    // Si idle, masquer
     if (payload.state === "idle") {
-      elApp.classList.remove("show");
-      setTimeout(() => {
-        resetEngine();
-      }, 800);
+      hideOverlay();
       return;
     }
     
-    // Si active, afficher
     if (payload.state === "active") {
       showReady();
       
-      // Appliquer config serveur si présente
       if (payload.data) {
         if (payload.data.mode) {
           MODE = payload.data.mode;
@@ -367,12 +367,11 @@ async function init() {
         }
       }
       
-      resetEngine();
+      showOverlay();
       updateDisplay();
     }
   });
   
-  // Event control dédié timer
   socket.on("control:timer_chrono", (payload) => {
     handleControl(payload || {});
   });
