@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MDI Nuage - V6.4 (État Unifié + Anti-Collision)</title>
+  <title>MDI Nuage - V6.6 (Anti-Collision FIX)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
@@ -19,7 +19,6 @@
 
     .hidden { display: none !important; }
 
-    /* Écran sécurité */
     .mdi-security {
       width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
@@ -42,7 +41,6 @@
       color: #ff3b30;
     }
 
-    /* Conteneur nuage */
     #cloud-container {
       position: absolute;
       right: var(--cloud-right, 50px);
@@ -72,24 +70,22 @@
       transition: left 0.6s cubic-bezier(0.19, 1, 0.22, 1),
                   top 0.6s cubic-bezier(0.19, 1, 0.22, 1),
                   font-size 0.6s cubic-bezier(0.19, 1, 0.22, 1),
-                  transform 0.6s cubic-bezier(0.19, 1, 0.22, 1),
                   opacity 0.45s ease;
-      transform: translate(-50%, -50%);
       -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.85);
       paint-order: stroke fill;
       filter: drop-shadow(3px 3px 0px rgba(0, 0, 0, 0.2));
-      will-change: left, top, font-size, transform, opacity;
+      will-change: left, top, font-size, opacity;
       user-select: none;
       z-index: 10;
     }
 
     .mot.is-new {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.92);
+      transform: scale(0.92);
     }
     .mot.is-new.mdi-in {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: scale(1);
     }
   </style>
 </head>
@@ -108,19 +104,17 @@
   <script>
     /**
      * ============================================================
-     * MDI NUAGE DE MOTS - V6.4 (ÉTAT UNIFIÉ + ANTI-COLLISION)
+     * MDI NUAGE DE MOTS - V6.6 (FIX ANTI-COLLISION)
      * ============================================================
-     * ✅ Anti-collision : détection chevauchements + réorganisation
-     * ✅ Anti-troncage : vigilance débordements
-     * ✅ Option majuscules CSS
-     * ✅ Taille de base conservée (70px)
+     * ✅ FIX : Anti-collision qui fonctionne vraiment
+     * ✅ FIX : Positions des mots sans transform CSS
+     * ✅ Option majuscules
      * ============================================================
      */
 
     const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
     const OVERLAY_TYPE = "nuage_de_mots";
 
-    // --- UTILITAIRES CSS ---
     function cssVar(name, fallback = "") {
       const v = getComputedStyle(document.documentElement).getPropertyValue(name);
       return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
@@ -131,19 +125,16 @@
       return v === "on" || v === "true" || v === "1";
     }
 
-    // --- ÉLÉMENTS DOM ---
     const zone = document.getElementById("word-zone");
     const container = document.getElementById("cloud-container");
     const securityScreen = document.getElementById("security-screen");
     const measureZone = document.getElementById("measure-zone");
 
-    // --- ÉTAT ---
     let STATE = "idle";
     let dbMots = {};
     let globalColorIndex = 0;
-    let wordPositions = []; // [{x, y, width, height, element}]
+    let wordPositions = [];
 
-    // --- PALETTE ---
     function getPalette() {
       return [
         cssVar("--color-1", "#F054A2"),
@@ -154,7 +145,6 @@
       ];
     }
 
-    // --- RESET ---
     function resetEcran() {
       zone.innerHTML = "";
       dbMots = {};
@@ -163,7 +153,6 @@
       console.log("🔄 [NUAGE] Reset complet");
     }
 
-    // --- MESURE TEXTE ---
     function measureText(text, fontSize) {
       measureZone.style.fontSize = fontSize + "px";
       measureZone.textContent = text;
@@ -173,9 +162,8 @@
       };
     }
 
-    // --- DÉTECTION COLLISION ---
     function hasCollision(x, y, width, height) {
-      const margin = 10; // Marge de sécurité
+      const margin = 15;
       
       for (const pos of wordPositions) {
         const overlapX = !(x + width + margin < pos.x || x > pos.x + pos.width + margin);
@@ -188,52 +176,44 @@
       return false;
     }
 
-    // --- TROUVER POSITION LIBRE ---
     function findFreePosition(width, height) {
       const W = container.clientWidth;
       const H = container.clientHeight;
       const cx = W / 2;
       const cy = H / 2;
 
-      // Tentatives en spirale
-      const maxAttempts = 500;
-      let angle = 0;
-      let radius = 0;
-      const radiusStep = 15;
-      const angleStep = 0.5;
+      const maxAttempts = 800;
+      let angle = Math.random() * Math.PI * 2;
+      let radius = 20;
+      const radiusStep = 10;
+      const angleStep = 0.3;
 
       for (let i = 0; i < maxAttempts; i++) {
-        const x = cx + Math.cos(angle) * radius;
-        const y = cy + Math.sin(angle) * radius;
+        const x = cx + Math.cos(angle) * radius - width/2;
+        const y = cy + Math.sin(angle) * radius - height/2;
 
-        // Vérifier si dans les limites
         if (x >= 0 && x + width <= W && y >= 0 && y + height <= H) {
-          // Vérifier collision
           if (!hasCollision(x, y, width, height)) {
             return { x, y };
           }
         }
 
-        // Spirale
         angle += angleStep;
-        radius += radiusStep * (angle / (Math.PI * 2));
+        radius += radiusStep * (angleStep / (Math.PI * 2));
       }
 
-      // Fallback : position aléatoire
       return {
-        x: Math.random() * (W - width),
-        y: Math.random() * (H - height)
+        x: Math.max(0, Math.min(W - width, cx - width/2 + (Math.random() - 0.5) * 100)),
+        y: Math.max(0, Math.min(H - height, cy - height/2 + (Math.random() - 0.5) * 100))
       };
     }
 
-    // --- RENDU ---
     function render() {
       const W = container.clientWidth;
       const H = container.clientHeight;
       const words = Object.values(dbMots);
       const uppercase = cssOnOff("--uppercase", false);
 
-      // Tri par count décroissant
       words.sort((a, b) => b.count - a.count);
 
       wordPositions = [];
@@ -242,16 +222,13 @@
         const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
         let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
         
-        // Taille dynamique
         const baseSize = 70;
         const sizeDecrease = i * 2;
         const countBonus = (mot.count - 1) * 5;
         const fontSize = Math.max(20, baseSize - sizeDecrease + countBonus);
 
-        // Mesurer
         const { width, height } = measureText(displayText, fontSize);
 
-        // Nouvelle création
         if (!el) {
           el = document.createElement("div");
           el.id = `mot-${mot.text.replace(/\s+/g, '-')}`;
@@ -260,24 +237,20 @@
           el.style.fontSize = `${fontSize}px`;
           zone.appendChild(el);
 
-          // Trigger animation
           requestAnimationFrame(() => {
             el.classList.add("mdi-in");
           });
         } else {
-          // Mise à jour
           el.style.fontSize = `${fontSize}px`;
         }
 
         el.textContent = displayText;
 
-        // Trouver position libre
         const pos = findFreePosition(width, height);
         
-        el.style.left = `${pos.x + width/2}px`;
-        el.style.top = `${pos.y + height/2}px`;
+        el.style.left = `${pos.x}px`;
+        el.style.top = `${pos.y}px`;
 
-        // Enregistrer position
         wordPositions.push({
           x: pos.x,
           y: pos.y,
@@ -288,7 +261,6 @@
       });
     }
 
-    // --- SOCKET ---
     const socket = io(SERVER_URL, { 
       transports: ["websocket", "polling"],
       reconnection: true
@@ -298,11 +270,6 @@
       console.log("✅ [NUAGE] Connecté");
     });
 
-    socket.on("connect_error", (err) => {
-      console.warn("⚠️ [NUAGE] Erreur:", err.message);
-    });
-
-    // État overlay
     socket.on("overlay:state", (payload) => {
       if (payload.overlay !== OVERLAY_TYPE) return;
 
@@ -320,7 +287,6 @@
         securityScreen.classList.add("hidden");
         container.classList.remove("hidden");
 
-        // Synchro serveur
         if (payload.data && payload.data.words) {
           const serverWords = payload.data.words;
           const palette = getPalette();
@@ -346,7 +312,6 @@
       container.classList.add("hidden");
     });
 
-    // Init
     async function init() {
       await new Promise(resolve => setTimeout(resolve, 800));
 
