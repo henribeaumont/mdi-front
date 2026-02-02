@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MDI Timer/Chrono V2</title>
 
-  <!-- Police Montserrat (fallback system) -->
+  <!-- Police -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&display=swap" rel="stylesheet">
 
   <!-- Socket.io -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
   <!-- CSS externe (versionné pour forcer OBS à recharger) -->
-  <link rel="stylesheet" href="./style.css?v=2.0.0">
+  <link rel="stylesheet" href="./style.css?v=2.0.2">
 </head>
 
 <body>
@@ -24,14 +24,14 @@
     <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
   </div>
 
-  <!-- App principale -->
-  <div id="app" class="hidden">
+  <!-- Conteneur timer -->
+  <div id="timer-container" class="hidden">
     <div id="panel" class="panel">
       <span id="time" class="time">00:00</span>
     </div>
   </div>
 
   <!-- JS externe (versionné pour forcer OBS à recharger) -->
-  <script src="./script.js?v=2.0.0"></script>
+  <script src="./script.js?v=2.0.2"></script>
 </body>
 </html>
