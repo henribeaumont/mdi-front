@@ -1,63 +1,38 @@
 /**
  * ============================================================
- * MDI TIMER/CHRONO V2.0 - CORRIGÉ
+ * MDI TIMER/CHRONO V2.0
  * ============================================================
- * ✅ Auth stricte hardcodée (pas de --auth-mode)
- * ✅ Activation/désactivation overlay
- * ✅ Mode TIMER : MM:SS (compte à rebours)
- * ✅ Mode CHRONO : MM:SS:CC (centièmes haute précision 10ms)
- * ✅ Pilotage télécommande + Stream Deck
+ * Pattern EXACT du nuage de mots V6.7
  * ============================================================ */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "timer_chrono";
 
-/* ============================================================
-   HELPERS CSS OBS
-   ============================================================ */
+/* -------- Helpers CSS Vars (OBS) -------- */
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
 }
 
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
 }
 
-/* ============================================================
-   DOM ELEMENTS
-   ============================================================ */
+/* -------- DOM -------- */
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
 const elPanel = document.getElementById("panel");
 const elTime = document.getElementById("time");
 
-function showDenied() {
-  elApp.classList.add("hidden");
-  elSecurity.classList.remove("hidden");
-  document.body.style.backgroundColor = "black";
-}
-
-function showReady() {
-  elSecurity.classList.add("hidden");
-  document.body.style.backgroundColor = "transparent";
-}
-
-/* ============================================================
-   STATE
-   ============================================================ */
-let MODE = "timer";
+/* -------- State -------- */
 let STATE = "idle";
-let OVERLAY_ACTIVE = false;
-
+let MODE = "timer";
 let remainingMs = 60000;
 let elapsedMs = 0;
 let lastTickTime = 0;
 let animationFrameId = null;
 
-/* ============================================================
-   FORMATTING
-   ============================================================ */
+/* -------- Formatting -------- */
 function pad2(n) {
   return String(n).padStart(2, "0");
 }
@@ -87,9 +62,7 @@ function updateDisplay() {
   }
 }
 
-/* ============================================================
-   ENGINE
-   ============================================================ */
+/* -------- Engine -------- */
 function resetEngine() {
   STATE = "idle";
   elapsedMs = 0;
@@ -110,10 +83,7 @@ function resetEngine() {
 
 function startEngine() {
   if (STATE === "running") return;
-  if (STATE === "done" && MODE === "timer") {
-    console.warn("⚠️ [TIMER] Timer fini, reset d'abord");
-    return;
-  }
+  if (STATE === "done" && MODE === "timer") return;
   
   STATE = "running";
   elApp.classList.remove("state-idle", "state-paused");
@@ -192,9 +162,7 @@ function loop(timestamp) {
   animationFrameId = requestAnimationFrame(loop);
 }
 
-/* ============================================================
-   CONTROL HANDLERS
-   ============================================================ */
+/* -------- Control Handlers -------- */
 function handleControl(payload) {
   const action = String(payload?.action || "").toLowerCase();
   
@@ -272,109 +240,89 @@ function handleControl(payload) {
   }
 }
 
-/* ============================================================
-   AFFICHAGE/MASQUAGE OVERLAY
-   ============================================================ */
-function showOverlay() {
-  OVERLAY_ACTIVE = true;
-  
-  // Retire .hidden puis ajoute .show au prochain frame
-  elApp.classList.remove("hidden");
-  requestAnimationFrame(() => {
-    elApp.classList.add("show");
-  });
-  
-  updateDisplay();
-  console.log("✅ [TIMER] Overlay affiché");
-}
+/* -------- Socket.io -------- */
+const socket = io(SERVER_URL, {
+  transports: ["websocket", "polling"],
+  reconnection: true,
+  reconnectionAttempts: 20
+});
 
-function hideOverlay() {
-  OVERLAY_ACTIVE = false;
-  
-  // Retire .show (fondu sortie)
-  elApp.classList.remove("show");
-  
-  // Après le fondu, masque complètement
-  setTimeout(() => {
-    elApp.classList.add("hidden");
-    resetEngine();
-  }, 800);
-  
-  console.log("🔴 [TIMER] Overlay masqué");
-}
+socket.on("overlay:state", (payload) => {
+  if (payload?.overlay !== OVERLAY_TYPE) return;
 
-/* ============================================================
-   SOCKET.IO CONNECTION
-   ============================================================ */
-let socket = null;
+  console.log(`📡 [TIMER] État:`, payload.state, payload.data);
+  STATE = payload.state;
 
-async function init() {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  const room = cssVar("--room-id", "").trim();
-  const key = cssVar("--room-key", "").trim();
-  
-  console.log(`🔐 [TIMER] Auth: Room=${room}`);
-  
-  if (!room || !key) {
-    console.error("❌ [TIMER] Room ou Key manquante");
-    showDenied();
+  if (STATE === "idle") {
+    elApp.classList.remove("show");
+    setTimeout(() => {
+      elApp.classList.add("hidden");
+      resetEngine();
+    }, 800);
     return;
   }
-  
-  resetEngine();
-  
-  socket = io(SERVER_URL, {
-    transports: ["websocket", "polling"],
-    reconnection: true,
-    reconnectionAttempts: 20
-  });
-  
-  socket.on("connect", () => {
-    console.log("✅ [TIMER] Connecté au serveur");
-    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
-  });
-  
-  socket.on("overlay:forbidden", (payload) => {
-    console.error("❌ [TIMER] Accès refusé:", payload?.reason);
-    showDenied();
-  });
-  
-  socket.on("overlay:state", (payload) => {
-    if (payload?.overlay !== OVERLAY_TYPE) return;
-    
-    console.log("📡 [TIMER] État reçu:", payload.state, payload.data);
-    
-    if (payload.state === "idle") {
-      hideOverlay();
-      return;
-    }
-    
-    if (payload.state === "active") {
-      showReady();
-      
-      if (payload.data) {
-        if (payload.data.mode) {
-          MODE = payload.data.mode;
-        }
-        if (payload.data.seconds != null) {
-          const ms = payload.data.seconds * 1000;
-          if (MODE === "timer") {
-            remainingMs = ms;
-          } else {
-            elapsedMs = 0;
-          }
+
+  if (STATE === "active") {
+    elSecurity.classList.add("hidden");
+    elApp.classList.remove("hidden");
+    requestAnimationFrame(() => elApp.classList.add("show"));
+
+    if (payload.data) {
+      if (payload.data.mode) {
+        MODE = payload.data.mode;
+      }
+      if (payload.data.seconds != null) {
+        const ms = payload.data.seconds * 1000;
+        if (MODE === "timer") {
+          remainingMs = ms;
+        } else {
+          elapsedMs = 0;
         }
       }
-      
-      showOverlay();
-      updateDisplay();
     }
-  });
-  
-  socket.on("control:timer_chrono", (payload) => {
-    handleControl(payload || {});
-  });
+
+    updateDisplay();
+  }
+});
+
+socket.on("control:timer_chrono", (payload) => {
+  handleControl(payload || {});
+});
+
+socket.on("overlay:forbidden", (payload) => {
+  console.error("❌ [TIMER] Accès refusé:", payload?.reason);
+  elSecurity.classList.remove("hidden");
+  elApp.classList.add("hidden");
+});
+
+/* -------- Auth (OBS CSS vars) -------- */
+async function init() {
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  const authMode = cssVar("--auth-mode", "strict");
+  const room = cssVar("--room-id", "").trim();
+  const key = cssVar("--room-key", "").trim();
+
+  console.log(`🔐 [TIMER] Auth: ${authMode}, Room: ${room}`);
+
+  if (!room) {
+    console.error("❌ [TIMER] Aucun room-id");
+    elSecurity.classList.remove("hidden");
+    return;
+  }
+
+  if (authMode === "strict") {
+    if (!key) {
+      console.error("❌ [TIMER] Mode strict sans key");
+      elSecurity.classList.remove("hidden");
+      return;
+    }
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  } else {
+    socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
+  }
+
+  console.log("✅ [TIMER] Auth envoyée");
 }
 
-init();
+socket.on("connect", init);
