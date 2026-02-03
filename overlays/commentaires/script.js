@@ -1,148 +1,165 @@
-/* globals io */
-(() => {
-  const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-  const OVERLAY = "commentaires"; // IMPORTANT: doit rester EXACTEMENT "commentaires"
+/**
+ * ============================================================
+ * MDI COMMENTAIRES V1.0
+ * ============================================================
+ * Pattern EXACT du nuage_de_mots.js V6.7
+ * ============================================================ */
 
-  const $ = (id) => document.getElementById(id);
+const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+const OVERLAY_TYPE = "commentaires";
 
-  const elText = $("text");
-  const elMeta = $("meta");
+/* -------- Helpers CSS Vars (OBS) -------- */
+function cssVar(name, fallback = "") {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
+}
 
-  const dbgRoom = $("dbgRoom");
-  const dbgSock = $("dbgSock");
-  const dbgJoin = $("dbgJoin");
-  const dbgLast = $("dbgLast");
+function cssOnOff(name, fallbackOn = true) {
+  const v = (cssVar(name, "") || "").toLowerCase();
+  if (!v) return fallbackOn;
+  return v === "on" || v === "true" || v === "1";
+}
 
-  let socket = null;
+/* -------- DOM -------- */
+const container = document.getElementById("comment-container");
+const securityScreen = document.getElementById("security-screen");
+const panel = document.getElementById("comment-panel");
+const authorEl = document.getElementById("comment-author");
+const textEl = document.getElementById("comment-text");
 
-  function setBodyState(state){
-    // state: "idle" | "show"
-    document.body.classList.remove("is-idle","is-show");
-    document.body.classList.add(state === "show" ? "is-show" : "is-idle");
+/* -------- State -------- */
+let STATE = "idle";
+let currentComment = null;
+
+/* -------- Affichage -------- */
+function showComment(comment) {
+  if (!comment) return;
+  
+  currentComment = comment;
+  
+  // Gérer affichage auteur
+  const showAuthor = cssOnOff("--show-author", true);
+  if (showAuthor && comment.author) {
+    authorEl.textContent = comment.author;
+    authorEl.classList.remove("hidden-author");
+  } else {
+    authorEl.classList.add("hidden-author");
+  }
+  
+  // Afficher message
+  textEl.textContent = comment.text;
+  
+  // Gérer border
+  const borderEnabled = cssOnOff("--panel-border-enabled", true);
+  if (borderEnabled) {
+    panel.classList.remove("no-border");
+  } else {
+    panel.classList.add("no-border");
+  }
+  
+  // Animation
+  panel.classList.remove("animate-in");
+  void panel.offsetWidth; // Force reflow
+  panel.classList.add("animate-in");
+  
+  console.log("💬 [COMMENTAIRES] Affichage:", comment);
+}
+
+function hideComment() {
+  currentComment = null;
+  
+  container.classList.remove("show");
+  setTimeout(() => {
+    container.classList.add("hidden");
+    authorEl.textContent = "";
+    textEl.textContent = "";
+  }, 600);
+  
+  console.log("🔴 [COMMENTAIRES] Masqué");
+}
+
+/* -------- Socket.io -------- */
+const socket = io(SERVER_URL, {
+  transports: ["websocket", "polling"],
+  reconnection: true
+});
+
+socket.on("connect", () => {
+  console.log("✅ [COMMENTAIRES] Connecté");
+});
+
+socket.on("overlay:state", (payload) => {
+  if (payload.overlay !== OVERLAY_TYPE) return;
+
+  console.log(`📡 [COMMENTAIRES] État:`, payload.state, payload.data);
+  STATE = payload.state;
+
+  if (STATE === "idle") {
+    container.classList.remove("show");
+    setTimeout(() => {
+      container.classList.add("hidden");
+      authorEl.textContent = "";
+      textEl.textContent = "";
+      currentComment = null;
+    }, 600);
+    return;
   }
 
-  function setDebug({ room, sock, join, last }){
-    if(room != null) dbgRoom.textContent = room || "—";
-    if(sock != null) dbgSock.textContent = sock || "—";
-    if(join != null) dbgJoin.textContent = join || "—";
-    if(last != null) dbgLast.textContent = last || "—";
+  if (STATE === "active") {
+    securityScreen.classList.add("hidden");
+    
+    // Vérifier si un commentaire doit être affiché
+    if (payload.data && payload.data.current) {
+      const comment = payload.data.current;
+      
+      container.classList.remove("hidden");
+      requestAnimationFrame(() => {
+        container.classList.add("show");
+        showComment(comment);
+      });
+    } else {
+      // Pas de commentaire à afficher, masquer
+      if (!container.classList.contains("hidden")) {
+        hideComment();
+      }
+    }
+  }
+});
+
+socket.on("overlay:forbidden", (payload) => {
+  console.error("❌ [COMMENTAIRES] Accès refusé:", payload.reason);
+  securityScreen.classList.remove("hidden");
+  container.classList.add("hidden");
+});
+
+/* -------- Auth (OBS CSS vars) -------- */
+async function init() {
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  const authMode = cssVar("--auth-mode", "strict");
+  const room = cssVar("--room-id", "").trim();
+  const key = cssVar("--room-key", "").trim();
+
+  console.log(`🔐 [COMMENTAIRES] Auth: ${authMode}, Room: ${room}`);
+
+  if (!room) {
+    console.error("❌ [COMMENTAIRES] Aucun room-id");
+    securityScreen.classList.remove("hidden");
+    return;
   }
 
-  function clean(t){
-    return String(t ?? "")
-      .replace(/\u00A0/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function parseAuth(){
-    // Priorité à l'URL (?room=...&key=...)
-    const u = new URL(location.href);
-    const room = clean(u.searchParams.get("room"));
-    const key  = clean(u.searchParams.get("key"));
-    return { room, key };
-  }
-
-  function showText({ text, user }){
-    const t = clean(text);
-    if(!t){
-      hideText();
+  if (authMode === "strict") {
+    if (!key) {
+      console.error("❌ [COMMENTAIRES] Mode strict sans key");
+      securityScreen.classList.remove("hidden");
       return;
     }
-    elText.textContent = t;
-    elMeta.textContent = user ? `— ${clean(user)}` : "";
-    setBodyState("show");
+    socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  } else {
+    socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
   }
 
-  function hideText(){
-    setBodyState("idle");
-  }
+  console.log("✅ [COMMENTAIRES] Auth envoyée");
+}
 
-  // Supporte plusieurs formats d'events serveur (robuste)
-  function handleStatePayload(payload){
-    // payload attendu (souple) :
-    // { state:"show"/"hide", data:{text, user} }
-    // OU { state:"show", text:"...", user:"..." }
-    // OU { action:"show"/"hide", text:"..." } etc.
-
-    const p = payload || {};
-    const state = clean(p.state || p.action).toLowerCase();
-
-    if(state === "hide" || state === "idle" || state === "off"){
-      setDebug({ last: "state=hide" });
-      hideText();
-      return;
-    }
-
-    if(state === "show" || state === "on"){
-      const d = p.data || p.payload || {};
-      const text = p.text ?? d.text;
-      const user = p.user ?? d.user;
-      setDebug({ last: "state=show" });
-      showText({ text, user });
-      return;
-    }
-
-    // parfois le serveur envoie directement {text:"..."}
-    const directText = p.text ?? (p.data && p.data.text);
-    if(clean(directText)){
-      setDebug({ last: "direct text" });
-      showText({ text: directText, user: p.user ?? (p.data && p.data.user) });
-    }
-  }
-
-  function connect(){
-    const { room, key } = parseAuth();
-
-    document.body.classList.add("is-ready");
-    setDebug({ room, sock: "connecting...", join: "—", last: "—" });
-
-    if(!room || !key){
-      setDebug({ sock: "missing room/key", join: "NO" });
-      // en overlay OBS tu auras l'URL avec ?room=...&key=...
-      return;
-    }
-
-    socket = io(SERVER_URL, { transports: ["websocket","polling"] });
-
-    socket.on("connect", () => {
-      setDebug({ sock: "connected", join: "sent" });
-      socket.emit("overlay:join", { room, key, overlay: OVERLAY });
-    });
-
-    socket.on("overlay:forbidden", () => {
-      setDebug({ sock: "FORBIDDEN", join: "refused" });
-      hideText();
-    });
-
-    socket.on("disconnect", () => {
-      setDebug({ sock: "disconnected" });
-      hideText();
-    });
-
-    // --- ÉVÉNEMENTS POSSIBLES CÔTÉ SERVEUR ---
-    // 1) Si le serveur broadcast raw_vote dans la room (pour debug)
-    socket.on("raw_vote", (data) => {
-      const t = clean(data?.vote ?? data?.text);
-      if(t) setDebug({ last: `raw_vote: ${t.slice(0, 40)}${t.length>40?"…":""}` });
-    });
-
-    // 2) Si le serveur broadcast un "set_state" générique
-    socket.on("control:set_state", handleStatePayload);
-
-    // 3) variantes fréquentes
-    socket.on("overlay:set_state", handleStatePayload);
-    socket.on("overlay:state", handleStatePayload);
-    socket.on("commentaires:set_state", handleStatePayload);
-    socket.on("commentaires:state", handleStatePayload);
-
-    // 4) ancien event spécifique
-    socket.on("control:commentaires", handleStatePayload);
-  }
-
-  // état initial
-  setBodyState("idle");
-  document.body.classList.add("is-ready");
-
-  connect();
-})();
+socket.on("connect", init);
