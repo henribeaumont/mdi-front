@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MDI Match Équipes</title>
+
+  <!-- Police -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <!-- Socket.io -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- CSS externe (versionné pour forcer OBS à recharger) -->
+  <link rel="stylesheet" href="./style.css?v=1.0.0">
+</head>
+
+<body>
+  <!-- Écran sécurité -->
+  <div id="security-screen" class="mdi-security hidden">
+    <div class="mdi-x">✖</div>
+    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  </div>
+
+  <!-- Conteneur match -->
+  <div id="match-container" class="hidden">
+    <div id="match-panel" class="match-panel">
+      <div class="team team-a">
+        <div class="team-indicator"></div>
+        <div class="team-name" id="teamAName">ÉQUIPE A</div>
+        <div class="team-score" id="teamAScore">0</div>
+      </div>
+      
+      <div class="separator">-</div>
+      
+      <div class="team team-b">
+        <div class="team-score" id="teamBScore">0</div>
+        <div class="team-name" id="teamBName">ÉQUIPE B</div>
+        <div class="team-indicator"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS externe (versionné pour forcer OBS à recharger) -->
+  <script src="./script.js?v=1.0.0"></script>
+</body>
+</html>

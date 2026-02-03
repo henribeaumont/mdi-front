@@ -1,0 +1,189 @@
+html, body {
+  background-color: transparent;
+  margin: 0; padding: 0; overflow: hidden;
+  height: 100vh; width: 100vw;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.hidden { display: none !important; }
+
+/* Écran sécurité standard MDI (fond transparent) */
+.mdi-security {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  background: rgba(0,0,0,0);
+  color: #ff3b30;
+  z-index: 1000;
+  position: absolute;
+  text-shadow: 0 3px 18px rgba(0,0,0,0.9);
+}
+.mdi-security .mdi-x {
+  font-size: 84px;
+  font-weight: 900;
+  color: #ff3b30;
+}
+.mdi-security .mdi-msg {
+  font-size: 34px;
+  font-weight: 900;
+  text-align: center;
+  color: #ff3b30;
+}
+
+/* Conteneur principal - BAS CENTRÉ */
+#match-container {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  max-width: 90vw;
+  
+  /* Fondu géré par JS via .show */
+  opacity: 0;
+  transition: opacity 0.6s ease-in-out;
+}
+
+#match-container.show {
+  opacity: 1;
+}
+
+/* Panel scoreboard */
+.match-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  
+  /* Fond avec dégradé */
+  background: linear-gradient(
+    var(--panel-bg-angle, 135deg),
+    var(--panel-bg-gradient-start, #1a1a2e),
+    var(--panel-bg-gradient-end, #16213e)
+  );
+  
+  /* Opacité globale */
+  opacity: var(--panel-bg-opacity, 0.90);
+  
+  /* Contour */
+  border-style: solid;
+  border-width: var(--panel-border-width, 2px);
+  border-color: var(--panel-border-color, #ffffff);
+  border-radius: var(--panel-border-radius, 16px);
+  
+  /* Dimensions */
+  padding: 24px 40px;
+  
+  /* Effets */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  
+  /* Animation */
+  transition: all 0.3s ease-in-out;
+}
+
+/* Si border désactivé via CSS OBS */
+.match-panel.no-border {
+  border: none;
+}
+
+/* Équipe */
+.team {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.team-a {
+  flex-direction: row;
+}
+
+.team-b {
+  flex-direction: row-reverse;
+}
+
+/* Indicateur couleur équipe (petit cercle) */
+.team-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-a .team-indicator {
+  background: var(--team-a-color, #3b82f6);
+  box-shadow: 0 0 12px var(--team-a-color, #3b82f6);
+}
+
+.team-b .team-indicator {
+  background: var(--team-b-color, #ef4444);
+  box-shadow: 0 0 12px var(--team-b-color, #ef4444);
+}
+
+/* Nom équipe */
+.team-name {
+  font-family: var(--name-font-family, "Montserrat"), sans-serif;
+  font-size: var(--name-font-size, 24px);
+  font-weight: var(--name-font-weight, 700);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.team-a .team-name {
+  color: var(--team-a-color, #3b82f6);
+}
+
+.team-b .team-name {
+  color: var(--team-b-color, #ef4444);
+}
+
+/* Score */
+.team-score {
+  font-family: var(--score-font-family, "Montserrat"), sans-serif;
+  font-size: var(--score-font-size, 48px);
+  font-weight: var(--score-font-weight, 900);
+  color: var(--score-color, #ffffff);
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: center;
+  line-height: 1;
+}
+
+/* Séparateur */
+.separator {
+  font-family: var(--score-font-family, "Montserrat"), sans-serif;
+  font-size: var(--score-font-size, 48px);
+  font-weight: var(--score-font-weight, 900);
+  color: var(--score-color, #ffffff);
+  opacity: 0.5;
+  line-height: 1;
+}
+
+/* Animation changement score */
+@keyframes scoreChange {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.team-score.animate {
+  animation: scoreChange 0.4s ease-out;
+}
+
+/* Animation apparition */
+@keyframes slideUp {
+  from {
+    transform: translateX(-50%) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+#match-container.animate-in {
+  animation: slideUp 0.5s ease-out;
+}
