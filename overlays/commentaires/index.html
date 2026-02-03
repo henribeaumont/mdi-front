@@ -1,225 +1,38 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MDI • Overlay Commentaires</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MDI Commentaires</title>
 
+  <!-- Police -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <!-- Socket.io -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
-  <style>
-    :root{
-      --bg: transparent;
-      --text: rgba(255,255,255,0.96);
-      --muted: rgba(255,255,255,0.70);
-      --panel: rgba(10,15,30,0.72);
-      --border: rgba(255,255,255,0.16);
-      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    *{ box-sizing: border-box; }
-    html, body{
-      width:100%;
-      height:100%;
-      margin:0;
-      background: var(--bg);
-      overflow:hidden;
-      font-family: var(--font);
-    }
-
-    /* Anti-flicker */
-    body{ opacity: 0; }
-    body.is-ready{ opacity: 1; }
-
-    .stage{
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: end center;
-      padding: 64px;
-      pointer-events: none;
-    }
-
-    .bubble{
-      max-width: 1200px;
-      width: fit-content;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 18px 22px;
-      box-shadow: 0 18px 50px rgba(0,0,0,0.45);
-
-      transform: translateY(14px);
-      opacity: 0;
-      transition: opacity .18s ease, transform .18s ease;
-    }
-
-    .text{
-      font-size: 46px;
-      line-height: 1.1;
-      font-weight: 900;
-      color: var(--text);
-      word-break: break-word;
-      white-space: pre-wrap;
-    }
-
-    .meta{
-      margin-top: 10px;
-      font-size: 16px;
-      color: var(--muted);
-    }
-
-    body.is-show .bubble{ opacity: 1; transform: translateY(0); }
-    body.is-idle .bubble{ opacity: 0; transform: translateY(14px); }
-
-    /* Debug */
-    .debug{
-      position: fixed;
-      left: 14px;
-      top: 14px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(255,255,255,0.14);
-      color: rgba(255,255,255,0.80);
-      font-size: 12px;
-      line-height: 1.35;
-      pointer-events: none;
-      max-width: 60vw;
-    }
-    .debug b{ color: rgba(255,255,255,0.92); }
-  </style>
+  <!-- CSS externe (versionné pour forcer OBS à recharger) -->
+  <link rel="stylesheet" href="./style.css?v=1.0.0">
 </head>
 
-<body class="is-ready is-idle">
-  <div class="stage">
-    <div class="bubble">
-      <div id="text" class="text">—</div>
-      <div id="meta" class="meta"></div>
+<body>
+  <!-- Écran sécurité -->
+  <div id="security-screen" class="mdi-security hidden">
+    <div class="mdi-x">✖</div>
+    <div class="mdi-msg">ACCÈS REFUSÉ / ACCESS DENIED</div>
+  </div>
+
+  <!-- Conteneur commentaires -->
+  <div id="comment-container" class="hidden">
+    <div id="comment-panel" class="comment-panel">
+      <div id="comment-author" class="comment-author"></div>
+      <div id="comment-text" class="comment-text"></div>
     </div>
   </div>
 
-  <div class="debug">
-    <div><b>overlay</b>: commentaires</div>
-    <div><b>room</b>: <span id="dbgRoom">—</span></div>
-    <div><b>key</b>: <span id="dbgKey">—</span></div>
-    <div><b>socket</b>: <span id="dbgSock">—</span></div>
-    <div><b>join</b>: <span id="dbgJoin">—</span></div>
-    <div><b>last</b>: <span id="dbgLast">—</span></div>
-    <div><b>js</b>: <span id="dbgJs">loaded</span></div>
-  </div>
-
-  <script>
-    const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-    const OVERLAY = "commentaires"; // DOIT rester exactement "commentaires"
-
-    const dbgRoom = document.getElementById("dbgRoom");
-    const dbgKey  = document.getElementById("dbgKey");
-    const dbgSock = document.getElementById("dbgSock");
-    const dbgJoin = document.getElementById("dbgJoin");
-    const dbgLast = document.getElementById("dbgLast");
-
-    const elText = document.getElementById("text");
-    const elMeta = document.getElementById("meta");
-
-    function clean(t){
-      return String(t ?? "")
-        .replace(/\u00A0/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-
-    function setState(state){
-      document.body.classList.remove("is-idle","is-show");
-      document.body.classList.add(state === "show" ? "is-show" : "is-idle");
-    }
-
-    function showText(text, user){
-      const t = clean(text);
-      if(!t){ hideText(); return; }
-      elText.textContent = t;
-      elMeta.textContent = user ? ("— " + clean(user)) : "";
-      setState("show");
-    }
-
-    function hideText(){
-      setState("idle");
-    }
-
-    function handlePayload(p){
-      const state = clean(p?.state || p?.action).toLowerCase();
-
-      if(state === "hide" || state === "idle" || state === "off"){
-        dbgLast.textContent = "state=hide";
-        hideText();
-        return;
-      }
-
-      if(state === "show" || state === "on"){
-        const d = p?.data || p?.payload || {};
-        const text = p?.text ?? d?.text;
-        const user = p?.user ?? d?.user;
-        dbgLast.textContent = "state=show";
-        showText(text, user);
-        return;
-      }
-
-      const directText = p?.text ?? p?.data?.text;
-      if(clean(directText)){
-        dbgLast.textContent = "direct text";
-        showText(directText, p?.user ?? p?.data?.user);
-      }
-    }
-
-    (function boot(){
-      // Lire room/key depuis URL
-      const u = new URL(location.href);
-      const room = clean(u.searchParams.get("room"));
-      const key  = clean(u.searchParams.get("key"));
-
-      dbgRoom.textContent = room || "(missing)";
-      dbgKey.textContent  = key ? "present" : "(missing)";
-
-      if(!room || !key){
-        dbgSock.textContent = "missing room/key in URL";
-        dbgJoin.textContent = "NO";
-        return;
-      }
-
-      dbgSock.textContent = "connecting...";
-      dbgJoin.textContent = "—";
-
-      const socket = io(SERVER_URL, { transports: ["websocket","polling"] });
-
-      socket.on("connect", () => {
-        dbgSock.textContent = "connected";
-        dbgJoin.textContent = "sent";
-        socket.emit("overlay:join", { room, key, overlay: OVERLAY });
-      });
-
-      socket.on("overlay:forbidden", () => {
-        dbgSock.textContent = "FORBIDDEN";
-        dbgJoin.textContent = "refused";
-        hideText();
-      });
-
-      socket.on("disconnect", () => {
-        dbgSock.textContent = "disconnected";
-        hideText();
-      });
-
-      // écoute large
-      socket.on("raw_vote", (data) => {
-        const t = clean(data?.vote ?? data?.text);
-        if(t) dbgLast.textContent = "raw_vote: " + t.slice(0, 40) + (t.length>40 ? "…" : "");
-      });
-
-      socket.on("control:set_state", handlePayload);
-      socket.on("overlay:set_state", handlePayload);
-      socket.on("overlay:state", handlePayload);
-      socket.on("commentaires:set_state", handlePayload);
-      socket.on("commentaires:state", handlePayload);
-      socket.on("control:commentaires", handlePayload);
-    })();
-  </script>
+  <!-- JS externe (versionné pour forcer OBS à recharger) -->
+  <script src="./script.js?v=1.0.0"></script>
 </body>
 </html>
