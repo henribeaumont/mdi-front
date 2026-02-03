@@ -73,7 +73,13 @@ html, body {
   
   /* Dimensions */
   padding: var(--panel-padding-y, 20px) var(--panel-padding-x, 30px);
-  max-width: var(--panel-max-width, 800px);
+  width: var(--panel-width, auto);
+  min-width: var(--panel-min-width, 600px);  /* Plus large par défaut */
+  max-width: var(--panel-max-width, 1200px); /* Max plus généreux */
+  
+  /* Permet au texte de s'étaler sur plusieurs lignes si nécessaire */
+  word-wrap: break-word;
+  word-break: break-word;
   
   /* Effets */
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -110,8 +116,14 @@ html, body {
   font-weight: var(--message-font-weight, 400);
   color: var(--message-color, #ffffff);
   line-height: var(--message-line-height, 1.4);
+  text-transform: var(--message-text-transform, none);
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+/* Première lettre en majuscule automatique */
+.comment-text::first-letter {
+  text-transform: uppercase;
 }
 
 /* Animation apparition */
