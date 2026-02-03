@@ -588,16 +588,25 @@
 
     <!-- Onglets -->
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('quiz')">❓ QUIZ</button>
+      <button class="tab active" onclick="switchTab('quiz')">❓ QUESTION</button>
       <button class="tab" onclick="switchTab('nuage')">☁️ NUAGE</button>
       <button class="tab" onclick="switchTab('roue')">🎡 ROUE</button>
-      <button class="tab" onclick="switchTab('timer')">⏱️ TIMER</button>
+      <button class="tab" onclick="switchTab('timer')">⌚️ TEMPS</button>
+      <button class="tab" onclick="switchTab('match')">🆚 MATCH</button>
     </div>
 
     <!-- Contenu Quiz -->
     <div id="tabQuiz" class="tab-content active">
+      <!-- Indicateur overlay -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+        <div id="statusQuiz" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
+        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      </div>
+
+      <div class="timer-separator"></div>
+
       <div class="quiz-header">
-        <div class="section-title">Quiz / Sondage</div>
+        <div class="section-title">Question / Sondage</div>
         <span id="quizStatus" class="quiz-status idle">Inactif</span>
       </div>
 
@@ -629,6 +638,14 @@
 
     <!-- Contenu Nuage -->
     <div id="tabNuage" class="tab-content">
+      <!-- Indicateur overlay -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+        <div id="statusNuage" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
+        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      </div>
+
+      <div class="timer-separator"></div>
+
       <div class="toggle-container">
         <div class="toggle-label">
           <span class="icon">☁️</span>
@@ -642,6 +659,14 @@
 
     <!-- Contenu Roue -->
     <div id="tabRoue" class="tab-content">
+      <!-- Indicateur overlay -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+        <div id="statusRoue" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
+        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      </div>
+
+      <div class="timer-separator"></div>
+
       <div class="toggle-container">
         <div class="toggle-label">
           <span class="icon">🎡</span>
@@ -673,11 +698,10 @@
 
     <!-- Contenu Timer -->
     <div id="tabTimer" class="tab-content">
-      <!-- Bouton Statut Timer (toujours actif, non cliquable) -->
-      <div style="margin-bottom: 12px;">
-        <button class="btn-success" style="cursor: default; opacity: 0.9; pointer-events: none;">
-          ✅ Timer / Chrono Actif
-        </button>
+      <!-- Indicateur rond vert/rouge dynamique -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+        <div id="statusTimer" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
+        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
       </div>
 
       <div class="timer-separator"></div>
@@ -685,10 +709,10 @@
       <!-- Toggle Mode -->
       <div class="timer-mode-toggle">
         <button class="timer-mode-btn active" data-mode="timer" onclick="timerSetMode('timer')">
-          ⏱️ TIMER
+          Compte à rebours
         </button>
         <button class="timer-mode-btn" data-mode="chrono" onclick="timerSetMode('chrono')">
-          ⏲️ CHRONO
+          Chronomètre
         </button>
       </div>
 
@@ -786,6 +810,55 @@
 
       <div id="messageTimer" class="message"></div>
     </div>
+
+    <!-- Contenu Match -->
+    <div id="tabMatch" class="tab-content">
+      <!-- Indicateur rond vert/rouge dynamique -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
+        <div id="statusMatch" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
+        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      </div>
+
+      <div class="timer-separator"></div>
+
+      <!-- 2 Colonnes scores -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <!-- Équipe A -->
+        <div style="text-align: center;">
+          <div style="font-size: 16px; font-weight: 700; color: #3b82f6; margin-bottom: 12px;">
+            ÉQUIPE A
+          </div>
+          <div style="font-size: 48px; font-weight: 900; color: #f1f5f9; margin-bottom: 12px;" id="matchScoreA">
+            0
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: center;">
+            <button class="btn-danger" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('A', -1)">−</button>
+            <button class="btn-success" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('A', 1)">+</button>
+          </div>
+        </div>
+
+        <!-- Équipe B -->
+        <div style="text-align: center;">
+          <div style="font-size: 16px; font-weight: 700; color: #ef4444; margin-bottom: 12px;">
+            ÉQUIPE B
+          </div>
+          <div style="font-size: 48px; font-weight: 900; color: #f1f5f9; margin-bottom: 12px;" id="matchScoreB">
+            0
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: center;">
+            <button class="btn-danger" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('B', -1)">−</button>
+            <button class="btn-success" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('B', 1)">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bouton Reset -->
+      <button class="btn-danger" style="width: 100%;" onclick="matchReset()">
+        🔄 Réinitialiser les scores
+      </button>
+
+      <div id="messageMatch" class="message"></div>
+    </div>
   </div>
 
   <script>
@@ -803,20 +876,34 @@
       roue_loto: false,
       roue_collecte: false,
       quiz_ou_sondage: false,
-      timer_chrono: false
+      timer_chrono: false,
+      match_equipes: false
     };
 
     // Timer state
     let timerMode = "timer";
     let timerSeconds = 60;
     let timerRunning = false;
-    let timerDisplayBeforeStart = false; // Affichage avant démarrage
+    let timerDisplayBeforeStart = false;
+
+    // Match state
+    let matchScoreA = 0;
+    let matchScoreB = 0; // Affichage avant démarrage
 
     const $ = (id) => document.getElementById(id);
 
     // --- HELPERS ---
     function pad2(n) {
       return String(n).padStart(2, "0");
+    }
+
+    // Mettre à jour indicateur rond vert/rouge
+    function updateStatusIndicator(statusId, isActive) {
+      const el = $(statusId);
+      if (el) {
+        el.style.background = isActive ? "#22c55e" : "#ef4444";
+        el.style.boxShadow = isActive ? "0 0 0 3px rgba(34, 197, 94, 0.2)" : "none";
+      }
     }
 
     // --- ONGLETS ---
@@ -848,10 +935,12 @@
       
       if (overlayName === "nuage_de_mots") {
         $("toggleNuage").className = isActive ? "toggle-switch active" : "toggle-switch";
+        updateStatusIndicator("statusNuage", isActive);
       }
       if (overlayName === "roue_loto") {
         $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
         $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
+        updateStatusIndicator("statusRoue", isActive);
         
         // Auto-démarrer collecte si roue activée
         if (isActive && !overlayStates.roue_collecte) {
@@ -861,7 +950,7 @@
         }
       }
       if (overlayName === "timer_chrono") {
-        $("toggleTimer").className = isActive ? "toggle-switch active" : "toggle-switch";
+        // Géré ailleurs
       }
     }
 
@@ -879,6 +968,8 @@
       const btnResults = $("btnShowResults");
       const btnReveal = $("btnRevealAnswer");
       const btnReset = $("btnResetQuiz");
+
+      updateStatusIndicator("statusQuiz", isActive);
 
       if (isActive) {
         status.textContent = questionType === "poll" ? "Sondage" : "Quiz";
@@ -926,14 +1017,21 @@
         loadQuestionCatalog();
         showMessage("Quiz", "✅ Connecté", "success");
         
-        // Activer automatiquement l'overlay timer
+        // Activer automatiquement timer
         setTimeout(() => {
           socket.emit("control:activate_overlay", {
             room: currentRoom,
             overlay: "timer_chrono"
           });
-          console.log("✅ [TIMER] Overlay activé automatiquement");
         }, 500);
+
+        // Activer automatiquement match
+        setTimeout(() => {
+          socket.emit("control:activate_overlay", {
+            room: currentRoom,
+            overlay: "match_equipes"
+          });
+        }, 700);
       });
 
       socket.on("connect_error", (err) => {
@@ -1007,7 +1105,11 @@
       }
 
       if (overlay === "timer_chrono") {
-        updateToggle("timer_chrono", state === "active");
+        updateStatusIndicator("statusTimer", state === "active");
+      }
+
+      if (overlay === "match_equipes") {
+        updateStatusIndicator("statusMatch", state === "active");
       }
     }
 
@@ -1365,6 +1467,49 @@
       const msg = timerDisplayBeforeStart ? "👁️ Affichage activé" : "👁️ Affichage masqué";
       showMessage("Timer", msg, "success");
       console.log(`👁️ [TIMER] Affichage: ${timerDisplayBeforeStart}`);
+    }
+
+    // --- MATCH ---
+    function matchAdjustScore(team, delta) {
+      if (!connected) {
+        showMessage("Match", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      if (team === 'A') {
+        matchScoreA = Math.max(0, matchScoreA + delta);
+        $("matchScoreA").textContent = matchScoreA;
+      } else {
+        matchScoreB = Math.max(0, matchScoreB + delta);
+        $("matchScoreB").textContent = matchScoreB;
+      }
+
+      socket.emit("control:match_adjust_score", {
+        room: currentRoom,
+        team: team,
+        delta: delta
+      });
+
+      console.log(`📊 [MATCH] ${team} ${delta > 0 ? '+' : ''}${delta}`);
+    }
+
+    function matchReset() {
+      if (!connected) {
+        showMessage("Match", "❌ Connectez-vous", "error");
+        return;
+      }
+
+      matchScoreA = 0;
+      matchScoreB = 0;
+      $("matchScoreA").textContent = "0";
+      $("matchScoreB").textContent = "0";
+
+      socket.emit("control:match_reset", {
+        room: currentRoom
+      });
+
+      showMessage("Match", "🔄 Scores réinitialisés", "success");
+      console.log("🔄 [MATCH] Reset");
     }
 
     // --- INIT ---
