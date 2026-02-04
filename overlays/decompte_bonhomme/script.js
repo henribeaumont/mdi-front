@@ -39,9 +39,6 @@ const diskEl = document.getElementById('score-disk');
 async function init() {
     console.log("[BONHOMME] Initialisation...");
     
-    // Attendre 800ms pour laisser le CSS se charger
-    await new Promise(r => setTimeout(r, 800));
-    
     // Récupérer les identifiants depuis le CSS OBS
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
