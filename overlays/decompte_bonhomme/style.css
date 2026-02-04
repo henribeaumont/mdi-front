@@ -27,7 +27,6 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: var(--hand-disk-gap, 15px);
 }
 
 /* DISQUE DE SCORE (EN HAUT) */
@@ -58,6 +57,7 @@ body {
     position: relative;
     width: 280px;
     height: 380px;
+    margin-top: var(--hand-disk-gap, 15px); /* GAP CONFIGURABLE ICI */
     display: flex;
     align-items: center;
     justify-content: center;
