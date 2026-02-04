@@ -57,12 +57,16 @@ body {
     position: relative;
     width: 280px;
     height: 380px;
-    margin-top: var(--hand-disk-gap, 15px); /* GAP CONFIGURABLE ICI */
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1;
     filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.25));
+}
+
+/* Espacement entre disque et main - CONFIGURABLE */
+#hero-wrapper > #hero-hand {
+    margin-top: var(--hand-disk-gap, 15px);
 }
 
 #hero-hand svg {
@@ -72,9 +76,6 @@ body {
 
 #hero-hand path {
     fill: var(--hand-fill, #F9AD48);
-    stroke: var(--hand-stroke, #000000);
-    stroke-width: var(--hand-stroke-width, 0);
-    stroke-linejoin: round;
 }
 
 /* ANIMATIONS */
