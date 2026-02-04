@@ -131,13 +131,27 @@ function updateDisplay() {
    🔒 GESTION SÉCURITÉ
 ========================================== */
 function showDenied() {
-    document.getElementById("security-screen").classList.remove("hidden");
-    document.getElementById("scene").classList.add("hidden");
+    const security = document.getElementById("security-screen");
+    const scene = document.getElementById("scene");
+    
+    security.classList.remove("hidden");
+    scene.classList.add("hidden");
+    scene.classList.remove("visible");
 }
 
 function showScene() {
-    document.getElementById("security-screen").classList.add("hidden");
-    document.getElementById("scene").classList.remove("hidden");
+    const security = document.getElementById("security-screen");
+    const scene = document.getElementById("scene");
+    
+    // Masquer l'écran de sécurité
+    security.classList.add("hidden");
+    
+    // Afficher la scène avec transition
+    scene.classList.remove("hidden");
+    
+    // Force reflow puis ajoute la classe visible pour la transition
+    void scene.offsetWidth;
+    scene.classList.add("visible");
 }
 
 /* ==========================================
