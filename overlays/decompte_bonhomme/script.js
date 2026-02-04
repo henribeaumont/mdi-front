@@ -49,22 +49,25 @@ async function init() {
         return; 
     }
 
-    console.log(`[BONHOMME] 🔌 Connexion à la room: ${room}`);
-    socket.emit('overlay:join', { 
-        room, 
-        key, 
-        overlay: OVERLAY_TYPE 
+    // ATTENDRE QUE LE SOCKET SOIT CONNECTÉ
+    socket.on('connect', () => {
+        console.log(`[BONHOMME] 🔌 Socket connecté, envoi auth à la room: ${room}`);
+        socket.emit('overlay:join', { 
+            room, 
+            key, 
+            overlay: OVERLAY_TYPE 
+        });
     });
 
     // Écouter les événements Socket.io
     socket.on('overlay:forbidden', () => {
-        console.error("[BONHOMME] ❌ Accès refusé");
+        console.error("[BONHOMME] ❌ Accès refusé par le serveur");
         showDenied();
     });
 
     socket.on('overlay:state', (payload) => {
         if (payload?.overlay === OVERLAY_TYPE) {
-            console.log("[BONHOMME] ✅ Overlay autorisé");
+            console.log("[BONHOMME] ✅ Overlay autorisé", payload);
             showScene();
             estAutorise = true;
         }
@@ -73,6 +76,15 @@ async function init() {
     socket.on('raw_vote', (data) => {
         if (!estAutorise) return;
         traiterMessage(data.vote);
+    });
+
+    // Debug: afficher les erreurs de connexion
+    socket.on('connect_error', (error) => {
+        console.error("[BONHOMME] ❌ Erreur de connexion:", error);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.warn("[BONHOMME] ⚠️ Déconnecté:", reason);
     });
 }
 
