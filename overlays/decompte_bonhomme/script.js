@@ -1,73 +1,31 @@
-/* ==========================================
-   🔧 CONFIGURATION
-========================================== */
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "decompte_bonhomme";
 
-/* ==========================================
-   🛠️ HELPERS
-========================================== */
 function cssVar(name, fallback = "") {
-    return getComputedStyle(document.documentElement)
-        .getPropertyValue(name)
-        .trim()
-        .replace(/^['"]+|['"]+$/g, "") || fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim().replace(/^['"]+|['"]+$/g, "") || fallback;
 }
 
-/* ==========================================
-   🌐 SOCKET.IO
-========================================== */
-const socket = io(SERVER_URL, { 
-    transports: ['websocket', 'polling'] 
-});
-
-/* ==========================================
-   📊 ÉTAT GLOBAL
-========================================== */
 let globalCount = 0;
 let estAutorise = false;
-
-/* ==========================================
-   🎯 ÉLÉMENTS DOM
-========================================== */
 const scoreEl = document.getElementById('hero-score');
 const diskEl = document.getElementById('score-disk');
 
-/* ==========================================
-   🚀 INITIALISATION
-========================================== */
+const socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+
 async function init() {
-    console.log("[BONHOMME] Initialisation...");
+    // DÉLAI NÉCESSAIRE pour laisser le socket se connecter
+    await new Promise(r => setTimeout(r, 800));
     
-    // Récupérer les identifiants depuis le CSS OBS
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
 
-    if (!room || !key) { 
-        console.error("[BONHOMME] ❌ Room ID ou Key manquant");
-        showDenied(); 
-        return; 
-    }
+    if (!room || !key) { showDenied(); return; }
+    
+    socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
 
-    // ATTENDRE QUE LE SOCKET SOIT CONNECTÉ
-    socket.on('connect', () => {
-        console.log(`[BONHOMME] 🔌 Socket connecté, envoi auth à la room: ${room}`);
-        socket.emit('overlay:join', { 
-            room, 
-            key, 
-            overlay: OVERLAY_TYPE 
-        });
-    });
-
-    // Écouter les événements Socket.io
-    socket.on('overlay:forbidden', () => {
-        console.error("[BONHOMME] ❌ Accès refusé par le serveur");
-        showDenied();
-    });
-
+    socket.on('overlay:forbidden', showDenied);
     socket.on('overlay:state', (payload) => {
         if (payload?.overlay === OVERLAY_TYPE) {
-            console.log("[BONHOMME] ✅ Overlay autorisé", payload);
             showScene();
             estAutorise = true;
         }
@@ -77,96 +35,49 @@ async function init() {
         if (!estAutorise) return;
         traiterMessage(data.vote);
     });
-
-    // Debug: afficher les erreurs de connexion
-    socket.on('connect_error', (error) => {
-        console.error("[BONHOMME] ❌ Erreur de connexion:", error);
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.warn("[BONHOMME] ⚠️ Déconnecté:", reason);
-    });
 }
 
-/* ==========================================
-   💬 TRAITEMENT DES MESSAGES CHAT
-========================================== */
 function traiterMessage(msgRaw) {
     const msg = msgRaw.trim().toUpperCase();
     const triggers = cssVar("--hand-triggers", "MOI,OUI,1").toUpperCase().split(",");
 
-    // Reset du compteur
     if (msg === "RESET") {
-        console.log("[BONHOMME] 🔄 Reset du compteur");
         globalCount = 0;
         updateDisplay();
         return;
     }
 
-    // Vérifier si le message contient un trigger
-    const triggerFound = triggers.some(t => msg.includes(t.trim()));
-    
-    if (triggerFound) {
+    if (triggers.some(t => msg.includes(t.trim()))) {
         globalCount++;
-        console.log(`[BONHOMME] 👋 Nouveau vote ! Total: ${globalCount}`);
         updateDisplay();
     }
 }
 
-/* ==========================================
-   🎨 MISE À JOUR DE L'AFFICHAGE
-========================================== */
 function updateDisplay() {
     if (!scoreEl) return;
-    
     scoreEl.innerText = globalCount;
     
-    // Ajustement responsive de la taille du texte
+    // RESPONSIVE TEXT
     const len = String(globalCount).length;
-    if (len <= 2) {
-        scoreEl.style.fontSize = "60px";
-    } else if (len === 3) {
-        scoreEl.style.fontSize = "48px";
-    } else if (len === 4) {
-        scoreEl.style.fontSize = "38px";
-    } else {
-        scoreEl.style.fontSize = "32px";
-    }
+    if (len <= 2) scoreEl.style.fontSize = "60px";
+    else if (len === 3) scoreEl.style.fontSize = "48px";
+    else if (len === 4) scoreEl.style.fontSize = "38px";
+    else scoreEl.style.fontSize = "32px";
 
-    // Animation bump sur le disque
+    // Animation Pop sur le disque
     diskEl.classList.remove('bump-anim');
-    void diskEl.offsetWidth; // Force reflow
+    void diskEl.offsetWidth; 
     diskEl.classList.add('bump-anim');
 }
 
-/* ==========================================
-   🔒 GESTION SÉCURITÉ
-========================================== */
 function showDenied() {
-    const security = document.getElementById("security-screen");
-    const scene = document.getElementById("scene");
-    
-    security.classList.remove("hidden");
-    scene.classList.add("hidden");
-    scene.classList.remove("visible");
+    document.getElementById("security-screen").classList.remove("hidden");
+    document.getElementById("scene").classList.add("hidden");
 }
 
 function showScene() {
-    const security = document.getElementById("security-screen");
-    const scene = document.getElementById("scene");
-    
-    // Masquer l'écran de sécurité
-    security.classList.add("hidden");
-    
-    // Afficher la scène avec transition
-    scene.classList.remove("hidden");
-    
-    // Force reflow puis ajoute la classe visible pour la transition
-    void scene.offsetWidth;
-    scene.classList.add("visible");
+    document.getElementById("security-screen").classList.add("hidden");
+    document.getElementById("scene").classList.remove("hidden");
 }
 
-/* ==========================================
-   🎬 DÉMARRAGE
-========================================== */
 init();
