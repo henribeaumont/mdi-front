@@ -59,7 +59,10 @@
   <!-- ONGLET CLIENTS -->
   <div id="view-clients" class="view active">
     <div class="card">
-      <h3>Ajouter / Modifier Client</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3 style="margin:0;">Ajouter / Modifier Client</h3>
+        <button onclick="resetClientForm()" style="background:#94a3b8; width:auto; padding:8px 15px;">🔄 Nouveau</button>
+      </div>
       <form id="formClient">
         <div class="row">
           <div><label>ID Client</label><input id="c_id" required></div>
@@ -187,10 +190,17 @@ function renderData(res) {
   const overlaysSet = new Set();
   res.clients.forEach(c => {
     if(c.entitlements) {
-      Object.keys(c.entitlements).forEach(o => overlaysSet.add(o));
+      Object.keys(c.entitlements).forEach(o => {
+        // Nettoyer les doublons emoji
+        if(o === 'emoji_tornado') return; // Ignorer le doublon
+        overlaysSet.add(o);
+      });
     }
   });
   AVAILABLE_OVERLAYS = Array.from(overlaysSet).sort();
+  
+  // AFFICHER LES TOGGLES DÈS LE DÉPART (mode création)
+  renderOverlaysSelection({});
   
   // Render Clients
   document.querySelector("#tableClients tbody").innerHTML = res.clients.map(c => {
@@ -294,8 +304,24 @@ window.editClient = (id) => {
     document.getElementById("c_id").value = c.room_id; 
     document.getElementById("c_key").value = c.room_key;
     document.getElementById("c_active").value = c.active ? "true" : "false";
-    renderOverlaysSelection(c.entitlements || {});
+    
+    // Nettoyer les entitlements (retirer emoji_tornado)
+    const cleanedEntitlements = {};
+    if(c.entitlements) {
+      Object.keys(c.entitlements).forEach(k => {
+        if(k !== 'emoji_tornado') { // Ignorer le doublon
+          cleanedEntitlements[k] = c.entitlements[k];
+        }
+      });
+    }
+    
+    renderOverlaysSelection(cleanedEntitlements);
   }
+};
+
+window.resetClientForm = () => {
+  document.getElementById("formClient").reset();
+  renderOverlaysSelection({});
 };
 
 window.editQ = (rid, qid) => {
