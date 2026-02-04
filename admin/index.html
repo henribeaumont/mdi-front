@@ -4,26 +4,34 @@
   <meta charset="UTF-8">
   <title>MDI • Admin Cockpit (Secure)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root { --bg: #0f172a; --panel: #1e293b; --text: #f1f5f9; --accent: #3b82f6; --danger: #ef4444; }
-    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
-    .container { max-width: 1000px; margin: 0 auto; display: none; }
+    body { background: var(--bg); color: var(--text); font-family: 'Montserrat', sans-serif; margin: 0; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; display: none; }
     h1 { display: flex; justify-content: space-between; align-items: center; }
     .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab { background: var(--panel); padding: 10px 20px; border-radius: 8px; cursor: pointer; opacity: 0.6; }
-    .tab.active { opacity: 1; background: var(--accent); }
+    .tab { background: var(--panel); padding: 10px 20px; border-radius: 8px; cursor: pointer; opacity: 0.6; transition: all 0.3s; }
+    .tab.active { opacity: 1; background: var(--accent); font-weight: 800; }
     .view { display: none; }
     .view.active { display: block; }
     .card { background: var(--panel); padding: 20px; border-radius: 12px; margin-bottom: 15px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-    input, select, textarea { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 6px; box-sizing:border-box; }
-    button { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; font-weight: 600; }
+    input, select, textarea { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 6px; box-sizing:border-box; font-family: 'Montserrat', sans-serif; }
+    button { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: 'Montserrat', sans-serif; }
+    button:hover { opacity: 0.9; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
     th, td { text-align: left; padding: 10px; border-bottom: 1px solid #334155; }
+    th { font-weight: 800; }
     #login-screen { position: fixed; inset: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 999; }
     .login-box { background: var(--panel); padding: 40px; border-radius: 16px; text-align: center; width: 300px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+    .overlay-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .overlay-tag { background: #0f172a; padding: 8px 12px; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
+    .toggle { position: relative; width: 40px; height: 20px; background: #334155; border-radius: 10px; cursor: pointer; transition: 0.3s; }
+    .toggle.active { background: var(--accent); }
+    .toggle::after { content: ''; position: absolute; width: 16px; height: 16px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: 0.3s; }
+    .toggle.active::after { left: 22px; }
   </style>
 </head>
 <body>
@@ -33,7 +41,7 @@
     <h2>🔒 Accès Admin</h2>
     <div style="margin-bottom:15px; text-align:left;">
       <label>Mot de passe serveur</label>
-      <input type="password" id="adminPass" placeholder="MDI_SUPER_ADMIN..." >
+      <input type="password" id="adminPass" placeholder="•••••••••••••" autocomplete="off">
     </div>
     <button onclick="tryLogin()" style="width:100%">Déverrouiller</button>
   </div>
@@ -43,10 +51,12 @@
   <h1><span>🚀 MDI Admin</span> <button onclick="logout()" style="background:#334155">Logout</button></h1>
 
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('clients')">👥 Clients</div>
-    <div class="tab" onclick="switchTab('questions')">❓ Questions</div>
+    <div class="tab active" data-tab="clients" onclick="switchTab('clients')">👥 Clients</div>
+    <div class="tab" data-tab="overlays" onclick="switchTab('overlays')">🎨 Overlays</div>
+    <div class="tab" data-tab="questions" onclick="switchTab('questions')">❓ Questions</div>
   </div>
 
+  <!-- ONGLET CLIENTS -->
   <div id="view-clients" class="view active">
     <div class="card">
       <h3>Ajouter / Modifier Client</h3>
@@ -56,14 +66,44 @@
           <div><label>Clé Secrète</label><input id="c_key" required></div>
         </div>
         <div><label>Actif ?</label><select id="c_active"><option value="true">OUI</option><option value="false">NON</option></select></div>
-        <button type="submit" style="margin-top:10px">💾 Sauvegarder</button>
+        
+        <div style="margin-top:15px">
+          <label>Overlays Disponibles</label>
+          <div id="overlays-selection" class="overlay-list">
+            <!-- Généré dynamiquement -->
+          </div>
+        </div>
+        
+        <button type="submit" style="margin-top:15px">💾 Sauvegarder</button>
       </form>
     </div>
     <div class="card">
-      <table id="tableClients"><thead><tr><th>Room ID</th><th>Key</th><th>Actif</th><th>Action</th></tr></thead><tbody></tbody></table>
+      <h3>Liste des Clients</h3>
+      <table id="tableClients">
+        <thead><tr><th>Room ID</th><th>Key</th><th>Actif</th><th>Overlays</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 
+  <!-- ONGLET OVERLAYS -->
+  <div id="view-overlays" class="view">
+    <div class="card">
+      <h3>Gérer les Overlays Disponibles</h3>
+      <form id="formOverlay">
+        <div><label>Nom de l'Overlay (ex: roue_loto)</label><input id="o_name" required placeholder="nom_overlay"></div>
+        <button type="submit" style="margin-top:10px">➕ Ajouter</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3>Overlays Existants</h3>
+      <div id="overlaysList" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">
+        <!-- Généré dynamiquement -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ONGLET QUESTIONS -->
   <div id="view-questions" class="view">
     <div class="card">
       <h3>Éditer Question</h3>
@@ -72,10 +112,7 @@
           <div><label>Room ID</label><input id="q_room" required></div>
           <div><label>Code (ex: Q01)</label><input id="q_key" required></div>
         </div>
-        <div class="row">
-          <div><label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select></div>
-          <div><label>Ordre</label><input type="number" id="q_order" value="1"></div>
-        </div>
+        <div><label>Type</label><select id="q_type"><option value="quiz">Quiz</option><option value="poll">Sondage</option></select></div>
         <div style="margin-bottom:10px"><label>Question</label><textarea id="q_prompt" rows="2" required></textarea></div>
         <div class="row">
           <div><label>A</label><input id="q_a" required></div>
@@ -89,13 +126,20 @@
         <button type="submit">💾 Sauvegarder</button>
       </form>
     </div>
-    <div class="card"><table id="tableQuestions"><thead><tr><th>Room</th><th>Key</th><th>Txt</th><th>Action</th></tr></thead><tbody></tbody></table></div>
+    <div class="card">
+      <h3>Liste des Questions</h3>
+      <table id="tableQuestions">
+        <thead><tr><th>Room</th><th>Key</th><th>Question</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <script>
 const API_BASE = "https://magic-digital-impact-live.onrender.com/api/admin";
 let SECRET = localStorage.getItem("mdi_admin_secret") || "";
+let AVAILABLE_OVERLAYS = [];
 
 if(SECRET) tryLogin(true);
 
@@ -138,32 +182,79 @@ async function refresh() { renderData(await apiCall("/data")); }
 function renderData(res) {
   if(!res || !res.clients) return;
   window.rawData = res;
-  document.querySelector("#tableClients tbody").innerHTML = res.clients.map(c => 
-    `<tr><td>${c.room_id}</td><td>${c.room_key}</td><td>${c.active?'✅':'❌'}</td><td><button onclick="editClient('${c.room_id}')">Edit</button></td></tr>`
-  ).join('');
+  
+  // Extraire tous les overlays disponibles de tous les clients
+  const overlaysSet = new Set();
+  res.clients.forEach(c => {
+    if(c.entitlements) {
+      Object.keys(c.entitlements).forEach(o => overlaysSet.add(o));
+    }
+  });
+  AVAILABLE_OVERLAYS = Array.from(overlaysSet).sort();
+  
+  // Render Clients
+  document.querySelector("#tableClients tbody").innerHTML = res.clients.map(c => {
+    const overlaysCount = c.entitlements ? Object.keys(c.entitlements).filter(k => c.entitlements[k]).length : 0;
+    return `<tr>
+      <td>${c.room_id}</td>
+      <td>${c.room_key}</td>
+      <td>${c.active?'✅':'❌'}</td>
+      <td>${overlaysCount} actifs</td>
+      <td><button onclick="editClient('${c.room_id}')">Edit</button></td>
+    </tr>`;
+  }).join('');
+  
+  // Render Questions
   document.querySelector("#tableQuestions tbody").innerHTML = res.questions.map(q => 
-    `<tr><td>${q.room_id}</td><td><b>${q.question_key}</b></td><td>${q.prompt}</td><td><button onclick="editQ('${q.room_id}','${q.question_key}')">Edit</button> <button onclick="delQ('${q.room_id}','${q.question_key}')" style="background:#ef4444">X</button></td></tr>`
+    `<tr>
+      <td>${q.room_id}</td>
+      <td><b>${q.question_key}</b></td>
+      <td>${q.prompt}</td>
+      <td>
+        <button onclick="editQ('${q.room_id}','${q.question_key}')">Edit</button> 
+        <button onclick="delQ('${q.room_id}','${q.question_key}')" style="background:#ef4444">X</button>
+      </td>
+    </tr>`
+  ).join('');
+  
+  // Render Overlays List
+  document.getElementById("overlaysList").innerHTML = AVAILABLE_OVERLAYS.map(o => 
+    `<div class="overlay-tag">
+      <span>${o}</span>
+      <button onclick="deleteOverlay('${o}')" style="background:#ef4444; padding:4px 8px; font-size:12px">X</button>
+    </div>`
   ).join('');
 }
 
+// Form Client
 document.getElementById("formClient").onsubmit = async (e) => {
   e.preventDefault();
+  
+  // Récupérer les overlays sélectionnés
+  const entitlements = {};
+  AVAILABLE_OVERLAYS.forEach(overlay => {
+    const toggle = document.querySelector(`[data-overlay="${overlay}"]`);
+    entitlements[overlay] = toggle ? toggle.classList.contains('active') : false;
+  });
+  
   const body = {
     room_id: document.getElementById("c_id").value,
     room_key: document.getElementById("c_key").value,
     active: document.getElementById("c_active").value === "true",
-    entitlements: {"quiz_ou_sondage":true, "tug_of_war":true} 
+    entitlements
   };
-  await apiCall("/client", "POST", body); refresh();
+  await apiCall("/client", "POST", body); 
+  refresh();
 };
 
+// Form Question
 document.getElementById("formQuestion").onsubmit = async (e) => {
   e.preventDefault();
   const body = {
     room_id: document.getElementById("q_room").value,
     question_key: document.getElementById("q_key").value,
     type: document.getElementById("q_type").value,
-    order_index: parseInt(document.getElementById("q_order").value) || 1,
+    order_index: 1,
     prompt: document.getElementById("q_prompt").value,
     option_a: document.getElementById("q_a").value,
     option_b: document.getElementById("q_b").value,
@@ -172,12 +263,39 @@ document.getElementById("formQuestion").onsubmit = async (e) => {
     correct_option: document.getElementById("q_correct").value,
     enabled: true
   };
-  await apiCall("/question", "POST", body); refresh();
+  await apiCall("/question", "POST", body); 
+  refresh();
+};
+
+// Form Overlay
+document.getElementById("formOverlay").onsubmit = async (e) => {
+  e.preventDefault();
+  const overlayName = document.getElementById("o_name").value.trim().toLowerCase().replace(/ /g, '_');
+  if(!AVAILABLE_OVERLAYS.includes(overlayName)) {
+    AVAILABLE_OVERLAYS.push(overlayName);
+    AVAILABLE_OVERLAYS.sort();
+  }
+  document.getElementById("o_name").value = "";
+  renderOverlaysSelection();
+  renderData(window.rawData);
+};
+
+window.deleteOverlay = (name) => {
+  if(confirm(`Supprimer l'overlay "${name}" de la liste ?`)) {
+    AVAILABLE_OVERLAYS = AVAILABLE_OVERLAYS.filter(o => o !== name);
+    renderOverlaysSelection();
+    renderData(window.rawData);
+  }
 };
 
 window.editClient = (id) => {
   const c = window.rawData.clients.find(x => x.room_id === id);
-  if(c) { document.getElementById("c_id").value=c.room_id; document.getElementById("c_key").value=c.room_key; }
+  if(c) { 
+    document.getElementById("c_id").value = c.room_id; 
+    document.getElementById("c_key").value = c.room_key;
+    document.getElementById("c_active").value = c.active ? "true" : "false";
+    renderOverlaysSelection(c.entitlements || {});
+  }
 };
 
 window.editQ = (rid, qid) => {
@@ -185,22 +303,49 @@ window.editQ = (rid, qid) => {
   if(q) {
     document.getElementById("q_room").value = q.room_id;
     document.getElementById("q_key").value = q.question_key;
+    document.getElementById("q_type").value = q.type;
     document.getElementById("q_prompt").value = q.prompt;
     document.getElementById("q_a").value = q.option_a;
     document.getElementById("q_b").value = q.option_b;
-    document.getElementById("q_c").value = q.option_c;
-    document.getElementById("q_d").value = q.option_d;
+    document.getElementById("q_c").value = q.option_c || "";
+    document.getElementById("q_d").value = q.option_d || "";
+    document.getElementById("q_correct").value = q.correct_option;
     switchTab('questions');
   }
 };
 
 window.delQ = async (rid, qid) => {
-  if(confirm("Supprimer ?")) { await apiCall("/delete-question", "POST", {room_id:rid, question_key:qid}); refresh(); }
+  if(confirm("Supprimer cette question ?")) { 
+    await apiCall("/delete-question", "POST", {room_id:rid, question_key:qid}); 
+    refresh(); 
+  }
 };
 
-function switchTab(t) {
-  document.querySelectorAll(".view").forEach(e => e.classList.remove("active"));
-  document.getElementById("view-"+t).classList.add("active");
+function renderOverlaysSelection(currentEntitlements = {}) {
+  document.getElementById("overlays-selection").innerHTML = AVAILABLE_OVERLAYS.map(overlay => {
+    const isActive = currentEntitlements[overlay] || false;
+    return `
+      <div class="overlay-tag">
+        <span>${overlay}</span>
+        <div class="toggle ${isActive ? 'active' : ''}" data-overlay="${overlay}" onclick="toggleOverlay('${overlay}')"></div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.toggleOverlay = (name) => {
+  const toggle = document.querySelector(`[data-overlay="${name}"]`);
+  toggle.classList.toggle('active');
+};
+
+function switchTab(tabName) {
+  // Retirer active de tous les onglets et vues
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  
+  // Ajouter active au bon onglet et vue
+  document.querySelector(`[data-tab="${tabName}"]`).classList.add("active");
+  document.getElementById("view-" + tabName).classList.add("active");
 }
 </script>
 </body>
