@@ -64,9 +64,9 @@ body {
     filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.25));
 }
 
-/* Espacement entre disque et main - CONFIGURABLE */
+/* Espacement entre disque et main - FIXE 10px */
 #hero-wrapper > #hero-hand {
-    margin-top: var(--hand-disk-gap, 15px);
+    margin-top: 10px;
 }
 
 #hero-hand svg {
