@@ -3,14 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDI Live - Télécommande V3.2</title>
+  <title>MDI Live - Télécommande V3.5</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
       --bg-dark: #0f172a;
@@ -30,21 +26,26 @@
       color: var(--text);
       min-height: 100vh;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       padding: 20px;
     }
 
+    /* ===================== LAYOUT ===================== */
     .container {
       background: var(--bg-card);
       border-radius: 16px;
       border: 1px solid var(--border);
-      max-width: 420px;
       width: 100%;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
 
-    /* Header compact 2 colonnes */
+    /* Télécommande standard : max 420px */
+    .container.narrow { max-width: 420px; }
+    /* Onglet commentaires : max 1200px */
+    .container.wide { max-width: 1200px; }
+
+    /* ===================== HEADER ===================== */
     .header {
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
@@ -54,12 +55,7 @@
       align-items: end;
     }
 
-    .auth-inputs {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
+    .auth-inputs { display: flex; flex-direction: column; gap: 6px; }
     .auth-inputs input {
       width: 100%;
       padding: 8px 10px;
@@ -69,53 +65,32 @@
       color: var(--text);
       font-size: 12px;
     }
+    .auth-inputs input:focus { outline: none; border-color: var(--accent); }
 
-    .auth-inputs input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .header-connect {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      align-items: center;
-    }
+    .header-connect { display: flex; flex-direction: column; gap: 4px; align-items: center; }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       background: var(--danger);
       transition: all 0.3s;
     }
-
     .status-dot.connected {
       background: var(--success);
-      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
     }
 
     .btn-connect {
       padding: 10px 16px;
-      border: none;
-      border-radius: 6px;
-      background: var(--accent);
-      color: white;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
+      border: none; border-radius: 6px;
+      background: var(--accent); color: white;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
     }
+    .btn-connect:hover { background: #2563eb; }
+    .btn-connect:active { transform: scale(0.98); }
 
-    .btn-connect:hover {
-      background: #2563eb;
-    }
-
-    .btn-connect:active {
-      transform: scale(0.98);
-    }
-
-    /* Onglets */
+    /* ===================== ONGLETS ===================== */
     .tabs {
       display: flex;
       border-bottom: 1px solid var(--border);
@@ -126,455 +101,396 @@
     .tab {
       flex: 1;
       padding: 12px 8px;
-      border: none;
-      background: transparent;
+      border: none; background: transparent;
       color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
+      font-size: 22px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
       border-bottom: 2px solid transparent;
       white-space: nowrap;
     }
+    .tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg-card); }
 
-    .tab:hover {
-      color: var(--text);
-      background: rgba(255,255,255,0.05);
-    }
+    /* ===================== CONTENU ONGLETS ===================== */
+    .tab-content { display: none; padding: 16px; }
+    .tab-content.active { display: block; }
 
-    .tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-      background: var(--bg-card);
-    }
+    /* L'onglet commentaires a son propre layout */
+    .tab-content.comments-tab { padding: 0; }
+    .tab-content.comments-tab.active { display: flex; flex-direction: column; }
 
-    /* Contenu onglets */
-    .tab-content {
-      display: none;
-      padding: 16px;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    /* Toggle */
+    /* ===================== TOGGLES ===================== */
     .toggle-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 14px;
       background: var(--bg-dark);
       border-radius: 8px;
       margin-bottom: 12px;
     }
-
-    .toggle-label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .toggle-label .icon {
-      font-size: 24px;
-    }
+    .toggle-label { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
+    .toggle-label .icon { font-size: 24px; }
 
     .toggle-switch {
-      position: relative;
-      width: 48px;
-      height: 26px;
+      position: relative; width: 48px; height: 26px;
       background: var(--danger);
-      border-radius: 13px;
-      cursor: pointer;
-      transition: background 0.3s;
+      border-radius: 13px; cursor: pointer; transition: background 0.3s;
+      flex-shrink: 0;
     }
-
-    .toggle-switch.active {
-      background: var(--success);
-    }
-
+    .toggle-switch.active { background: var(--success); }
     .toggle-switch::after {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      top: 3px;
-      left: 3px;
-      transition: left 0.3s;
+      content: ''; position: absolute;
+      width: 20px; height: 20px;
+      background: white; border-radius: 50%;
+      top: 3px; left: 3px; transition: left 0.3s;
     }
+    .toggle-switch.active::after { left: 25px; }
 
-    .toggle-switch.active::after {
-      left: 25px;
-    }
-
-    /* Boutons */
+    /* ===================== BOUTONS GÉNÉRAUX ===================== */
     button {
-      width: 100%;
-      padding: 11px;
-      border: none;
+      width: 100%; padding: 11px;
+      border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+
+    .btn-secondary { background: var(--border); color: var(--text); }
+    .btn-secondary:hover:not(:disabled) { background: #475569; }
+
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-warning:hover:not(:disabled) { background: #d97706; }
+
+    .btn-small {
+      width: auto; padding: 4px 8px;
+      font-size: 11px; font-weight: 600;
+      border-radius: 4px; cursor: pointer;
+      border: none; transition: all 0.15s;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-small:active { transform: scale(0.95); }
+
+    /* ===================== SÉPARATEUR ===================== */
+    .separator { height: 1px; background: var(--border); margin: 12px 0; }
+
+    /* ===================== STATUS INDICATOR ===================== */
+    .overlay-status {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; margin-bottom: 12px;
+    }
+    .overlay-status-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%; background: var(--danger);
+      transition: all 0.3s; flex-shrink: 0;
+    }
+    .overlay-status-label { font-size: 13px; color: var(--text-muted); }
+
+    /* ===================== MESSAGE FLASH ===================== */
+    .flash-msg {
+      padding: 8px 10px;
       border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      font-size: 12px;
+      margin-top: 12px;
+      display: none;
     }
+    .flash-msg.show { display: block; }
+    .flash-msg.success { background: rgba(34,197,94,0.1); color: var(--success); border: 1px solid var(--success); }
+    .flash-msg.error { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid var(--danger); }
 
-    button:active {
-      transform: scale(0.98);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-success {
-      background: var(--success);
-      color: white;
-    }
-
-    .btn-success:hover:not(:disabled) {
-      background: #16a34a;
-    }
-
-    .btn-secondary {
-      background: var(--border);
-      color: var(--text);
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: #475569;
-    }
-
-    .btn-danger {
-      background: var(--danger);
-      color: white;
-    }
-
-    .btn-danger:hover:not(:disabled) {
-      background: #dc2626;
-    }
-
-    /* Quiz */
-    .quiz-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .section-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
+    /* ===================== QUIZ ===================== */
+    .quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--text-muted); }
     .quiz-status {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
+      display: inline-block; padding: 3px 8px;
+      border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase;
     }
-
-    .quiz-status.idle {
-      background: var(--border);
-      color: var(--text-muted);
-    }
-
-    .quiz-status.active {
-      background: var(--success);
-      color: white;
-    }
-
-    .quiz-status.poll {
-      background: var(--warning);
-      color: white;
-    }
+    .quiz-status.idle { background: var(--border); color: var(--text-muted); }
+    .quiz-status.active { background: var(--success); color: white; }
+    .quiz-status.poll { background: var(--warning); color: white; }
 
     select {
-      width: 100%;
-      padding: 9px 10px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--bg-dark);
-      color: var(--text);
-      font-size: 12px;
+      width: 100%; padding: 9px 10px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-dark); color: var(--text);
+      font-size: 12px; margin-bottom: 10px;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+
+    .quiz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+
+    /* ===================== ROUE ===================== */
+    .roue-controls { display: none; margin-top: 12px; }
+    .roue-controls.active { display: block; }
+    .roue-action-btn { margin-bottom: 8px; }
+
+    /* Mode consécutif toggle */
+    .consecutive-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(59,130,246,0.08);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 8px;
       margin-bottom: 10px;
     }
+    .consecutive-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .consecutive-label span { color: var(--accent); }
 
-    select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .quiz-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    /* Roue */
-    .roue-controls {
-      display: none;
+    /* ===================== LISTE PARTICIPANTS ROUE ===================== */
+    .moderation-section {
       margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
     }
 
-    .roue-controls.active {
-      display: block;
-    }
-
-    .roue-action-btn {
-      margin-bottom: 8px;
-    }
-
-    /* Message */
-    .message {
-      padding: 8px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      margin-top: 12px;
-      display: none;
-    }
-
-    .message.show {
-      display: block;
-    }
-
-    .message.success {
-      background: rgba(34, 197, 94, 0.1);
-      color: var(--success);
-      border: 1px solid var(--success);
-    }
-
-    .message.error {
-      background: rgba(239, 68, 68, 0.1);
-      color: var(--danger);
-      border: 1px solid var(--danger);
-    }
-
-    /* ===== TIMER STYLES ===== */
-    .timer-mode-toggle {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .timer-mode-btn {
-      flex: 1;
-      padding: 10px;
-      border: 2px solid var(--border);
+    .moderation-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px;
       background: var(--bg-dark);
-      color: var(--text-muted);
-      border-radius: 6px;
       cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-      transition: all 0.2s;
+      user-select: none;
+      transition: background 0.2s;
     }
+    .moderation-header:hover { background: #1a2438; }
 
-    .timer-mode-btn.active {
-      border-color: var(--accent);
+    .moderation-header-left {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+    }
+    .moderation-count {
       background: var(--accent);
       color: white;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px;
+      min-width: 20px; text-align: center;
     }
-
-    .timer-mode-btn:hover:not(.active) {
-      background: var(--border);
+    .moderation-chevron {
+      font-size: 12px; color: var(--text-muted);
+      transition: transform 0.25s;
     }
+    .moderation-chevron.open { transform: rotate(180deg); }
 
-    .timer-preview-box {
-      background: var(--bg-dark);
-      padding: 16px;
-      border-radius: 8px;
-      text-align: center;
-      margin-bottom: 12px;
-      border: 1px solid var(--border);
+    .moderation-body {
+      display: none;
+      padding: 10px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-card);
     }
+    .moderation-body.open { display: block; }
 
-    .timer-preview-label {
-      font-size: 10px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-      font-weight: 600;
+    /* Ajout manuel participant */
+    .add-participant-row {
+      display: flex; gap: 6px; margin-bottom: 10px;
     }
-
-    .timer-preview-time {
-      font-size: 36px;
-      font-weight: 900;
-      color: var(--text);
-      font-family: 'Courier New', monospace;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .timer-presets {
-      margin-bottom: 12px;
-    }
-
-    .timer-presets-title {
-      font-size: 11px;
-      margin-bottom: 8px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-    }
-
-    .timer-preset-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-
-    .timer-preset-btn {
-      flex: 1;
-      min-width: 60px;
-      padding: 8px 10px;
-      background: var(--bg-dark);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 11px;
-      transition: all 0.2s;
-    }
-
-    .timer-preset-btn:hover {
-      background: var(--border);
-      border-color: var(--accent);
-    }
-
-    .timer-custom {
-      margin-bottom: 12px;
-    }
-
-    .timer-custom-title {
-      font-size: 11px;
-      margin-bottom: 10px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-    }
-
-    .timer-digits {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-      background: var(--bg-dark);
-      padding: 12px;
-      border-radius: 8px;
-    }
-
-    .timer-digit-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .timer-digit-value {
-      font-size: 24px;
-      font-weight: 900;
-      color: var(--text);
-      font-family: 'Courier New', monospace;
-      min-width: 32px;
-      text-align: center;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .timer-digit-btns {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .timer-digit-btn {
-      width: 32px;
-      height: 24px;
-      padding: 0;
-      background: var(--border);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: bold;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .timer-digit-btn:hover:not(:disabled) {
-      background: #475569;
-    }
-
-    .timer-digit-btn:active {
-      transform: scale(0.95);
-    }
-
-    .timer-digit-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    .timer-digit-label {
-      font-size: 9px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      margin-top: 2px;
-    }
-
-    .timer-colon {
-      font-size: 24px;
-      font-weight: 900;
-      color: var(--border);
-      margin: 0 2px;
-      padding-bottom: 28px;
-    }
-
-    .timer-controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .timer-controls button {
+    .add-participant-row input {
+      flex: 1; padding: 7px 10px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-dark); color: var(--text);
       font-size: 12px;
     }
+    .add-participant-row input:focus { outline: none; border-color: var(--accent); }
 
-    .timer-reset-btn {
-      grid-column: 1 / -1;
+    /* Liste participants */
+    .participants-list { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+    .participants-list::-webkit-scrollbar { width: 6px; }
+    .participants-list::-webkit-scrollbar-track { background: var(--bg-dark); }
+    .participants-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .participant-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px;
+      background: var(--bg-dark);
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: border-color 0.15s;
+    }
+    .participant-item:hover { border-color: var(--border); }
+
+    .participant-name {
+      flex: 1; font-size: 12px; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    .timer-separator {
-      height: 1px;
+    .participant-edit-input {
+      flex: 1; padding: 3px 6px;
+      border: 1px solid var(--accent); border-radius: 4px;
+      background: var(--bg-dark); color: var(--text);
+      font-size: 12px; font-weight: 600;
+    }
+    .participant-edit-input:focus { outline: none; }
+
+    .participant-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .empty-participants {
+      text-align: center; padding: 20px;
+      font-size: 12px; color: var(--text-muted);
+    }
+
+    /* ===================== NUAGE MODÉRATION ===================== */
+    .nuage-word-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px;
+      background: var(--bg-dark);
+      border-radius: 6px; margin-bottom: 4px;
+      border: 1px solid transparent;
+      transition: border-color 0.15s;
+    }
+    .nuage-word-item:hover { border-color: var(--border); }
+
+    .nuage-word-text {
+      flex: 1; font-size: 12px; font-weight: 700; color: var(--text);
+    }
+    .nuage-word-count {
+      font-size: 11px; color: var(--text-muted);
+      background: var(--border); padding: 1px 6px;
+      border-radius: 10px; font-weight: 600;
+    }
+    .nuage-word-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .nuage-words-list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+    .nuage-words-list::-webkit-scrollbar { width: 6px; }
+    .nuage-words-list::-webkit-scrollbar-track { background: var(--bg-dark); }
+    .nuage-words-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ===================== TIMER ===================== */
+    .timer-mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+    .timer-mode-btn {
+      flex: 1; padding: 10px;
+      border: 2px solid var(--border);
+      background: var(--bg-dark); color: var(--text-muted);
+      border-radius: 6px; cursor: pointer;
+      font-weight: 600; font-size: 12px; transition: all 0.2s;
+    }
+    .timer-mode-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+    .timer-mode-btn:hover:not(.active) { background: var(--border); }
+
+    .timer-preview-box {
+      background: var(--bg-dark); padding: 16px; border-radius: 8px;
+      text-align: center; margin-bottom: 12px; border: 1px solid var(--border);
+    }
+    .timer-preview-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
+    .timer-preview-time { font-size: 36px; font-weight: 900; color: var(--text); font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+
+    .timer-presets-title { font-size: 11px; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .timer-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .timer-preset-btn {
+      flex: 1; min-width: 60px; padding: 8px 10px;
+      background: var(--bg-dark); border: 1px solid var(--border);
+      color: var(--text); border-radius: 4px; cursor: pointer;
+      font-weight: 600; font-size: 11px; transition: all 0.2s;
+    }
+    .timer-preset-btn:hover { background: var(--border); border-color: var(--accent); }
+
+    .timer-custom-title { font-size: 11px; margin-bottom: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .timer-digits { display: flex; justify-content: center; align-items: center; gap: 8px; background: var(--bg-dark); padding: 12px; border-radius: 8px; }
+    .timer-digit-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .timer-digit-value { font-size: 24px; font-weight: 900; color: var(--text); font-family: 'Courier New', monospace; min-width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+    .timer-digit-btns { display: flex; flex-direction: column; gap: 3px; }
+    .timer-digit-btn {
+      width: 32px; height: 24px; padding: 0;
+      background: var(--border); border: 1px solid var(--border);
+      color: var(--text); border-radius: 4px; cursor: pointer;
+      font-size: 14px; font-weight: bold; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .timer-digit-btn:hover:not(:disabled) { background: #475569; }
+    .timer-digit-btn:active { transform: scale(0.95); }
+    .timer-digit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .timer-digit-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+    .timer-colon { font-size: 24px; font-weight: 900; color: var(--border); margin: 0 2px; padding-bottom: 28px; }
+    .timer-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .timer-controls button { font-size: 12px; }
+    .timer-reset-btn { grid-column: 1 / -1; }
+
+    /* ===================== COMMENTAIRES - LAYOUT 2 COL ===================== */
+    .comments-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .comments-overlay-status { display: flex; align-items: center; gap: 6px; }
+
+    .comments-toggle-row {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-dark);
+    }
+
+    .comments-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
       background: var(--border);
-      margin: 12px 0;
+      flex: 1;
+    }
+
+    .comments-col {
+      background: var(--bg-card);
+      padding: 12px;
+      min-height: 480px;
+      max-height: 560px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .comments-col::-webkit-scrollbar { width: 6px; }
+    .comments-col::-webkit-scrollbar-track { background: var(--bg-dark); }
+    .comments-col::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .comments-col-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .comments-col-title {
+      font-size: 13px; font-weight: 700; color: var(--text-muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .comments-col-actions { display: flex; gap: 6px; }
+
+    .comments-list { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+
+    .comment-item {
+      background: var(--bg-dark);
+      border: 2px solid transparent;
+      border-radius: 8px; padding: 10px;
+      cursor: pointer; transition: all 0.15s;
+      position: relative;
+    }
+    .comment-item:hover { border-color: var(--border); }
+    .comment-item.selected { border-color: var(--success); box-shadow: 0 0 0 1px var(--success); }
+    .comment-item.sent { opacity: 0.55; }
+    .comment-item.displayed { opacity: 0.45; background: #141424; }
+
+    .comment-author { font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
+    .comment-text { font-size: 12px; color: var(--text); line-height: 1.4; margin-bottom: 6px; }
+    .comment-actions { display: flex; gap: 5px; justify-content: flex-end; }
+    .comment-sent-badge {
+      position: absolute; top: 6px; right: 6px;
+      color: var(--success); font-size: 14px; display: none;
+    }
+    .comment-item.sent .comment-sent-badge { display: block; }
+
+    .comments-empty {
+      text-align: center; padding: 30px 20px;
+      color: var(--text-muted); font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Header compact -->
+  <div id="mainContainer" class="container narrow">
+
+    <!-- Header -->
     <div class="header">
       <div class="auth-inputs">
         <input type="text" id="roomId" placeholder="Room ID (ex: DEMO_CLIENT)">
@@ -588,22 +504,21 @@
 
     <!-- Onglets -->
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('quiz')">❓ QUESTION</button>
-      <button class="tab" onclick="switchTab('nuage')">☁️ NUAGE</button>
-      <button class="tab" onclick="switchTab('roue')">🎡 ROUE</button>
-      <button class="tab" onclick="switchTab('timer')">⌚️ TEMPS</button>
-      <button class="tab" onclick="switchTab('match')">🆚 MATCH</button>
+      <button class="tab active" onclick="switchTab('quiz', this)">❓</button>
+      <button class="tab" onclick="switchTab('nuage', this)">☁️</button>
+      <button class="tab" onclick="switchTab('roue', this)">🎡</button>
+      <button class="tab" onclick="switchTab('timer', this)">🕔</button>
+      <button class="tab" onclick="switchTab('match', this)">↔️</button>
+      <button class="tab" onclick="switchTab('commentaires', this)">💬</button>
     </div>
 
-    <!-- Contenu Quiz -->
+    <!-- ===================== ONGLET QUIZ ===================== -->
     <div id="tabQuiz" class="tab-content active">
-      <!-- Indicateur overlay -->
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
-        <div id="statusQuiz" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
-        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      <div class="overlay-status">
+        <div id="statusQuiz" class="overlay-status-dot"></div>
+        <span class="overlay-status-label">Overlay</span>
       </div>
-
-      <div class="timer-separator"></div>
+      <div class="separator"></div>
 
       <div class="quiz-header">
         <div class="section-title">Question / Sondage</div>
@@ -615,36 +530,22 @@
       </select>
 
       <div class="quiz-grid">
-        <button id="btnLoadQuestion" class="btn-success" onclick="loadQuestion()">
-          1. ❓ Charger
-        </button>
-        <button id="btnShowOptions" class="btn-secondary" onclick="showOptions()" disabled>
-          2. 🗳️ Options
-        </button>
-        <button id="btnShowResults" class="btn-secondary" onclick="showResults()" disabled>
-          3. 📊 Résultats
-        </button>
-        <button id="btnRevealAnswer" class="btn-secondary" onclick="revealAnswer()" disabled>
-          4. ✅ Réponse
-        </button>
+        <button class="btn-success" onclick="loadQuestion()">1. ❓ Charger</button>
+        <button id="btnShowOptions" class="btn-secondary" onclick="showOptions()" disabled>2. 🗳️ Options</button>
+        <button id="btnShowResults" class="btn-secondary" onclick="showResults()" disabled>3. 📊 Résultats</button>
+        <button id="btnRevealAnswer" class="btn-secondary" onclick="revealAnswer()" disabled>4. ✅ Réponse</button>
       </div>
-
-      <button id="btnResetQuiz" class="btn-danger" onclick="resetQuiz()" disabled>
-        5. 🔄 Réinitialiser
-      </button>
-
-      <div id="messageQuiz" class="message"></div>
+      <button id="btnResetQuiz" class="btn-danger" onclick="resetQuiz()" disabled>5. 🔄 Réinitialiser</button>
+      <div id="messageQuiz" class="flash-msg"></div>
     </div>
 
-    <!-- Contenu Nuage -->
+    <!-- ===================== ONGLET NUAGE ===================== -->
     <div id="tabNuage" class="tab-content">
-      <!-- Indicateur overlay -->
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
-        <div id="statusNuage" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
-        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      <div class="overlay-status">
+        <div id="statusNuage" class="overlay-status-dot"></div>
+        <span class="overlay-status-label">Overlay</span>
       </div>
-
-      <div class="timer-separator"></div>
+      <div class="separator"></div>
 
       <div class="toggle-container">
         <div class="toggle-label">
@@ -654,18 +555,36 @@
         <div id="toggleNuage" class="toggle-switch" onclick="toggleOverlay('nuage_de_mots')"></div>
       </div>
 
-      <div id="messageNuage" class="message"></div>
-    </div>
-
-    <!-- Contenu Roue -->
-    <div id="tabRoue" class="tab-content">
-      <!-- Indicateur overlay -->
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
-        <div id="statusRoue" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
-        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      <!-- Section modération NUAGE - collapsible -->
+      <div class="moderation-section">
+        <div class="moderation-header" onclick="toggleModerationNuage()">
+          <div class="moderation-header-left">
+            🔍 Modération mots
+            <span id="nuageWordCount" class="moderation-count">0</span>
+          </div>
+          <span id="nuageChevron" class="moderation-chevron">▼</span>
+        </div>
+        <div id="nuageModerationBody" class="moderation-body">
+          <div id="nuageWordsList" class="nuage-words-list">
+            <div class="empty-participants">Aucun mot pour l'instant</div>
+          </div>
+          <div class="separator"></div>
+          <button class="btn-danger" onclick="clearAllNuage()" style="font-size:12px; padding:8px;">
+            🧹 Vider tout le nuage
+          </button>
+        </div>
       </div>
 
-      <div class="timer-separator"></div>
+      <div id="messageNuage" class="flash-msg"></div>
+    </div>
+
+    <!-- ===================== ONGLET ROUE ===================== -->
+    <div id="tabRoue" class="tab-content">
+      <div class="overlay-status">
+        <div id="statusRoue" class="overlay-status-dot"></div>
+        <span class="overlay-status-label">Overlay</span>
+      </div>
+      <div class="separator"></div>
 
       <div class="toggle-container">
         <div class="toggle-label">
@@ -676,402 +595,483 @@
       </div>
 
       <div id="roueControls" class="roue-controls">
+
+        <!-- Mode consécutif -->
+        <div class="consecutive-toggle">
+          <div class="consecutive-label">
+            🔁 Mode consécutif — <span>gagnant retiré après chaque spin</span>
+          </div>
+          <div id="toggleConsecutif" class="toggle-switch" style="width:38px; height:22px;"
+               onclick="toggleConsecutifMode()"></div>
+        </div>
+
         <!-- Toggle Collecte -->
-        <div class="toggle-container" style="margin-bottom: 12px;">
+        <div class="toggle-container" style="margin-bottom: 10px;">
           <div class="toggle-label">
-            <span style="font-size: 13px;">📝 Fermer la collecte pour lancer la roue</span>
+            <span style="font-size: 13px;">📝 Fermer collecte pour lancer</span>
           </div>
           <div id="toggleCollecte" class="toggle-switch" onclick="toggleCollecte()"></div>
         </div>
 
-        <!-- Boutons actions -->
-        <button class="btn-success roue-action-btn" onclick="spinRoue()">
-          🎡 Lancer la roue
-        </button>
-        <button class="btn-danger" onclick="resetRoue()">
-          🔄 Reset Roue
-        </button>
+        <!-- Lancer / Reset -->
+        <button class="btn-success roue-action-btn" onclick="spinRoue()">🎡 Lancer la roue</button>
+        <button class="btn-danger" onclick="resetRoue()">🔄 Reset Roue</button>
+
+        <!-- Section modération ROUE - collapsible -->
+        <div class="moderation-section" style="margin-top:12px;">
+          <div class="moderation-header" onclick="toggleModerationRoue()">
+            <div class="moderation-header-left">
+              👥 Participants
+              <span id="roueParticipantCount" class="moderation-count">0</span>
+            </div>
+            <span id="roueChevron" class="moderation-chevron">▼</span>
+          </div>
+          <div id="roueModerationBody" class="moderation-body">
+            <!-- Ajout manuel -->
+            <div class="add-participant-row">
+              <input type="text" id="newParticipantInput" placeholder="Ajouter un nom…" maxlength="40"
+                     onkeydown="if(event.key==='Enter') addParticipantManual()">
+              <button class="btn-primary btn-small" onclick="addParticipantManual()" style="padding:7px 12px;">➕ Ajouter</button>
+            </div>
+            <!-- Liste -->
+            <div id="participantsList" class="participants-list">
+              <div class="empty-participants">Aucun participant pour l'instant</div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <div id="messageRoue" class="message"></div>
+      <div id="messageRoue" class="flash-msg"></div>
     </div>
 
-    <!-- Contenu Timer -->
+    <!-- ===================== ONGLET COMMENTAIRES ===================== -->
+    <div id="tabCommentaires" class="tab-content comments-tab">
+
+      <!-- Header commentaires -->
+      <div class="comments-header">
+        <div class="comments-overlay-status">
+          <div id="statusCommentaires" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Overlay</span>
+        </div>
+        <div style="flex:1;"></div>
+        <div id="messageCommentaires" class="flash-msg" style="margin-top:0; flex:0 0 auto;"></div>
+      </div>
+
+      <!-- Toggle activation overlay commentaires -->
+      <div class="comments-toggle-row">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px;">
+            💬 <span>Commentaires</span>
+          </div>
+          <div id="toggleCommentaires" class="toggle-switch" onclick="toggleOverlay('commentaires')"></div>
+        </div>
+      </div>
+
+      <!-- 2 colonnes Flux / En attente -->
+      <div class="comments-columns">
+        <!-- Flux -->
+        <div class="comments-col">
+          <div class="comments-col-header">
+            <div class="comments-col-title">📥 FLUX</div>
+            <div class="comments-col-actions">
+              <button class="btn-small btn-danger" onclick="resetFlux()">🧹 Nettoyer</button>
+            </div>
+          </div>
+          <div id="fluxList" class="comments-list">
+            <div class="comments-empty">Aucun message pour l'instant</div>
+          </div>
+        </div>
+
+        <!-- En attente -->
+        <div class="comments-col">
+          <div class="comments-col-header">
+            <div class="comments-col-title">📺 EN ATTENTE</div>
+            <div class="comments-col-actions">
+              <button class="btn-small btn-success" onclick="showComment()">👁️ Afficher</button>
+              <button class="btn-small btn-secondary" onclick="hideComment()">🙈 Masquer</button>
+              <button class="btn-small btn-danger" onclick="resetQueue()">🧹 Vider</button>
+            </div>
+          </div>
+          <div id="queueList" class="comments-list">
+            <div class="comments-empty">Aucun commentaire en attente</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== ONGLET TIMER ===================== -->
     <div id="tabTimer" class="tab-content">
-      <!-- Indicateur rond vert/rouge dynamique -->
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
-        <div id="statusTimer" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
-        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      <div class="overlay-status">
+        <div id="statusTimer" class="overlay-status-dot"></div>
+        <span class="overlay-status-label">Overlay</span>
       </div>
+      <div class="separator"></div>
 
-      <div class="timer-separator"></div>
-
-      <!-- Toggle Mode -->
       <div class="timer-mode-toggle">
-        <button class="timer-mode-btn active" data-mode="timer" onclick="timerSetMode('timer')">
-          Compte à rebours
-        </button>
-        <button class="timer-mode-btn" data-mode="chrono" onclick="timerSetMode('chrono')">
-          Chronomètre
-        </button>
+        <button class="timer-mode-btn active" data-mode="timer" onclick="timerSetMode('timer')">Compte à rebours</button>
+        <button class="timer-mode-btn" data-mode="chrono" onclick="timerSetMode('chrono')">Chronomètre</button>
       </div>
 
-      <!-- Aperçu -->
       <div class="timer-preview-box">
         <div class="timer-preview-label">Temps configuré</div>
         <div class="timer-preview-time" id="timerPreview">00:00</div>
       </div>
 
-      <!-- ✅ CONTRÔLES (déplacés ici, juste après l'aperçu) -->
       <div class="timer-controls">
-        <button class="btn-success" onclick="timerStart()">
-          ▶️ Start
-        </button>
-        <button class="btn-secondary" onclick="timerPause()">
-          ⏸️ Pause
-        </button>
-        <button class="btn-danger timer-reset-btn" onclick="timerReset()">
-          🔄 Reset
-        </button>
+        <button class="btn-success" onclick="timerStart()">▶️ Start</button>
+        <button class="btn-secondary" onclick="timerPause()">⏸️ Pause</button>
+        <button class="btn-danger timer-reset-btn" onclick="timerReset()">🔄 Reset</button>
       </div>
 
-      <div class="timer-separator"></div>
-
-      <!-- Presets -->
-      <div class="timer-presets">
-        <div class="timer-presets-title">⚡ Presets rapides</div>
-        <div class="timer-preset-row">
-          <button class="timer-preset-btn" onclick="timerPreset(10)">10s</button>
-          <button class="timer-preset-btn" onclick="timerPreset(20)">20s</button>
-          <button class="timer-preset-btn" onclick="timerPreset(30)">30s</button>
+      <!-- Presets rapides — collapsible -->
+      <div class="moderation-section" style="margin-top:12px;">
+        <div class="moderation-header" onclick="toggleTimerPresets()">
+          <div class="moderation-header-left">⚡ Presets rapides</div>
+          <span id="timerPresetsChevron" class="moderation-chevron">▼</span>
         </div>
-        <div class="timer-preset-row">
-          <button class="timer-preset-btn" onclick="timerPreset(60)">1min</button>
-          <button class="timer-preset-btn" onclick="timerPreset(120)">2min</button>
-          <button class="timer-preset-btn" onclick="timerPreset(300)">5min</button>
-        </div>
-        <div class="timer-preset-row">
-          <button class="timer-preset-btn" onclick="timerPreset(900)">15min</button>
-          <button class="timer-preset-btn" onclick="timerPreset(1200)">20min</button>
-          <button class="timer-preset-btn" onclick="timerPreset(1800)">30min</button>
-        </div>
-      </div>
-
-      <div class="timer-separator"></div>
-
-      <!-- Custom -->
-      <div class="timer-custom">
-        <div class="timer-custom-title">🎛️ Personnalisé</div>
-        <div class="timer-digits">
-          <!-- Dizaine minutes -->
-          <div class="timer-digit-group">
-            <div class="timer-digit-btns">
-              <button class="timer-digit-btn" onclick="timerAdjust(600)">+</button>
-              <button class="timer-digit-btn" onclick="timerAdjust(-600)">−</button>
-            </div>
-            <div class="timer-digit-value" id="timerDigitM10">0</div>
-            <div class="timer-digit-label">Diz min</div>
+        <div id="timerPresetsBody" class="moderation-body">
+          <div class="timer-preset-row" style="margin-top:4px;">
+            <button class="timer-preset-btn" onclick="timerPreset(10)">10s</button>
+            <button class="timer-preset-btn" onclick="timerPreset(20)">20s</button>
+            <button class="timer-preset-btn" onclick="timerPreset(30)">30s</button>
           </div>
-
-          <!-- Unité minutes -->
-          <div class="timer-digit-group">
-            <div class="timer-digit-btns">
-              <button class="timer-digit-btn" onclick="timerAdjust(60)">+</button>
-              <button class="timer-digit-btn" onclick="timerAdjust(-60)">−</button>
-            </div>
-            <div class="timer-digit-value" id="timerDigitM1">0</div>
-            <div class="timer-digit-label">Unit min</div>
+          <div class="timer-preset-row">
+            <button class="timer-preset-btn" onclick="timerPreset(60)">1min</button>
+            <button class="timer-preset-btn" onclick="timerPreset(120)">2min</button>
+            <button class="timer-preset-btn" onclick="timerPreset(300)">5min</button>
           </div>
-
-          <!-- Colon -->
-          <div class="timer-colon">:</div>
-
-          <!-- Dizaine secondes -->
-          <div class="timer-digit-group">
-            <div class="timer-digit-btns">
-              <button class="timer-digit-btn" onclick="timerAdjust(10)">+</button>
-              <button class="timer-digit-btn" onclick="timerAdjust(-10)">−</button>
-            </div>
-            <div class="timer-digit-value" id="timerDigitS10">0</div>
-            <div class="timer-digit-label">Diz sec</div>
-          </div>
-
-          <!-- Unité secondes -->
-          <div class="timer-digit-group">
-            <div class="timer-digit-btns">
-              <button class="timer-digit-btn" onclick="timerAdjust(1)">+</button>
-              <button class="timer-digit-btn" onclick="timerAdjust(-1)">−</button>
-            </div>
-            <div class="timer-digit-value" id="timerDigitS1">0</div>
-            <div class="timer-digit-label">Unit sec</div>
+          <div class="timer-preset-row">
+            <button class="timer-preset-btn" onclick="timerPreset(900)">15min</button>
+            <button class="timer-preset-btn" onclick="timerPreset(1200)">20min</button>
+            <button class="timer-preset-btn" onclick="timerPreset(1800)">30min</button>
           </div>
         </div>
       </div>
 
-      <div id="messageTimer" class="message"></div>
+      <!-- Personnalisé — collapsible -->
+      <div class="moderation-section" style="margin-top:8px;">
+        <div class="moderation-header" onclick="toggleTimerCustom()">
+          <div class="moderation-header-left">🎛️ Personnalisé</div>
+          <span id="timerCustomChevron" class="moderation-chevron">▼</span>
+        </div>
+        <div id="timerCustomBody" class="moderation-body">
+          <div class="timer-digits" style="margin-top:4px;">
+            <div class="timer-digit-group">
+              <div class="timer-digit-btns">
+                <button class="timer-digit-btn" onclick="timerAdjust(600)">+</button>
+                <button class="timer-digit-btn" onclick="timerAdjust(-600)">−</button>
+              </div>
+              <div class="timer-digit-value" id="timerDigitM10">0</div>
+              <div class="timer-digit-label">Diz min</div>
+            </div>
+            <div class="timer-digit-group">
+              <div class="timer-digit-btns">
+                <button class="timer-digit-btn" onclick="timerAdjust(60)">+</button>
+                <button class="timer-digit-btn" onclick="timerAdjust(-60)">−</button>
+              </div>
+              <div class="timer-digit-value" id="timerDigitM1">0</div>
+              <div class="timer-digit-label">Unit min</div>
+            </div>
+            <div class="timer-colon">:</div>
+            <div class="timer-digit-group">
+              <div class="timer-digit-btns">
+                <button class="timer-digit-btn" onclick="timerAdjust(10)">+</button>
+                <button class="timer-digit-btn" onclick="timerAdjust(-10)">−</button>
+              </div>
+              <div class="timer-digit-value" id="timerDigitS10">0</div>
+              <div class="timer-digit-label">Diz sec</div>
+            </div>
+            <div class="timer-digit-group">
+              <div class="timer-digit-btns">
+                <button class="timer-digit-btn" onclick="timerAdjust(1)">+</button>
+                <button class="timer-digit-btn" onclick="timerAdjust(-1)">−</button>
+              </div>
+              <div class="timer-digit-value" id="timerDigitS1">0</div>
+              <div class="timer-digit-label">Unit sec</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="messageTimer" class="flash-msg" style="margin-top:12px;"></div>
     </div>
 
-    <!-- Contenu Match -->
+    <!-- ===================== ONGLET MATCH ===================== -->
     <div id="tabMatch" class="tab-content">
-      <!-- Indicateur rond vert/rouge dynamique -->
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px;">
-        <div id="statusMatch" style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; transition: all 0.3s;"></div>
-        <span style="font-size: 13px; color: #94a3b8;">Overlay</span>
+      <div class="overlay-status">
+        <div id="statusMatch" class="overlay-status-dot"></div>
+        <span class="overlay-status-label">Overlay</span>
       </div>
+      <div class="separator"></div>
 
-      <div class="timer-separator"></div>
-
-      <!-- 2 Colonnes scores -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-        <!-- Équipe A -->
-        <div style="text-align: center;">
-          <div style="font-size: 16px; font-weight: 700; color: #3b82f6; margin-bottom: 12px;">
-            ÉQUIPE A
-          </div>
-          <div style="font-size: 48px; font-weight: 900; color: #f1f5f9; margin-bottom: 12px;" id="matchScoreA">
-            0
-          </div>
-          <div style="display: flex; gap: 8px; justify-content: center;">
-            <button class="btn-danger" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('A', -1)">−</button>
-            <button class="btn-success" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('A', 1)">+</button>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div style="text-align:center;">
+          <div style="font-size:16px; font-weight:700; color:#3b82f6; margin-bottom:12px;">ÉQUIPE A</div>
+          <div style="font-size:48px; font-weight:900; color:var(--text); margin-bottom:12px;" id="matchScoreA">0</div>
+          <div style="display:flex; gap:8px; justify-content:center;">
+            <button class="btn-danger" style="width:50px; height:50px; font-size:24px;" onclick="matchAdjustScore('A',-1)">−</button>
+            <button class="btn-success" style="width:50px; height:50px; font-size:24px;" onclick="matchAdjustScore('A',1)">+</button>
           </div>
         </div>
-
-        <!-- Équipe B -->
-        <div style="text-align: center;">
-          <div style="font-size: 16px; font-weight: 700; color: #ef4444; margin-bottom: 12px;">
-            ÉQUIPE B
-          </div>
-          <div style="font-size: 48px; font-weight: 900; color: #f1f5f9; margin-bottom: 12px;" id="matchScoreB">
-            0
-          </div>
-          <div style="display: flex; gap: 8px; justify-content: center;">
-            <button class="btn-danger" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('B', -1)">−</button>
-            <button class="btn-success" style="width: 50px; height: 50px; font-size: 24px;" onclick="matchAdjustScore('B', 1)">+</button>
+        <div style="text-align:center;">
+          <div style="font-size:16px; font-weight:700; color:#ef4444; margin-bottom:12px;">ÉQUIPE B</div>
+          <div style="font-size:48px; font-weight:900; color:var(--text); margin-bottom:12px;" id="matchScoreB">0</div>
+          <div style="display:flex; gap:8px; justify-content:center;">
+            <button class="btn-danger" style="width:50px; height:50px; font-size:24px;" onclick="matchAdjustScore('B',-1)">−</button>
+            <button class="btn-success" style="width:50px; height:50px; font-size:24px;" onclick="matchAdjustScore('B',1)">+</button>
           </div>
         </div>
       </div>
-
-      <!-- Bouton Reset -->
-      <button class="btn-danger" style="width: 100%;" onclick="matchReset()">
-        🔄 Réinitialiser les scores
-      </button>
-
-      <div id="messageMatch" class="message"></div>
+      <button class="btn-danger" onclick="matchReset()">🔄 Réinitialiser les scores</button>
+      <div id="messageMatch" class="flash-msg"></div>
     </div>
-  </div>
+
+  </div><!-- /container -->
 
   <script>
     const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
-    
+
+    // ===================== STATE =====================
     let socket = null;
     let connected = false;
     let currentRoom = "";
     let currentKey = "";
     let questions = [];
     let currentQuestionType = null;
-    
+
     let overlayStates = {
       nuage_de_mots: false,
       roue_loto: false,
       roue_collecte: false,
       quiz_ou_sondage: false,
       timer_chrono: false,
-      match_equipes: false
+      match_equipes: false,
+      commentaires: false
     };
 
-    // Timer state
+    // Timer
     let timerMode = "timer";
     let timerSeconds = 60;
     let timerRunning = false;
-    let timerDisplayBeforeStart = false;
 
-    // Match state
+    // Match
     let matchScoreA = 0;
-    let matchScoreB = 0; // Affichage avant démarrage
+    let matchScoreB = 0;
 
+    // Nuage — mots locaux (mis à jour depuis overlay:state)
+    let nuageWords = {}; // { mot: count }
+
+    // Roue — participants locaux
+    let roueParticipants = []; // [{ name, key }] ou [string]
+    let consecutifMode = false;
+
+    // Commentaires
+    let fluxMessages = [];
+    let queueMessages = [];
+    let selectedQueueId = null;
+
+    // ===================== HELPERS =====================
     const $ = (id) => document.getElementById(id);
+    const pad2 = (n) => String(n).padStart(2, "0");
 
-    // --- HELPERS ---
-    function pad2(n) {
-      return String(n).padStart(2, "0");
+    function updateStatusDot(id, isActive) {
+      const el = $(id);
+      if (!el) return;
+      el.style.background = isActive ? "#22c55e" : "#ef4444";
+      el.style.boxShadow = isActive ? "0 0 0 3px rgba(34,197,94,0.2)" : "none";
     }
 
-    // Mettre à jour indicateur rond vert/rouge
-    function updateStatusIndicator(statusId, isActive) {
-      const el = $(statusId);
-      if (el) {
-        el.style.background = isActive ? "#22c55e" : "#ef4444";
-        el.style.boxShadow = isActive ? "0 0 0 3px rgba(34, 197, 94, 0.2)" : "none";
-      }
+    function flash(tabId, text, type = "success") {
+      const el = $("message" + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+      if (!el) return;
+      el.textContent = text;
+      el.className = `flash-msg ${type} show`;
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.remove("show"), 3000);
     }
 
-    // --- ONGLETS ---
-    function switchTab(tab) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      
-      event.target.classList.add('active');
-      $('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
-    }
+    // ===================== ONGLETS =====================
+    let currentTab = "quiz";
 
-    // --- UI ---
-    function setConnectionStatus(isConnected) {
-      connected = isConnected;
-      $("statusDot").className = isConnected ? "status-dot connected" : "status-dot";
-    }
+    function switchTab(tab, btnEl) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
 
-    function showMessage(tabId, text, type = "success") {
-      const msg = $("message" + tabId);
-      msg.textContent = text;
-      msg.className = `message ${type} show`;
-      setTimeout(() => {
-        msg.classList.remove("show");
-      }, 3000);
-    }
+      if (btnEl) btnEl.classList.add("active");
+      const contentEl = $("tab" + tab.charAt(0).toUpperCase() + tab.slice(1));
+      if (contentEl) contentEl.classList.add("active");
 
-    function updateToggle(overlayName, isActive) {
-      overlayStates[overlayName] = isActive;
-      
-      if (overlayName === "nuage_de_mots") {
-        $("toggleNuage").className = isActive ? "toggle-switch active" : "toggle-switch";
-        updateStatusIndicator("statusNuage", isActive);
-      }
-      if (overlayName === "roue_loto") {
-        $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
-        $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
-        updateStatusIndicator("statusRoue", isActive);
-        
-        // Auto-démarrer collecte si roue activée
-        if (isActive && !overlayStates.roue_collecte) {
-          setTimeout(() => {
-            startCollect();
-          }, 300);
-        }
-      }
-      if (overlayName === "timer_chrono") {
-        // Géré ailleurs
-      }
-    }
+      currentTab = tab;
 
-    function updateCollecteToggle(isActive) {
-      overlayStates.roue_collecte = isActive;
-      $("toggleCollecte").className = isActive ? "toggle-switch active" : "toggle-switch";
-    }
-
-    function updateQuizUI(isActive, questionType = null) {
-      overlayStates.quiz_ou_sondage = isActive;
-      currentQuestionType = questionType;
-
-      const status = $("quizStatus");
-      const btnOptions = $("btnShowOptions");
-      const btnResults = $("btnShowResults");
-      const btnReveal = $("btnRevealAnswer");
-      const btnReset = $("btnResetQuiz");
-
-      updateStatusIndicator("statusQuiz", isActive);
-
-      if (isActive) {
-        status.textContent = questionType === "poll" ? "Sondage" : "Quiz";
-        status.className = questionType === "poll" ? "quiz-status poll" : "quiz-status active";
-        
-        btnOptions.disabled = false;
-        btnResults.disabled = false;
-        btnReset.disabled = false;
-        btnReveal.disabled = (questionType === "poll");
+      // Redimensionner le container selon l'onglet
+      const container = $("mainContainer");
+      if (tab === "commentaires") {
+        container.classList.remove("narrow");
+        container.classList.add("wide");
       } else {
-        status.textContent = "Inactif";
-        status.className = "quiz-status idle";
-        
-        btnOptions.disabled = true;
-        btnResults.disabled = true;
-        btnReveal.disabled = true;
-        btnReset.disabled = true;
+        container.classList.remove("wide");
+        container.classList.add("narrow");
       }
     }
 
-    // --- CONNEXION ---
+    // ===================== CONNEXION =====================
     async function connect() {
       const room = $("roomId").value.trim();
       const key = $("roomKey").value.trim();
 
-      if (!room || !key) {
-        showMessage("Quiz", "⚠️ Room ID et Key requis", "error");
-        return;
-      }
+      if (!room || !key) { flash("quiz", "⚠️ Room ID et Key requis", "error"); return; }
 
       currentRoom = room;
       currentKey = key;
 
       if (socket) socket.disconnect();
 
-      socket = io(SERVER_URL, {
-        transports: ["websocket", "polling"],
-        reconnection: true
-      });
+      socket = io(SERVER_URL, { transports: ["websocket", "polling"], reconnection: true });
 
       socket.on("connect", () => {
-        console.log("✅ Connecté");
-        setConnectionStatus(true);
+        console.log("✅ [REMOTE] Connecté");
+        connected = true;
+        $("statusDot").className = "status-dot connected";
         socket.emit("rejoindre_salle", currentRoom);
         loadQuestionCatalog();
-        showMessage("Quiz", "✅ Connecté", "success");
-        
-        // Activer automatiquement timer
-        setTimeout(() => {
-          socket.emit("control:activate_overlay", {
-            room: currentRoom,
-            overlay: "timer_chrono"
-          });
-        }, 500);
+        flash("quiz", "✅ Connecté", "success");
 
-        // Activer automatiquement match
-        setTimeout(() => {
-          socket.emit("control:activate_overlay", {
-            room: currentRoom,
-            overlay: "match_equipes"
-          });
-        }, 700);
+        // Activer timer et match en arrière-plan
+        setTimeout(() => socket.emit("control:activate_overlay", { room: currentRoom, overlay: "timer_chrono" }), 500);
+        setTimeout(() => socket.emit("control:activate_overlay", { room: currentRoom, overlay: "match_equipes" }), 700);
       });
 
-      socket.on("connect_error", (err) => {
-        console.error("❌ Erreur:", err);
-        setConnectionStatus(false);
-        showMessage("Quiz", "❌ Erreur connexion", "error");
+      socket.on("connect_error", () => {
+        connected = false;
+        $("statusDot").className = "status-dot";
+        flash("quiz", "❌ Erreur connexion", "error");
       });
 
       socket.on("disconnect", () => {
-        console.warn("⚠️ Déconnecté");
-        setConnectionStatus(false);
+        connected = false;
+        $("statusDot").className = "status-dot";
       });
 
       socket.on("overlay:state", (payload) => {
-        console.log("📡 État:", payload);
+        console.log("📡 [REMOTE] État:", payload.overlay, payload.state);
         handleOverlayState(payload);
       });
 
       socket.on("overlay:forbidden", () => {
-        showMessage("Quiz", "❌ Accès refusé", "error");
-        setConnectionStatus(false);
-      });
-
-      // Event timer
-      socket.on("control:timer_chrono", (payload) => {
-        console.log("⏱️ Timer event:", payload);
+        flash("quiz", "❌ Accès refusé", "error");
+        connected = false;
+        $("statusDot").className = "status-dot";
       });
     }
 
-    // --- CATALOGUE ---
+    // ===================== ÉTATS OVERLAY =====================
+    function handleOverlayState(payload) {
+      const { overlay, state, data } = payload;
+
+      if (overlay === "nuage_de_mots") {
+        const isActive = state === "active";
+        overlayStates.nuage_de_mots = isActive;
+        $("toggleNuage").className = isActive ? "toggle-switch active" : "toggle-switch";
+        updateStatusDot("statusNuage", isActive);
+
+        if (isActive && data && data.words) {
+          nuageWords = { ...data.words };
+        } else if (!isActive) {
+          nuageWords = {};
+        }
+        renderNuageWords();
+      }
+
+      if (overlay === "roue_loto") {
+        const isActive = state !== "idle";
+        overlayStates.roue_loto = isActive;
+        $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
+        $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
+        updateStatusDot("statusRoue", isActive);
+
+        if (data && data.participants) {
+          roueParticipants = data.participants.map(p => typeof p === "string" ? { name: p, key: p.toLowerCase() } : p);
+        } else if (!isActive) {
+          roueParticipants = [];
+        }
+        renderParticipants();
+
+        if (isActive && !overlayStates.roue_collecte) {
+          // Auto-start collecte si la roue vient d'être activée
+          if (state === "active") {
+            setTimeout(() => startCollect(), 300);
+          }
+        }
+
+        if (state === "collecting") overlayStates.roue_collecte = true;
+        if (state === "ready") overlayStates.roue_collecte = false;
+        updateCollecteToggle(state === "collecting");
+      }
+
+      if (overlay === "quiz_ou_sondage") {
+        const isActive = state !== "idle";
+        const questionType = data?.question?.type || null;
+        updateQuizUI(isActive, questionType);
+      }
+
+      if (overlay === "timer_chrono") {
+        updateStatusDot("statusTimer", state === "active");
+      }
+
+      if (overlay === "match_equipes") {
+        updateStatusDot("statusMatch", state === "active");
+        if (data) {
+          if (data.teamA) { matchScoreA = data.teamA.score || 0; $("matchScoreA").textContent = matchScoreA; }
+          if (data.teamB) { matchScoreB = data.teamB.score || 0; $("matchScoreB").textContent = matchScoreB; }
+        }
+      }
+
+      if (overlay === "commentaires") {
+        const isActive = state !== "idle";
+        overlayStates.commentaires = isActive;
+        $("toggleCommentaires").className = isActive ? "toggle-switch active" : "toggle-switch";
+        updateStatusDot("statusCommentaires", isActive);
+
+        if (data) {
+          if (data.flux) fluxMessages = data.flux;
+          if (data.queue) queueMessages = data.queue;
+        }
+        renderFlux();
+        renderQueue();
+      }
+    }
+
+    // ===================== QUIZ =====================
+    function updateQuizUI(isActive, questionType) {
+      overlayStates.quiz_ou_sondage = isActive;
+      currentQuestionType = questionType;
+      const status = $("quizStatus");
+      updateStatusDot("statusQuiz", isActive);
+
+      if (isActive) {
+        status.textContent = questionType === "poll" ? "Sondage" : "Quiz";
+        status.className = questionType === "poll" ? "quiz-status poll" : "quiz-status active";
+        $("btnShowOptions").disabled = false;
+        $("btnShowResults").disabled = false;
+        $("btnResetQuiz").disabled = false;
+        $("btnRevealAnswer").disabled = questionType === "poll";
+      } else {
+        status.textContent = "Inactif"; status.className = "quiz-status idle";
+        $("btnShowOptions").disabled = true;
+        $("btnShowResults").disabled = true;
+        $("btnRevealAnswer").disabled = true;
+        $("btnResetQuiz").disabled = true;
+      }
+    }
+
     async function loadQuestionCatalog() {
       try {
         const res = await fetch(`${SERVER_URL}/debug/questions?room=${currentRoom}`);
         const json = await res.json();
-        
         questions = json.data || [];
-        
         const select = $("questionSelect");
         select.innerHTML = '<option value="">-- Choisir --</option>';
-        
         questions.forEach(q => {
           const opt = document.createElement("option");
           opt.value = q.question_key;
@@ -1079,440 +1079,466 @@
           opt.dataset.type = q.type;
           select.appendChild(opt);
         });
-        
-        console.log(`✅ ${questions.length} questions`);
-      } catch (e) {
-        console.error("❌ Erreur catalogue:", e);
-      }
+      } catch (e) { console.error("❌ Catalogue:", e); }
     }
 
-    // --- ÉTATS ---
-    function handleOverlayState(payload) {
-      const { overlay, state, data } = payload;
-
-      if (overlay === "nuage_de_mots") {
-        updateToggle("nuage_de_mots", state === "active");
-      }
-
-      if (overlay === "roue_loto") {
-        updateToggle("roue_loto", state === "active");
-      }
-
-      if (overlay === "quiz_ou_sondage") {
-        const isActive = (state !== "idle");
-        const questionType = data?.question?.type || null;
-        updateQuizUI(isActive, questionType);
-      }
-
-      if (overlay === "timer_chrono") {
-        updateStatusIndicator("statusTimer", state === "active");
-      }
-
-      if (overlay === "match_equipes") {
-        updateStatusIndicator("statusMatch", state === "active");
-      }
+    function loadQuestion() {
+      if (!connected) { flash("quiz", "❌ Connectez-vous", "error"); return; }
+      const questionKey = $("questionSelect").value;
+      if (!questionKey) { flash("quiz", "⚠️ Choisissez une question", "error"); return; }
+      if (overlayStates.nuage_de_mots) socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "nuage_de_mots" });
+      if (overlayStates.roue_loto) socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "roue_loto" });
+      socket.emit("control:load_question", { room: currentRoom, overlay: "quiz_ou_sondage", question_key: questionKey });
     }
+    function showOptions() { if (!connected) return; socket.emit("control:show_options", { room: currentRoom, overlay: "quiz_ou_sondage" }); }
+    function showResults() { if (!connected) return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "results" }); }
+    function revealAnswer() { if (!connected || currentQuestionType === "poll") return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "reveal" }); }
+    function resetQuiz() { if (!connected) return; socket.emit("control:idle", { room: currentRoom, overlay: "quiz_ou_sondage" }); }
 
-    // --- TOGGLE OVERLAYS (AVEC FONDU) ---
+    // ===================== TOGGLE OVERLAY GÉNÉRIQUE =====================
     function toggleOverlay(overlayName) {
-      if (!connected) {
-        const tab = overlayName === "nuage_de_mots" ? "Nuage" : "Roue";
-        showMessage(tab, "❌ Connectez-vous", "error");
-        return;
-      }
+      if (!connected) { flash(overlayName === "nuage_de_mots" ? "nuage" : overlayName, "❌ Connectez-vous", "error"); return; }
 
-      const isCurrentlyActive = overlayStates[overlayName];
-
-      if (isCurrentlyActive) {
-        socket.emit("control:deactivate_overlay", {
-          room: currentRoom,
-          overlay: overlayName
-        });
-        console.log(`🔴 OFF ${overlayName}`);
+      const isActive = overlayStates[overlayName];
+      if (isActive) {
+        socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: overlayName });
       } else {
-        // Désactiver les autres overlays (SAUF TIMER)
-        if (overlayName === "nuage_de_mots" && overlayStates.roue_loto) {
-          socket.emit("control:deactivate_overlay", {
-            room: currentRoom,
-            overlay: "roue_loto"
-          });
-        }
-        if (overlayName === "roue_loto" && overlayStates.nuage_de_mots) {
-          socket.emit("control:deactivate_overlay", {
-            room: currentRoom,
-            overlay: "nuage_de_mots"
-          });
-        }
-        if (overlayStates.quiz_ou_sondage) {
-          socket.emit("control:idle", {
-            room: currentRoom,
-            overlay: "quiz_ou_sondage"
-          });
-        }
-
-        socket.emit("control:activate_overlay", {
-          room: currentRoom,
-          overlay: overlayName
-        });
-        console.log(`🟢 ON ${overlayName}`);
+        // Désactiver concurrents (sauf timer/match/commentaires)
+        if (overlayName === "nuage_de_mots" && overlayStates.roue_loto)
+          socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "roue_loto" });
+        if (overlayName === "nuage_de_mots" && overlayStates.quiz_ou_sondage)
+          socket.emit("control:idle", { room: currentRoom, overlay: "quiz_ou_sondage" });
+        socket.emit("control:activate_overlay", { room: currentRoom, overlay: overlayName });
       }
     }
 
-    // --- ROUE SPÉCIFIQUE ---
-    function toggleRoueOverlay() {
-      if (!connected) {
-        showMessage("Roue", "❌ Connectez-vous", "error");
+    // ===================== NUAGE — MODÉRATION =====================
+    let nuageModerationOpen = false;
+
+    function toggleModerationNuage() {
+      nuageModerationOpen = !nuageModerationOpen;
+      $("nuageModerationBody").className = "moderation-body" + (nuageModerationOpen ? " open" : "");
+      $("nuageChevron").className = "moderation-chevron" + (nuageModerationOpen ? " open" : "");
+    }
+
+    function renderNuageWords() {
+      const list = $("nuageWordsList");
+      const words = Object.entries(nuageWords).sort((a, b) => b[1] - a[1]);
+      $("nuageWordCount").textContent = words.length;
+
+      if (!words.length) {
+        list.innerHTML = '<div class="empty-participants">Aucun mot pour l\'instant</div>';
         return;
       }
 
+      list.innerHTML = words.map(([word, count]) => `
+        <div class="nuage-word-item">
+          <span class="nuage-word-text">${escHtml(word)}</span>
+          <span class="nuage-word-count">${count}×</span>
+          <div class="nuage-word-actions">
+            <button class="btn-small btn-success" onclick="nuageIncrementWord('${escJs(word)}')" title="+1 vote">+1</button>
+            <button class="btn-small btn-danger" onclick="nuageRemoveWord('${escJs(word)}')" title="Supprimer">❌</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function nuageRemoveWord(word) {
+      if (!connected) return;
+      socket.emit("control:nuage_remove_word", { room: currentRoom, word });
+      // Mise à jour locale optimiste
+      delete nuageWords[word];
+      renderNuageWords();
+      console.log(`❌ [NUAGE] Mot supprimé: ${word}`);
+    }
+
+    function nuageIncrementWord(word) {
+      if (!connected) return;
+      socket.emit("control:nuage_word_increment", { room: currentRoom, word });
+      // Mise à jour locale optimiste
+      nuageWords[word] = (nuageWords[word] || 0) + 1;
+      renderNuageWords();
+      console.log(`+1 [NUAGE] Mot incrémenté: ${word}`);
+    }
+
+    function clearAllNuage() {
+      if (!connected) return;
+      if (!confirm("Vider tout le nuage ?")) return;
+      socket.emit("control:nuage_clear_all", { room: currentRoom });
+      nuageWords = {};
+      renderNuageWords();
+    }
+
+    // ===================== ROUE =====================
+    function toggleRoueOverlay() {
+      if (!connected) { flash("roue", "❌ Connectez-vous", "error"); return; }
       const isActive = overlayStates.roue_loto;
-
       if (isActive) {
-        // Désactiver roue
-        socket.emit("control:deactivate_overlay", {
-          room: currentRoom,
-          overlay: "roue_loto"
-        });
+        socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "roue_loto" });
         updateCollecteToggle(false);
+        roueParticipants = [];
+        renderParticipants();
       } else {
-        // Désactiver autres overlays (SAUF TIMER)
-        if (overlayStates.nuage_de_mots) {
-          socket.emit("control:deactivate_overlay", {
-            room: currentRoom,
-            overlay: "nuage_de_mots"
-          });
-        }
-        if (overlayStates.quiz_ou_sondage) {
-          socket.emit("control:idle", {
-            room: currentRoom,
-            overlay: "quiz_ou_sondage"
-          });
-        }
-
-        // Activer roue
-        socket.emit("control:activate_overlay", {
-          room: currentRoom,
-          overlay: "roue_loto"
-        });
+        if (overlayStates.nuage_de_mots) socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "nuage_de_mots" });
+        if (overlayStates.quiz_ou_sondage) socket.emit("control:idle", { room: currentRoom, overlay: "quiz_ou_sondage" });
+        socket.emit("control:activate_overlay", { room: currentRoom, overlay: "roue_loto" });
       }
     }
 
     function toggleCollecte() {
       if (!connected || !overlayStates.roue_loto) return;
-
-      const isActive = overlayStates.roue_collecte;
-
-      if (isActive) {
-        stopCollect();
-      } else {
-        startCollect();
-      }
+      if (overlayStates.roue_collecte) stopCollect(); else startCollect();
     }
 
     function startCollect() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:start_collect", { room: currentRoom });
       updateCollecteToggle(true);
-      showMessage("Roue", "📝 Collecte ouverte", "success");
-      console.log("📝 Collecte ouverte");
+      flash("roue", "📝 Collecte ouverte", "success");
     }
 
     function stopCollect() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:stop_collect", { room: currentRoom });
       updateCollecteToggle(false);
-      showMessage("Roue", "🔒 Collecte fermée", "success");
-      console.log("🔒 Collecte fermée");
+      flash("roue", "🔒 Collecte fermée", "success");
+    }
+
+    function updateCollecteToggle(isActive) {
+      overlayStates.roue_collecte = isActive;
+      $("toggleCollecte").className = isActive ? "toggle-switch active" : "toggle-switch";
     }
 
     function spinRoue() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:spin", { room: currentRoom });
-      showMessage("Roue", "🎡 Roue lancée !", "success");
-      console.log("🎡 SPIN");
+      flash("roue", "🎡 Roue lancée !", "success");
     }
 
     function resetRoue() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:reset", { room: currentRoom });
       updateCollecteToggle(false);
-      showMessage("Roue", "🔄 Roue réinitialisée", "success");
-      console.log("🔄 Reset");
+      roueParticipants = [];
+      renderParticipants();
+      flash("roue", "🔄 Roue réinitialisée", "success");
     }
 
-    // --- QUIZ ---
-    function loadQuestion() {
-      if (!connected) {
-        showMessage("Quiz", "❌ Connectez-vous", "error");
+    // Mode consécutif
+    function toggleConsecutifMode() {
+      consecutifMode = !consecutifMode;
+      $("toggleConsecutif").className = consecutifMode ? "toggle-switch active" : "toggle-switch";
+      // Informer le serveur
+      if (connected) {
+        socket.emit("roue:set_consecutif", { room: currentRoom, enabled: consecutifMode });
+      }
+      flash("roue", consecutifMode ? "🔁 Mode consécutif ON" : "🔁 Mode consécutif OFF", "success");
+    }
+
+    // ===================== ROUE — MODÉRATION =====================
+    let roueModerationOpen = false;
+
+    function toggleModerationRoue() {
+      roueModerationOpen = !roueModerationOpen;
+      $("roueModerationBody").className = "moderation-body" + (roueModerationOpen ? " open" : "");
+      $("roueChevron").className = "moderation-chevron" + (roueModerationOpen ? " open" : "");
+    }
+
+    function renderParticipants() {
+      const list = $("participantsList");
+      $("roueParticipantCount").textContent = roueParticipants.length;
+
+      if (!roueParticipants.length) {
+        list.innerHTML = '<div class="empty-participants">Aucun participant pour l\'instant</div>';
         return;
       }
 
-      const questionKey = $("questionSelect").value;
-      if (!questionKey) {
-        showMessage("Quiz", "⚠️ Choisissez une question", "error");
+      list.innerHTML = roueParticipants.map((p, idx) => {
+        const name = typeof p === "string" ? p : p.name;
+        return `
+          <div class="participant-item" id="pitem-${idx}">
+            <span class="participant-name" id="pname-${idx}">${escHtml(name)}</span>
+            <div class="participant-actions">
+              <button class="btn-small btn-secondary" onclick="startEditParticipant(${idx})" title="Éditer">✏️</button>
+              <button class="btn-small btn-danger" onclick="removeParticipant(${idx})" title="Supprimer">❌</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function startEditParticipant(idx) {
+      const nameEl = $(`pname-${idx}`);
+      const currentName = nameEl.textContent;
+
+      // Remplacer le span par un input
+      nameEl.outerHTML = `<input class="participant-edit-input" id="pedit-${idx}"
+        value="${escHtml(currentName)}"
+        onkeydown="handleEditKey(event, ${idx})"
+        onblur="cancelEdit(${idx}, '${escJs(currentName)}')" />`;
+
+      const input = $(`pedit-${idx}`);
+      input.focus();
+      input.select();
+    }
+
+    function handleEditKey(event, idx) {
+      if (event.key === "Enter") { commitEdit(idx); }
+      if (event.key === "Escape") {
+        const input = $(`pedit-${idx}`);
+        const original = input.defaultValue;
+        cancelEdit(idx, original);
+      }
+    }
+
+    function commitEdit(idx) {
+      const input = $(`pedit-${idx}`);
+      if (!input) return;
+      const newName = input.value.trim();
+      const oldName = typeof roueParticipants[idx] === "string" ? roueParticipants[idx] : roueParticipants[idx].name;
+
+      if (!newName || newName === oldName) { cancelEdit(idx, oldName); return; }
+
+      if (connected) {
+        socket.emit("control:roue_edit_participant", {
+          room: currentRoom,
+          index: idx,
+          oldName,
+          newName
+        });
+      }
+
+      // Mise à jour locale
+      if (typeof roueParticipants[idx] === "string") {
+        roueParticipants[idx] = newName;
+      } else {
+        roueParticipants[idx] = { name: newName, key: newName.toLowerCase() };
+      }
+      renderParticipants();
+      flash("roue", `✏️ "${oldName}" → "${newName}"`, "success");
+    }
+
+    function cancelEdit(idx, originalName) {
+      // Remettre le span
+      const item = $(`pitem-${idx}`);
+      if (!item) return;
+      const input = $(`pedit-${idx}`);
+      if (!input) return;
+      input.outerHTML = `<span class="participant-name" id="pname-${idx}">${escHtml(originalName)}</span>`;
+    }
+
+    function removeParticipant(idx) {
+      if (!connected) return;
+      const p = roueParticipants[idx];
+      const name = typeof p === "string" ? p : p.name;
+      socket.emit("control:roue_remove_participant", { room: currentRoom, name, index: idx });
+      // Mise à jour locale optimiste
+      roueParticipants.splice(idx, 1);
+      renderParticipants();
+      console.log(`❌ [ROUE] Participant supprimé: ${name}`);
+    }
+
+    function addParticipantManual() {
+      if (!connected) { flash("roue", "❌ Connectez-vous", "error"); return; }
+      const input = $("newParticipantInput");
+      const name = input.value.trim();
+      if (!name) return;
+
+      socket.emit("control:roue_add_participant_manual", { room: currentRoom, name });
+
+      // Mise à jour locale optimiste
+      const key = name.toLowerCase();
+      if (!roueParticipants.some(p => (typeof p === "string" ? p : p.name).toLowerCase() === key)) {
+        roueParticipants.push({ name, key });
+        renderParticipants();
+      }
+
+      input.value = "";
+      input.focus();
+      flash("roue", `➕ "${name}" ajouté`, "success");
+    }
+
+    // ===================== COMMENTAIRES =====================
+    function renderFlux() {
+      const list = $("fluxList");
+      if (!fluxMessages.length) {
+        list.innerHTML = '<div class="comments-empty">Aucun message pour le moment</div>';
         return;
       }
+      list.innerHTML = fluxMessages.map(msg => `
+        <div class="comment-item ${msg.sent ? 'sent' : ''}" data-id="${msg.id}">
+          <div class="comment-sent-badge">✔</div>
+          <div class="comment-author">${escHtml(msg.author)}</div>
+          <div class="comment-text">${escHtml(msg.text)}</div>
+          <div class="comment-actions">
+            <button class="btn-small btn-danger" onclick="deleteFluxMsg('${escJs(msg.id)}')">❌</button>
+            <button class="btn-small btn-primary" onclick="sendToQueue('${escJs(msg.id)}')" ${msg.sent ? 'disabled' : ''}>→ Attente</button>
+          </div>
+        </div>
+      `).join("");
+    }
 
-      // Désactiver autres overlays (SAUF TIMER)
-      if (overlayStates.nuage_de_mots) {
-        socket.emit("control:deactivate_overlay", {
-          room: currentRoom,
-          overlay: "nuage_de_mots"
-        });
+    function renderQueue() {
+      const list = $("queueList");
+      if (!queueMessages.length) {
+        list.innerHTML = '<div class="comments-empty">Aucun commentaire en attente</div>';
+        return;
       }
-      if (overlayStates.roue_loto) {
-        socket.emit("control:deactivate_overlay", {
-          room: currentRoom,
-          overlay: "roue_loto"
-        });
-      }
-
-      socket.emit("control:load_question", {
-        room: currentRoom,
-        overlay: "quiz_ou_sondage",
-        question_key: questionKey
-      });
-
-      console.log(`❓ Question: ${questionKey}`);
+      list.innerHTML = queueMessages.map(msg => `
+        <div class="comment-item ${msg.displayed ? 'displayed' : ''} ${selectedQueueId === msg.id ? 'selected' : ''}"
+             onclick="selectQueueMsg('${escJs(msg.id)}')">
+          <div class="comment-author">${escHtml(msg.author)}</div>
+          <div class="comment-text">${escHtml(msg.text)}</div>
+          <div class="comment-actions">
+            <button class="btn-small btn-danger" onclick="event.stopPropagation(); deleteQueueMsg('${escJs(msg.id)}')">❌</button>
+          </div>
+        </div>
+      `).join("");
     }
 
-    function showOptions() {
+    function sendToQueue(msgId) {
       if (!connected) return;
-      socket.emit("control:show_options", {
-        room: currentRoom,
-        overlay: "quiz_ou_sondage"
-      });
-      console.log("🗳️ Options");
+      socket.emit("control:comment_to_queue", { room: currentRoom, messageId: msgId });
     }
 
-    function showResults() {
+    function deleteFluxMsg(msgId) {
       if (!connected) return;
-      socket.emit("control:set_state", {
-        room: currentRoom,
-        overlay: "quiz_ou_sondage",
-        state: "results"
-      });
-      console.log("📊 Résultats");
+      socket.emit("control:comment_delete", { room: currentRoom, column: "flux", messageId: msgId });
     }
 
-    function revealAnswer() {
+    function resetFlux() {
       if (!connected) return;
-      if (currentQuestionType === "poll") return;
-      socket.emit("control:set_state", {
-        room: currentRoom,
-        overlay: "quiz_ou_sondage",
-        state: "reveal"
-      });
-      console.log("✅ Réponse");
+      if (!confirm("Vider toute la colonne FLUX ?")) return;
+      socket.emit("control:comment_reset_flux", { room: currentRoom });
     }
 
-    function resetQuiz() {
+    function selectQueueMsg(msgId) {
+      selectedQueueId = msgId;
+      renderQueue();
+    }
+
+    function showComment() {
+      if (!connected || !selectedQueueId) { flash("commentaires", "⚠️ Sélectionnez un message", "error"); return; }
+      socket.emit("control:comment_show", { room: currentRoom, messageId: selectedQueueId });
+    }
+
+    function hideComment() {
       if (!connected) return;
-      socket.emit("control:idle", {
-        room: currentRoom,
-        overlay: "quiz_ou_sondage"
-      });
-      console.log("🔄 Reset");
+      socket.emit("control:comment_hide", { room: currentRoom });
     }
 
-    // --- TIMER FUNCTIONS ---
+    function deleteQueueMsg(msgId) {
+      if (!connected) return;
+      socket.emit("control:comment_delete", { room: currentRoom, column: "queue", messageId: msgId });
+      if (selectedQueueId === msgId) selectedQueueId = null;
+    }
+
+    function resetQueue() {
+      if (!connected) return;
+      if (!confirm("Vider toute la colonne EN ATTENTE ?")) return;
+      socket.emit("control:comment_reset_queue", { room: currentRoom });
+      selectedQueueId = null;
+    }
+
+    // ===================== TIMER — COLLAPSIBLES =====================
+    let timerPresetsOpen = false;
+    let timerCustomOpen = false;
+
+    function toggleTimerPresets() {
+      timerPresetsOpen = !timerPresetsOpen;
+      $("timerPresetsBody").className = "moderation-body" + (timerPresetsOpen ? " open" : "");
+      $("timerPresetsChevron").className = "moderation-chevron" + (timerPresetsOpen ? " open" : "");
+    }
+
+    function toggleTimerCustom() {
+      timerCustomOpen = !timerCustomOpen;
+      $("timerCustomBody").className = "moderation-body" + (timerCustomOpen ? " open" : "");
+      $("timerCustomChevron").className = "moderation-chevron" + (timerCustomOpen ? " open" : "");
+    }
+
+    // ===================== TIMER =====================
     function timerUpdateDisplay() {
       const mm = Math.floor(timerSeconds / 60);
       const ss = timerSeconds % 60;
-      
       $("timerPreview").textContent = `${pad2(mm)}:${pad2(ss)}`;
-      
-      const m10 = Math.floor(mm / 10);
-      const m1 = mm % 10;
-      const s10 = Math.floor(ss / 10);
-      const s1 = ss % 10;
-      
-      $("timerDigitM10").textContent = m10;
-      $("timerDigitM1").textContent = m1;
-      $("timerDigitS10").textContent = s10;
-      $("timerDigitS1").textContent = s1;
+      $("timerDigitM10").textContent = Math.floor(mm / 10);
+      $("timerDigitM1").textContent = mm % 10;
+      $("timerDigitS10").textContent = Math.floor(ss / 10);
+      $("timerDigitS1").textContent = ss % 10;
     }
 
     function timerSetMode(mode) {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
+      if (!connected) { flash("timer", "❌ Connectez-vous", "error"); return; }
       timerMode = mode;
-      
-      document.querySelectorAll(".timer-mode-btn").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.mode === mode);
-      });
-      
-      socket.emit("control:timer_set_mode", {
-        room: currentRoom,
-        mode: mode
-      });
-      
-      if (mode === "chrono") {
-        timerSeconds = 0;
-        timerUpdateDisplay();
-      }
-      
-      showMessage("Timer", `Mode: ${mode === "timer" ? "Timer" : "Chrono"}`, "success");
-      console.log(`🔄 [TIMER] Mode: ${mode}`);
+      document.querySelectorAll(".timer-mode-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.mode === mode));
+      socket.emit("control:timer_set_mode", { room: currentRoom, mode });
+      if (mode === "chrono") { timerSeconds = 0; timerUpdateDisplay(); }
     }
 
     function timerPreset(seconds) {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
+      if (!connected) { flash("timer", "❌ Connectez-vous", "error"); return; }
       timerSeconds = Math.max(0, Math.min(seconds, 99 * 60 + 59));
       timerUpdateDisplay();
-      
-      socket.emit("control:timer_set_time", {
-        room: currentRoom,
-        seconds: timerSeconds
-      });
-      
-      showMessage("Timer", `Temps: ${timerSeconds}s`, "success");
-      console.log(`⏱️ [TIMER] Preset: ${seconds}s`);
+      socket.emit("control:timer_set_time", { room: currentRoom, seconds: timerSeconds });
     }
 
-    function timerAdjust(deltaSeconds) {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      if (timerRunning) {
-        showMessage("Timer", "⚠️ Pause d'abord", "error");
-        return;
-      }
-      
-      timerSeconds = Math.max(0, Math.min(timerSeconds + deltaSeconds, 99 * 60 + 59));
+    function timerAdjust(delta) {
+      if (!connected) { flash("timer", "❌ Connectez-vous", "error"); return; }
+      timerSeconds = Math.max(0, Math.min(timerSeconds + delta, 99 * 60 + 59));
       timerUpdateDisplay();
-      
-      socket.emit("control:timer_increment_time", {
-        room: currentRoom,
-        seconds: deltaSeconds
-      });
-      
-      console.log(`➕➖ [TIMER] Ajusté: ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s → ${timerSeconds}s`);
+      socket.emit("control:timer_increment_time", { room: currentRoom, seconds: delta });
     }
 
     function timerStart() {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      socket.emit("control:timer_start", {
-        room: currentRoom
-      });
-      
+      if (!connected) { flash("timer", "❌ Connectez-vous", "error"); return; }
+      socket.emit("control:timer_start", { room: currentRoom });
       timerRunning = true;
-      showMessage("Timer", "▶️ Démarré", "success");
-      console.log("▶️ [TIMER] Start");
     }
 
     function timerPause() {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      socket.emit("control:timer_toggle_pause", {
-        room: currentRoom
-      });
-      
+      if (!connected) { flash("timer", "❌ Connectez-vous", "error"); return; }
+      socket.emit("control:timer_toggle_pause", { room: currentRoom });
       timerRunning = false;
-      showMessage("Timer", "⏸️ Pause", "success");
-      console.log("⏸️ [TIMER] Pause");
     }
 
     function timerReset() {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      socket.emit("control:timer_reset", {
-        room: currentRoom
-      });
-      
+      if (!connected) { flash("timer", "❌ Connectez-vous", "error"); return; }
+      socket.emit("control:timer_reset", { room: currentRoom });
       timerRunning = false;
-      timerSeconds = 60; // Reset à 1 minute
-      timerUpdateDisplay(); // ✅ Mettre à jour l'aperçu
-      
-      showMessage("Timer", "🔄 Reset", "success");
-      console.log("🔄 [TIMER] Reset");
+      timerSeconds = 60;
+      timerUpdateDisplay();
     }
 
-    // --- TOGGLE AFFICHAGE AVANT DÉMARRAGE ---
-    function toggleTimerDisplay() {
-      if (!connected) {
-        showMessage("Timer", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      timerDisplayBeforeStart = !timerDisplayBeforeStart;
-      
-      $("toggleTimerDisplay").className = timerDisplayBeforeStart ? "toggle-switch active" : "toggle-switch";
-      
-      // Envoyer au serveur pour afficher/masquer
-      socket.emit("control:timer_toggle_display", {
-        room: currentRoom,
-        display: timerDisplayBeforeStart
-      });
-      
-      const msg = timerDisplayBeforeStart ? "👁️ Affichage activé" : "👁️ Affichage masqué";
-      showMessage("Timer", msg, "success");
-      console.log(`👁️ [TIMER] Affichage: ${timerDisplayBeforeStart}`);
-    }
-
-    // --- MATCH ---
+    // ===================== MATCH =====================
     function matchAdjustScore(team, delta) {
-      if (!connected) {
-        showMessage("Match", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      if (team === 'A') {
-        matchScoreA = Math.max(0, matchScoreA + delta);
-        $("matchScoreA").textContent = matchScoreA;
-      } else {
-        matchScoreB = Math.max(0, matchScoreB + delta);
-        $("matchScoreB").textContent = matchScoreB;
-      }
-
-      socket.emit("control:match_adjust_score", {
-        room: currentRoom,
-        team: team,
-        delta: delta
-      });
-
-      console.log(`📊 [MATCH] ${team} ${delta > 0 ? '+' : ''}${delta}`);
+      if (!connected) { flash("match", "❌ Connectez-vous", "error"); return; }
+      if (team === "A") { matchScoreA = Math.max(0, matchScoreA + delta); $("matchScoreA").textContent = matchScoreA; }
+      else { matchScoreB = Math.max(0, matchScoreB + delta); $("matchScoreB").textContent = matchScoreB; }
+      socket.emit("control:match_adjust_score", { room: currentRoom, team, delta });
     }
 
     function matchReset() {
-      if (!connected) {
-        showMessage("Match", "❌ Connectez-vous", "error");
-        return;
-      }
-
-      matchScoreA = 0;
-      matchScoreB = 0;
-      $("matchScoreA").textContent = "0";
-      $("matchScoreB").textContent = "0";
-
-      socket.emit("control:match_reset", {
-        room: currentRoom
-      });
-
-      showMessage("Match", "🔄 Scores réinitialisés", "success");
-      console.log("🔄 [MATCH] Reset");
+      if (!connected) { flash("match", "❌ Connectez-vous", "error"); return; }
+      matchScoreA = 0; matchScoreB = 0;
+      $("matchScoreA").textContent = "0"; $("matchScoreB").textContent = "0";
+      socket.emit("control:match_reset", { room: currentRoom });
     }
 
-    // --- INIT ---
+    // ===================== SÉCURITÉ — ÉCHAPPEMENT HTML/JS =====================
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escJs(str) {
+      return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    }
+
+    // ===================== INIT =====================
     $("btnConnect").onclick = connect;
 
     const urlParams = new URLSearchParams(window.location.search);
