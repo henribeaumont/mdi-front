@@ -588,7 +588,6 @@
         </div>
         <div id="nuageModerationBody" class="moderation-body">
           <div id="nuageWordsList" class="nuage-words-list">
-            <div class="empty-participants">Aucun mot pour l'instant</div>
           </div>
           <div class="separator"></div>
           <button class="btn-danger" onclick="clearAllNuage()" style="font-size:12px; padding:8px;">
@@ -1035,28 +1034,6 @@
         updateOverlayDots(overlay, { online, displaying });
       });
 
-      // ✅ Votes du chat → mise à jour temps réel du nuage et de la roue
-      socket.on("nouveau_vote", (data) => {
-        if (!data || !data.vote) return;
-        const word = String(data.vote).trim();
-        if (!word) return;
-
-        // Nuage actif → ajouter le mot à la liste de modération
-        if (overlayStates.nuage_de_mots) {
-          nuageWords[word] = (nuageWords[word] || 0) + 1;
-          renderNuageWords();
-        }
-
-        // Roue collecte ouverte → ajouter le participant à la liste de modération
-        if (overlayStates.roue_loto && overlayStates.roue_collecte) {
-          const key = word.toLowerCase();
-          if (!roueParticipants.some(p => (typeof p === "string" ? p : p.name).toLowerCase() === key)) {
-            roueParticipants.push({ name: word, key });
-            renderParticipants();
-          }
-        }
-      });
-
       socket.on("overlay:forbidden", () => {
         flash("quiz", "❌ Accès refusé", "error");
         connected = false;
@@ -1218,7 +1195,7 @@
       $("nuageWordCount").textContent = words.length;
 
       if (!words.length) {
-        list.innerHTML = '<div class="empty-participants">Aucun mot pour l\'instant</div>';
+        list.innerHTML = '';
         return;
       }
 
