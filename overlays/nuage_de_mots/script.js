@@ -1,10 +1,14 @@
 /**
  * ============================================================
- * MDI NUAGE DE MOTS - V6.7.1
+ * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
  * ============================================================
- * Base : V6.7 ORIGINAL — aucune logique modifiée
- * Ajout minimal : overlay:online émis UNE SEULE FOIS à la connexion
- * (voyant télécommande) — jamais dans overlay:state ni sur les votes
+ * ✅ Écart taille : par défaut 30px (min) → 120px (max)
+ * ✅ MAIS configurable via CSS OBS :
+ *    --cloud-font-min: 42px;
+ *    --cloud-font-max: 92px;
+ * ✅ Fondu affichage/masquage
+ * ✅ Anti-collision
+ * ✅ FIX OBS : render différé si container mesuré à 0x0
  * ============================================================
  */
 
@@ -21,8 +25,11 @@ function cssOnOff(name, fallbackOn = true) {
   if (!v) return fallbackOn;
   return v === "on" || v === "true" || v === "1";
 }
+
+/* ✅ NEW (lié à ta demande) : lire un nombre (px) depuis CSS OBS */
 function cssPx(name, fallbackPx) {
   const raw = cssVar(name, "");
+  // tolère virgule FR "42,5px"
   const n = parseFloat(String(raw).replace(",", "."));
   return Number.isFinite(n) ? n : fallbackPx;
 }
@@ -42,7 +49,7 @@ let dbMots = {};
 let globalColorIndex = 0;
 let wordPositions = [];
 
-/* ✅ Anti-spam render */
+/* ✅ Anti-spam render (utile quand tu reçois beaucoup d’updates) */
 let renderScheduled = false;
 function scheduleRender() {
   if (renderScheduled) return;
@@ -82,6 +89,7 @@ function measureText(text, fontSize) {
 
 function hasCollision(x, y, width, height) {
   const margin = 15;
+
   for (const pos of wordPositions) {
     const overlapX = !(x + width + margin < pos.x || x > pos.x + pos.width + margin);
     const overlapY = !(y + height + margin < pos.y || y > pos.y + pos.height + margin);
@@ -95,6 +103,7 @@ function findFreePosition(width, height) {
   const H = container.clientHeight;
   const cx = W / 2;
   const cy = H / 2;
+
   const maxAttempts = 800;
   let angle = Math.random() * Math.PI * 2;
   let radius = 20;
@@ -104,12 +113,17 @@ function findFreePosition(width, height) {
   for (let i = 0; i < maxAttempts; i++) {
     const x = cx + Math.cos(angle) * radius - width / 2;
     const y = cy + Math.sin(angle) * radius - height / 2;
+
     if (x >= 0 && x + width <= W && y >= 0 && y + height <= H) {
-      if (!hasCollision(x, y, width, height)) return { x, y };
+      if (!hasCollision(x, y, width, height)) {
+        return { x, y };
+      }
     }
+
     angle += angleStep;
     radius += radiusStep * (angleStep / (Math.PI * 2));
   }
+
   return {
     x: Math.max(0, Math.min(W - width, cx - width / 2 + (Math.random() - 0.5) * 100)),
     y: Math.max(0, Math.min(H - height, cy - height / 2 + (Math.random() - 0.5) * 100))
@@ -119,10 +133,24 @@ function findFreePosition(width, height) {
 function render() {
   const W = container.clientWidth;
   const H = container.clientHeight;
-  if (!W || !H) { scheduleRender(); return; }
+
+  /**
+   * ✅ FIX OBS (lié à ta demande)
+   * Dans OBS, juste après avoir retiré .hidden, le container peut être mesuré à 0x0.
+   * On re-tente au frame suivant.
+   */
+  if (!W || !H) {
+    scheduleRender();
+    return;
+  }
 
   const words = Object.values(dbMots);
-  if (!words.length) { zone.innerHTML = ""; wordPositions = []; return; }
+
+  if (!words.length) {
+    zone.innerHTML = "";
+    wordPositions = [];
+    return;
+  }
 
   const uppercase = cssOnOff("--uppercase", false);
   words.sort((a, b) => b.count - a.count);
@@ -130,6 +158,8 @@ function render() {
 
   const maxCount = Math.max(...words.map(w => w.count), 1);
   const minCount = Math.min(...words.map(w => w.count), 1);
+
+  /* ✅ NEW (lié à ta demande) : tailles configurables via CSS OBS */
   const minPx = clamp(cssPx("--cloud-font-min", 30), 10, 300);
   const maxPx = clamp(cssPx("--cloud-font-max", 120), 10, 300);
   const safeMax = Math.max(minPx, maxPx);
@@ -137,8 +167,11 @@ function render() {
   words.forEach((mot) => {
     const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
     let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
+
+    // ✅ Taille basée sur le suffrage (minPx → safeMax)
     const ratio = maxCount > minCount ? (mot.count - minCount) / (maxCount - minCount) : 1;
     const fontSize = Math.floor(minPx + (ratio * (safeMax - minPx)));
+
     const { width, height } = measureText(displayText, fontSize);
 
     if (!el) {
@@ -148,16 +181,27 @@ function render() {
       el.style.color = mot.color;
       el.style.fontSize = `${fontSize}px`;
       zone.appendChild(el);
-      requestAnimationFrame(() => el.classList.add("mdi-in"));
+
+      requestAnimationFrame(() => {
+        el.classList.add("mdi-in");
+      });
     } else {
       el.style.fontSize = `${fontSize}px`;
     }
 
     el.textContent = displayText;
+
     const pos = findFreePosition(width, height);
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
-    wordPositions.push({ x: pos.x, y: pos.y, width, height, element: el });
+
+    wordPositions.push({
+      x: pos.x,
+      y: pos.y,
+      width,
+      height,
+      element: el
+    });
   });
 }
 
@@ -194,6 +238,7 @@ socket.on("overlay:state", (payload) => {
     if (payload.data && payload.data.words) {
       const serverWords = payload.data.words;
       const palette = getPalette();
+
       dbMots = {};
       Object.keys(serverWords).forEach((key, index) => {
         dbMots[key] = {
@@ -202,7 +247,10 @@ socket.on("overlay:state", (payload) => {
           color: palette[index % 5]
         };
       });
+
       globalColorIndex = Object.keys(dbMots).length;
+
+      // ✅ Render fiable même si OBS n’a pas encore mesuré le container
       scheduleRender();
     }
   }
@@ -240,10 +288,6 @@ async function init() {
   } else {
     socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
   }
-
-  // ✅ Seul ajout V6.7.1 : signaler la présence pour les voyants télécommande
-  // Émis UNE SEULE FOIS ici — jamais dans overlay:state, jamais sur les votes
-  socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
 
   console.log("✅ [NUAGE] Auth envoyée");
 }
