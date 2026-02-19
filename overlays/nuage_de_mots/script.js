@@ -1,12 +1,10 @@
 /**
  * ============================================================
- * MDI NUAGE DE MOTS - V6.8
+ * MDI NUAGE DE MOTS - V6.7.1
  * ============================================================
- * ✅ Tout V6.7 préservé (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : émission overlay:online / overlay:offline
- *    → permet à la télécommande d'afficher deux voyants :
- *      • Connexion serveur  (l'overlay est-il connecté au socket)
- *      • Affichage dans OBS (l'overlay est-il actif à l'écran)
+ * Base : V6.7 ORIGINAL — aucune logique modifiée
+ * Ajout minimal : overlay:online émis UNE SEULE FOIS à la connexion
+ * (voyant télécommande) — jamais dans overlay:state ni sur les votes
  * ============================================================
  */
 
@@ -43,20 +41,8 @@ let STATE = "idle";
 let dbMots = {};
 let globalColorIndex = 0;
 let wordPositions = [];
-let currentRoom = "";
 
-/* -------- Presence -------- */
-// Appelé à chaque changement d'état pour notifier la télécommande
-function emitPresence(displaying) {
-  if (!currentRoom) return;
-  socket.emit("overlay:presence_update", {
-    room: currentRoom,
-    overlay: OVERLAY_TYPE,
-    displaying
-  });
-}
-
-/* -------- Render anti-spam -------- */
+/* ✅ Anti-spam render */
 let renderScheduled = false;
 function scheduleRender() {
   if (renderScheduled) return;
@@ -88,7 +74,10 @@ function resetEcran() {
 function measureText(text, fontSize) {
   measureZone.style.fontSize = fontSize + "px";
   measureZone.textContent = text;
-  return { width: measureZone.offsetWidth, height: measureZone.offsetHeight };
+  return {
+    width: measureZone.offsetWidth,
+    height: measureZone.offsetHeight
+  };
 }
 
 function hasCollision(x, y, width, height) {
@@ -180,16 +169,6 @@ const socket = io(SERVER_URL, {
 
 socket.on("connect", () => {
   console.log("✅ [NUAGE] Connecté");
-  // Signaler la connexion au serveur pour les voyants télécommande
-  if (currentRoom) {
-    socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
-  }
-});
-
-socket.on("disconnect", () => {
-  console.log("🔴 [NUAGE] Déconnecté");
-  // Le serveur détectera la déconnexion via socket.on("disconnect")
-  // et émettra overlay:presence { online: false } automatiquement
 });
 
 socket.on("overlay:state", (payload) => {
@@ -204,7 +183,6 @@ socket.on("overlay:state", (payload) => {
       container.classList.add("hidden");
       resetEcran();
     }, 800);
-    emitPresence(false);
     return;
   }
 
@@ -218,12 +196,15 @@ socket.on("overlay:state", (payload) => {
       const palette = getPalette();
       dbMots = {};
       Object.keys(serverWords).forEach((key, index) => {
-        dbMots[key] = { text: key, count: serverWords[key], color: palette[index % 5] };
+        dbMots[key] = {
+          text: key,
+          count: serverWords[key],
+          color: palette[index % 5]
+        };
       });
       globalColorIndex = Object.keys(dbMots).length;
       scheduleRender();
     }
-    emitPresence(true);
   }
 });
 
@@ -240,8 +221,6 @@ async function init() {
   const authMode = cssVar("--auth-mode", "strict");
   const room = cssVar("--room-id", "").trim();
   const key = cssVar("--room-key", "").trim();
-
-  currentRoom = room;
 
   console.log(`🔐 [NUAGE] Auth: ${authMode}, Room: ${room}`);
 
@@ -262,7 +241,8 @@ async function init() {
     socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
   }
 
-  // Signaler la présence en ligne dès l'authentification
+  // ✅ Seul ajout V6.7.1 : signaler la présence pour les voyants télécommande
+  // Émis UNE SEULE FOIS ici — jamais dans overlay:state, jamais sur les votes
   socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
 
   console.log("✅ [NUAGE] Auth envoyée");
