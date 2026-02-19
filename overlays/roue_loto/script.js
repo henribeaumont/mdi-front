@@ -1,20 +1,19 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V6.8
+ * MDI ROUE LOTO - V6.9
  * ============================================================
- * ✅ Toutes les features V6.7 préservées (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : Mode consécutif — gagnant retiré après spin
- * ✅ NOUVEAU : Émission roue:winner_selected vers serveur
- *             (permet au serveur de tenir la liste à jour)
- * ✅ NOUVEAU : Réception overlay:state pour sync participants
- *             (ajout/suppression/édition depuis télécommande)
+ * ✅ Tout V6.8 préservé (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : émission overlay:online / overlay:offline
+ *    → deux voyants télécommande :
+ *      • Connexion serveur
+ *      • Affichage dans OBS (vert dès que l'overlay est visible,
+ *        quelque soit l'état : collecting, ready, spinning, winner)
  * ============================================================
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "roue_loto";
 
-// -------- Helpers CSS Vars (OBS) --------
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
@@ -32,7 +31,6 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-// -------- DOM --------
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
 const wheelCanvas = document.getElementById("wheel");
@@ -41,7 +39,6 @@ const elWinnerName = document.getElementById("winnerName");
 const confettiCanvas = document.getElementById("confetti");
 const confettiCtx = confettiCanvas.getContext("2d");
 
-// -------- State --------
 let STATE = "idle";
 let participants = [];
 let winnerIndex = -1;
@@ -52,26 +49,31 @@ let spinDurationMs = 4200;
 let spinStartAngle = 0;
 let targetAngle = 0;
 let lastSpinAt = 0;
-
 let spinDirection = "cw";
 let pointerSide = "left";
 let maxParticipants = 48;
 let spinCooldownMs = 1800;
-
-// ✅ NOUVEAU : mode consécutif (reçu depuis serveur via overlay:state)
 let consecutifMode = false;
+let currentRoom = "";
+
+/* -------- Presence -------- */
+function emitPresence(displaying) {
+  if (!currentRoom) return;
+  socket.emit("overlay:presence_update", {
+    room: currentRoom,
+    overlay: OVERLAY_TYPE,
+    displaying
+  });
+}
 
 function readConfig() {
   spinDirection = cssVar("--spin-direction", "cw").toLowerCase();
   spinDirection = (spinDirection === "ccw") ? "ccw" : "cw";
-
   pointerSide = cssVar("--pointer-side", "left").toLowerCase();
   pointerSide = (pointerSide === "right") ? "right" : "left";
   document.documentElement.setAttribute("data-pointer-side", pointerSide);
-
   const flip = cssOnOff("--pointer-rotate-180", true);
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
-
   maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
   spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
 }
@@ -98,7 +100,6 @@ function drawWheel() {
   const stroke = cssNum("--wheel-stroke", 16);
   const textSize = cssNum("--wheel-text-size", 30);
   const textWeight = cssNum("--wheel-text-weight", 900);
-
   const W = cssSize, H = cssSize;
   const cx = W / 2, cy = H / 2;
   const r = (W / 2) - stroke - 6;
@@ -163,7 +164,6 @@ function drawWheel() {
     const safeLabel = String(label).length > maxChars
       ? (String(label).slice(0, maxChars - 1) + "…")
       : label;
-
     const tx = Math.max(120, r * 0.26);
 
     if (pointerSide === "left") {
@@ -176,7 +176,6 @@ function drawWheel() {
       wheelCtx.strokeText(safeLabel, tx, 0);
       wheelCtx.fillText(safeLabel, tx, 0);
     }
-
     wheelCtx.restore();
   }
 
@@ -185,11 +184,9 @@ function drawWheel() {
   wheelCtx.lineWidth = stroke;
   wheelCtx.strokeStyle = "rgba(255,255,255,0.22)";
   wheelCtx.stroke();
-
   wheelCtx.restore();
 }
 
-// -------- Confettis --------
 let confetti = [];
 let confettiEndTs = 0;
 
@@ -210,13 +207,10 @@ function startConfetti() {
   if (!cssOnOff("--winner-confetti", true)) return;
   document.documentElement.classList.add("mdi-confetti");
   resizeConfetti();
-
   const density = clamp(cssNum("--confetti-density", 180), 30, 600);
   const dur = clamp(cssNum("--confetti-duration-ms", 2200), 600, 8000);
-
   confetti = [];
   confettiEndTs = performance.now() + dur;
-
   for (let i = 0; i < density; i++) {
     confetti.push({
       x: rand01() * window.innerWidth,
@@ -255,7 +249,6 @@ function tickConfetti(ts) {
   requestAnimationFrame(tickConfetti);
 }
 
-// -------- Helpers --------
 function normalizeText(raw) {
   return String(raw || "").replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -268,7 +261,6 @@ function pickRandomIndex(n) {
 }
 function pointerTargetAngle() { return (pointerSide === "left") ? Math.PI : 0; }
 
-// -------- SPIN --------
 function spin() {
   const now = Date.now();
   if (spinning) return;
@@ -298,19 +290,15 @@ function spin() {
 
   function tickSpin(ts) {
     const t = clamp((ts - spinStartTs) / spinDurationMs, 0, 1);
-    const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
-
+    const e = 1 - Math.pow(1 - t, 3);
     wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
     drawWheel();
-
     if (t < 1) { requestAnimationFrame(tickSpin); return; }
 
     spinning = false;
-
     const ang = normalizeAngle(pointerAngle - wheelAngle);
     const idx = Math.floor(ang / slice) % n;
     winnerIndex = (idx + n) % n;
-
     drawWheel();
 
     const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
@@ -319,14 +307,11 @@ function spin() {
     STATE = "winner";
     startConfetti();
 
-    // ✅ NOUVEAU : signaler le gagnant au serveur
-    // Le serveur gère le mode consécutif et met à jour la liste
     socket.emit("roue:winner_selected", {
       room: currentRoom,
       winnerName,
-      winnerIndex: winnerIndex
+      winnerIndex
     });
-
     console.log(`🏆 [ROUE] Gagnant: "${winnerName}" (index ${winnerIndex})`);
   }
 }
@@ -348,7 +333,6 @@ function clearAll() {
   drawWheel();
 }
 
-// -------- Mise à jour participants depuis serveur --------
 function applyParticipantsFromServer(serverList) {
   if (!Array.isArray(serverList)) return;
   participants = serverList.map(p =>
@@ -357,9 +341,7 @@ function applyParticipantsFromServer(serverList) {
   drawWheel();
 }
 
-// -------- Socket.io --------
-let currentRoom = "";
-
+/* -------- Socket.io -------- */
 const socket = io(SERVER_URL, {
   transports: ["websocket", "polling"],
   reconnection: true
@@ -367,19 +349,21 @@ const socket = io(SERVER_URL, {
 
 socket.on("connect", () => {
   console.log("✅ [ROUE] Connecté");
+  if (currentRoom) {
+    socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
+  }
+});
+
+socket.on("disconnect", () => {
+  console.log("🔴 [ROUE] Déconnecté");
 });
 
 socket.on("overlay:state", (payload) => {
   if (payload.overlay !== OVERLAY_TYPE) return;
-
   console.log("📡 [ROUE] État:", payload.state, payload.data);
 
-  // ✅ Synchronisation participants depuis télécommande
-  // (ajout manuel, édition, suppression, mode consécutif)
   if (payload.data) {
-    if (payload.data.participants !== undefined) {
-      applyParticipantsFromServer(payload.data.participants);
-    }
+    if (payload.data.participants !== undefined) applyParticipantsFromServer(payload.data.participants);
     if (payload.data.consecutifMode !== undefined) {
       consecutifMode = Boolean(payload.data.consecutifMode);
       console.log(`🔁 [ROUE] Mode consécutif: ${consecutifMode ? "ON" : "OFF"}`);
@@ -387,22 +371,19 @@ socket.on("overlay:state", (payload) => {
   }
 
   if (payload.state === "idle") {
-    console.log("🔴 [ROUE] Masquage overlay");
     elApp.classList.remove("show");
-    setTimeout(() => {
-      elApp.classList.add("hidden");
-      clearAll();
-    }, 800);
+    setTimeout(() => { elApp.classList.add("hidden"); clearAll(); }, 800);
+    emitPresence(false);
     return;
   }
 
   if (payload.state === "active") {
-    console.log("🟢 [ROUE] Affichage overlay");
     elSecurity.classList.add("hidden");
     elApp.classList.remove("hidden");
     requestAnimationFrame(() => elApp.classList.add("show"));
     STATE = "idle";
     drawWheel();
+    emitPresence(true);
   }
 });
 
@@ -411,6 +392,7 @@ socket.on("roue:start_collect", () => {
   clearAll();
   STATE = "collecting";
   drawWheel();
+  emitPresence(true);
 });
 
 socket.on("roue:stop_collect", () => {
@@ -427,18 +409,16 @@ socket.on("roue:reset", () => {
   console.log("🔄 [ROUE] Reset");
   clearAll();
   drawWheel();
+  emitPresence(false);
 });
 
 socket.on("raw_vote", (data) => {
   if (!data || !data.vote) return;
   if (STATE !== "collecting") return;
-
   const name = normalizeText(data.vote);
   const key = keyOfName(name);
-
   if (!name) return;
   if (participants.length >= maxParticipants) return;
-
   if (!participants.some(p => keyOfName(p.name || p) === key)) {
     participants.push({ name, key });
     drawWheel();
@@ -452,7 +432,6 @@ socket.on("overlay:forbidden", () => {
   elApp.classList.add("hidden");
 });
 
-// -------- Auth (OBS CSS vars) --------
 async function init() {
   await new Promise(resolve => setTimeout(resolve, 800));
 
@@ -461,7 +440,6 @@ async function init() {
   const key = cssVar("--room-key", "").trim();
 
   currentRoom = room;
-
   readConfig();
   resizeWheelCanvas();
   resizeConfetti();
@@ -485,6 +463,7 @@ async function init() {
     socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
   }
 
+  socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
   socket.emit("rejoindre_salle", room);
   console.log("✅ [ROUE] Init terminée");
 }
