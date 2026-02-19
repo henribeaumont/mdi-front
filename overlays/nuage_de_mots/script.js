@@ -1,14 +1,12 @@
 /**
  * ============================================================
- * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
+ * MDI NUAGE DE MOTS - V6.8
  * ============================================================
- * ✅ Écart taille : par défaut 30px (min) → 120px (max)
- * ✅ MAIS configurable via CSS OBS :
- *    --cloud-font-min: 42px;
- *    --cloud-font-max: 92px;
- * ✅ Fondu affichage/masquage
- * ✅ Anti-collision
- * ✅ FIX OBS : render différé si container mesuré à 0x0
+ * ✅ Tout V6.7 préservé (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : émission overlay:online / overlay:offline
+ *    → permet à la télécommande d'afficher deux voyants :
+ *      • Connexion serveur  (l'overlay est-il connecté au socket)
+ *      • Affichage dans OBS (l'overlay est-il actif à l'écran)
  * ============================================================
  */
 
@@ -25,11 +23,8 @@ function cssOnOff(name, fallbackOn = true) {
   if (!v) return fallbackOn;
   return v === "on" || v === "true" || v === "1";
 }
-
-/* ✅ NEW (lié à ta demande) : lire un nombre (px) depuis CSS OBS */
 function cssPx(name, fallbackPx) {
   const raw = cssVar(name, "");
-  // tolère virgule FR "42,5px"
   const n = parseFloat(String(raw).replace(",", "."));
   return Number.isFinite(n) ? n : fallbackPx;
 }
@@ -48,8 +43,20 @@ let STATE = "idle";
 let dbMots = {};
 let globalColorIndex = 0;
 let wordPositions = [];
+let currentRoom = "";
 
-/* ✅ Anti-spam render (utile quand tu reçois beaucoup d’updates) */
+/* -------- Presence -------- */
+// Appelé à chaque changement d'état pour notifier la télécommande
+function emitPresence(displaying) {
+  if (!currentRoom) return;
+  socket.emit("overlay:presence_update", {
+    room: currentRoom,
+    overlay: OVERLAY_TYPE,
+    displaying
+  });
+}
+
+/* -------- Render anti-spam -------- */
 let renderScheduled = false;
 function scheduleRender() {
   if (renderScheduled) return;
@@ -81,15 +88,11 @@ function resetEcran() {
 function measureText(text, fontSize) {
   measureZone.style.fontSize = fontSize + "px";
   measureZone.textContent = text;
-  return {
-    width: measureZone.offsetWidth,
-    height: measureZone.offsetHeight
-  };
+  return { width: measureZone.offsetWidth, height: measureZone.offsetHeight };
 }
 
 function hasCollision(x, y, width, height) {
   const margin = 15;
-
   for (const pos of wordPositions) {
     const overlapX = !(x + width + margin < pos.x || x > pos.x + pos.width + margin);
     const overlapY = !(y + height + margin < pos.y || y > pos.y + pos.height + margin);
@@ -103,7 +106,6 @@ function findFreePosition(width, height) {
   const H = container.clientHeight;
   const cx = W / 2;
   const cy = H / 2;
-
   const maxAttempts = 800;
   let angle = Math.random() * Math.PI * 2;
   let radius = 20;
@@ -113,17 +115,12 @@ function findFreePosition(width, height) {
   for (let i = 0; i < maxAttempts; i++) {
     const x = cx + Math.cos(angle) * radius - width / 2;
     const y = cy + Math.sin(angle) * radius - height / 2;
-
     if (x >= 0 && x + width <= W && y >= 0 && y + height <= H) {
-      if (!hasCollision(x, y, width, height)) {
-        return { x, y };
-      }
+      if (!hasCollision(x, y, width, height)) return { x, y };
     }
-
     angle += angleStep;
     radius += radiusStep * (angleStep / (Math.PI * 2));
   }
-
   return {
     x: Math.max(0, Math.min(W - width, cx - width / 2 + (Math.random() - 0.5) * 100)),
     y: Math.max(0, Math.min(H - height, cy - height / 2 + (Math.random() - 0.5) * 100))
@@ -133,24 +130,10 @@ function findFreePosition(width, height) {
 function render() {
   const W = container.clientWidth;
   const H = container.clientHeight;
-
-  /**
-   * ✅ FIX OBS (lié à ta demande)
-   * Dans OBS, juste après avoir retiré .hidden, le container peut être mesuré à 0x0.
-   * On re-tente au frame suivant.
-   */
-  if (!W || !H) {
-    scheduleRender();
-    return;
-  }
+  if (!W || !H) { scheduleRender(); return; }
 
   const words = Object.values(dbMots);
-
-  if (!words.length) {
-    zone.innerHTML = "";
-    wordPositions = [];
-    return;
-  }
+  if (!words.length) { zone.innerHTML = ""; wordPositions = []; return; }
 
   const uppercase = cssOnOff("--uppercase", false);
   words.sort((a, b) => b.count - a.count);
@@ -158,8 +141,6 @@ function render() {
 
   const maxCount = Math.max(...words.map(w => w.count), 1);
   const minCount = Math.min(...words.map(w => w.count), 1);
-
-  /* ✅ NEW (lié à ta demande) : tailles configurables via CSS OBS */
   const minPx = clamp(cssPx("--cloud-font-min", 30), 10, 300);
   const maxPx = clamp(cssPx("--cloud-font-max", 120), 10, 300);
   const safeMax = Math.max(minPx, maxPx);
@@ -167,11 +148,8 @@ function render() {
   words.forEach((mot) => {
     const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
     let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
-
-    // ✅ Taille basée sur le suffrage (minPx → safeMax)
     const ratio = maxCount > minCount ? (mot.count - minCount) / (maxCount - minCount) : 1;
     const fontSize = Math.floor(minPx + (ratio * (safeMax - minPx)));
-
     const { width, height } = measureText(displayText, fontSize);
 
     if (!el) {
@@ -181,27 +159,16 @@ function render() {
       el.style.color = mot.color;
       el.style.fontSize = `${fontSize}px`;
       zone.appendChild(el);
-
-      requestAnimationFrame(() => {
-        el.classList.add("mdi-in");
-      });
+      requestAnimationFrame(() => el.classList.add("mdi-in"));
     } else {
       el.style.fontSize = `${fontSize}px`;
     }
 
     el.textContent = displayText;
-
     const pos = findFreePosition(width, height);
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
-
-    wordPositions.push({
-      x: pos.x,
-      y: pos.y,
-      width,
-      height,
-      element: el
-    });
+    wordPositions.push({ x: pos.x, y: pos.y, width, height, element: el });
   });
 }
 
@@ -213,6 +180,16 @@ const socket = io(SERVER_URL, {
 
 socket.on("connect", () => {
   console.log("✅ [NUAGE] Connecté");
+  // Signaler la connexion au serveur pour les voyants télécommande
+  if (currentRoom) {
+    socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
+  }
+});
+
+socket.on("disconnect", () => {
+  console.log("🔴 [NUAGE] Déconnecté");
+  // Le serveur détectera la déconnexion via socket.on("disconnect")
+  // et émettra overlay:presence { online: false } automatiquement
 });
 
 socket.on("overlay:state", (payload) => {
@@ -227,6 +204,7 @@ socket.on("overlay:state", (payload) => {
       container.classList.add("hidden");
       resetEcran();
     }, 800);
+    emitPresence(false);
     return;
   }
 
@@ -238,21 +216,14 @@ socket.on("overlay:state", (payload) => {
     if (payload.data && payload.data.words) {
       const serverWords = payload.data.words;
       const palette = getPalette();
-
       dbMots = {};
       Object.keys(serverWords).forEach((key, index) => {
-        dbMots[key] = {
-          text: key,
-          count: serverWords[key],
-          color: palette[index % 5]
-        };
+        dbMots[key] = { text: key, count: serverWords[key], color: palette[index % 5] };
       });
-
       globalColorIndex = Object.keys(dbMots).length;
-
-      // ✅ Render fiable même si OBS n’a pas encore mesuré le container
       scheduleRender();
     }
+    emitPresence(true);
   }
 });
 
@@ -269,6 +240,8 @@ async function init() {
   const authMode = cssVar("--auth-mode", "strict");
   const room = cssVar("--room-id", "").trim();
   const key = cssVar("--room-key", "").trim();
+
+  currentRoom = room;
 
   console.log(`🔐 [NUAGE] Auth: ${authMode}, Room: ${room}`);
 
@@ -288,6 +261,9 @@ async function init() {
   } else {
     socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
   }
+
+  // Signaler la présence en ligne dès l'authentification
+  socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
 
   console.log("✅ [NUAGE] Auth envoyée");
 }
