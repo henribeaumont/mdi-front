@@ -249,8 +249,10 @@
       border: 1px solid rgba(59,130,246,0.25);
       border-radius: 8px;
       margin-bottom: 10px;
+      gap: 12px;
     }
-    .consecutive-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .consecutive-toggle .toggle-switch { flex-shrink: 0; }
+    .consecutive-label { font-size: 12px; font-weight: 600; color: var(--text-muted); flex: 1; }
     .consecutive-label span { color: var(--accent); }
 
     /* ===================== LISTE PARTICIPANTS ROUE ===================== */
@@ -525,11 +527,11 @@
       <div class="overlay-status">
         <div class="overlay-voyant">
           <div id="statusQuizOnline" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Connexion serveur</span>
+          <span class="overlay-status-label">Connexion chat</span>
         </div>
         <div class="overlay-voyant">
           <div id="statusQuizDisplay" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Affichage dans OBS</span>
+          <span class="overlay-status-label">Données OBS</span>
         </div>
       </div>
       <div class="separator"></div>
@@ -558,11 +560,11 @@
       <div class="overlay-status">
         <div class="overlay-voyant">
           <div id="statusNuageOnline" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Connexion serveur</span>
+          <span class="overlay-status-label">Connexion chat</span>
         </div>
         <div class="overlay-voyant">
           <div id="statusNuageDisplay" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Affichage dans OBS</span>
+          <span class="overlay-status-label">Données OBS</span>
         </div>
       </div>
       <div class="separator"></div>
@@ -603,15 +605,16 @@
       <div class="overlay-status">
         <div class="overlay-voyant">
           <div id="statusRoueOnline" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Connexion serveur</span>
+          <span class="overlay-status-label">Connexion chat</span>
         </div>
         <div class="overlay-voyant">
           <div id="statusRoueDisplay" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Affichage dans OBS</span>
+          <span class="overlay-status-label">Données OBS</span>
         </div>
       </div>
       <div class="separator"></div>
 
+      <!-- Activation overlay -->
       <div class="toggle-container">
         <div class="toggle-label">
           <span class="icon">🎡</span>
@@ -627,27 +630,22 @@
           <div class="consecutive-label">
             🔁 Mode consécutif — <span>gagnant retiré après chaque spin</span>
           </div>
-          <div id="toggleConsecutif" class="toggle-switch" style="width:38px; height:22px;"
-               onclick="toggleConsecutifMode()"></div>
+          <div id="toggleConsecutif" class="toggle-switch" onclick="toggleConsecutifMode()"></div>
         </div>
 
-        <!-- Toggle Collecte -->
+        <!-- Collecte ouverte / fermée -->
         <div class="toggle-container" style="margin-bottom: 10px;">
           <div class="toggle-label">
-            <span style="font-size: 13px;">📝 Fermer collecte pour lancer</span>
+            <span style="font-size: 13px;">📝 Collecte ouverte</span>
           </div>
           <div id="toggleCollecte" class="toggle-switch" onclick="toggleCollecte()"></div>
         </div>
 
-        <!-- Lancer / Reset -->
-        <button class="btn-success roue-action-btn" onclick="spinRoue()">🎡 Lancer la roue</button>
-        <button class="btn-danger" onclick="resetRoue()">🔄 Reset Roue</button>
-
-        <!-- Section modération ROUE - collapsible -->
-        <div class="moderation-section" style="margin-top:12px;">
+        <!-- Modération participants (visible dès que la roue est active) -->
+        <div class="moderation-section">
           <div class="moderation-header" onclick="toggleModerationRoue()">
             <div class="moderation-header-left">
-              👥 Participants
+              👥 Participants en attente
               <span id="roueParticipantCount" class="moderation-count">0</span>
             </div>
             <span id="roueChevron" class="moderation-chevron">▼</span>
@@ -657,14 +655,23 @@
             <div class="add-participant-row">
               <input type="text" id="newParticipantInput" placeholder="Ajouter un nom…" maxlength="40"
                      onkeydown="if(event.key==='Enter') addParticipantManual()">
-              <button class="btn-primary btn-small" onclick="addParticipantManual()" style="padding:7px 12px;">➕ Ajouter</button>
+              <button class="btn-primary btn-small" onclick="addParticipantManual()" style="padding:7px 12px;">➕</button>
             </div>
-            <!-- Liste -->
+            <!-- Liste de modération (chat → roue) -->
             <div id="participantsList" class="participants-list">
               <div class="empty-participants">Aucun participant pour l'instant</div>
             </div>
+            <div class="separator"></div>
+            <!-- Bouton alimenter la roue -->
+            <button class="btn-success" style="width:100%; margin-top:4px;" onclick="alimenterRoue()">
+              🎡 Alimenter la roue
+            </button>
           </div>
         </div>
+
+        <!-- Lancer / Reset -->
+        <button class="btn-success roue-action-btn" style="margin-top:10px;" onclick="spinRoue()">🎡 Lancer la roue</button>
+        <button class="btn-danger" onclick="resetRoue()">🔄 Reset Roue</button>
 
       </div>
 
@@ -679,11 +686,11 @@
         <div class="comments-overlay-status">
           <div class="overlay-voyant">
             <div id="statusCommOnline" class="overlay-status-dot"></div>
-            <span class="overlay-status-label">Connexion</span>
+            <span class="overlay-status-label">Connexion chat</span>
           </div>
           <div class="overlay-voyant">
             <div id="statusCommDisplay" class="overlay-status-dot"></div>
-            <span class="overlay-status-label">Affichage</span>
+            <span class="overlay-status-label">Données OBS</span>
           </div>
         </div>
         <div style="flex:1;"></div>
@@ -737,11 +744,11 @@
       <div class="overlay-status">
         <div class="overlay-voyant">
           <div id="statusTimerOnline" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Connexion serveur</span>
+          <span class="overlay-status-label">Connexion chat</span>
         </div>
         <div class="overlay-voyant">
           <div id="statusTimerDisplay" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Affichage dans OBS</span>
+          <span class="overlay-status-label">Données OBS</span>
         </div>
       </div>
       <div class="separator"></div>
@@ -839,12 +846,8 @@
     <div id="tabMatch" class="tab-content">
       <div class="overlay-status">
         <div class="overlay-voyant">
-          <div id="statusMatchOnline" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Connexion serveur</span>
-        </div>
-        <div class="overlay-voyant">
           <div id="statusMatchDisplay" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Affichage dans OBS</span>
+          <span class="overlay-status-label">Données OBS</span>
         </div>
       </div>
       <div class="separator"></div>
@@ -936,7 +939,7 @@
       "roue_loto":       { online: "statusRoueOnline",   display: "statusRoueDisplay"   },
       "commentaires":    { online: "statusCommOnline",   display: "statusCommDisplay"   },
       "timer_chrono":    { online: "statusTimerOnline",  display: "statusTimerDisplay"  },
-      "match_equipes":   { online: "statusMatchOnline",  display: "statusMatchDisplay"  }
+      "match_equipes":   { display: "statusMatchDisplay"  }
     };
 
     function updateOverlayDots(overlay, { online, displaying } = {}) {
@@ -1032,6 +1035,28 @@
         updateOverlayDots(overlay, { online, displaying });
       });
 
+      // ✅ Votes du chat → mise à jour temps réel du nuage et de la roue
+      socket.on("nouveau_vote", (data) => {
+        if (!data || !data.vote) return;
+        const word = String(data.vote).trim();
+        if (!word) return;
+
+        // Nuage actif → ajouter le mot à la liste de modération
+        if (overlayStates.nuage_de_mots) {
+          nuageWords[word] = (nuageWords[word] || 0) + 1;
+          renderNuageWords();
+        }
+
+        // Roue collecte ouverte → ajouter le participant à la liste de modération
+        if (overlayStates.roue_loto && overlayStates.roue_collecte) {
+          const key = word.toLowerCase();
+          if (!roueParticipants.some(p => (typeof p === "string" ? p : p.name).toLowerCase() === key)) {
+            roueParticipants.push({ name: word, key });
+            renderParticipants();
+          }
+        }
+      });
+
       socket.on("overlay:forbidden", () => {
         flash("quiz", "❌ Accès refusé", "error");
         connected = false;
@@ -1064,23 +1089,14 @@
         overlayStates.roue_loto = isActive;
         $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
         $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
-        if (!isActive) updateOverlayDots(overlay, { displaying: false });
-
-        if (data && data.participants) {
-          roueParticipants = data.participants.map(p => typeof p === "string" ? { name: p, key: p.toLowerCase() } : p);
-        } else if (!isActive) {
+        if (!isActive) {
+          updateOverlayDots(overlay, { displaying: false });
           roueParticipants = [];
-        }
-        renderParticipants();
-
-        if (isActive && !overlayStates.roue_collecte) {
-          if (state === "active") {
-            setTimeout(() => startCollect(), 300);
-          }
+          renderParticipants();
         }
 
         if (state === "collecting") overlayStates.roue_collecte = true;
-        if (state === "ready") overlayStates.roue_collecte = false;
+        if (state === "ready" || state === "idle") overlayStates.roue_collecte = false;
         updateCollecteToggle(state === "collecting");
       }
 
@@ -1419,18 +1435,33 @@
       const name = input.value.trim();
       if (!name) return;
 
-      socket.emit("control:roue_add_participant_manual", { room: currentRoom, name });
-
-      // Mise à jour locale optimiste
+      // Ajout local uniquement (liste de modération)
+      // La liste n'est envoyée à la roue que via "Alimenter la roue"
       const key = name.toLowerCase();
       if (!roueParticipants.some(p => (typeof p === "string" ? p : p.name).toLowerCase() === key)) {
         roueParticipants.push({ name, key });
         renderParticipants();
+        flash("roue", `➕ "${name}" ajouté`, "success");
       }
 
       input.value = "";
       input.focus();
-      flash("roue", `➕ "${name}" ajouté`, "success");
+    }
+
+    // Envoie la liste de modération vers la roue (overlay OBS)
+    function alimenterRoue() {
+      if (!connected || !overlayStates.roue_loto) {
+        flash("roue", "❌ Activez la roue d'abord", "error"); return;
+      }
+      if (!roueParticipants.length) {
+        flash("roue", "⚠️ Aucun participant", "error"); return;
+      }
+      // Envoyer la liste complète au serveur pour qu'il mette à jour l'overlay
+      roueParticipants.forEach(p => {
+        const name = typeof p === "string" ? p : p.name;
+        socket.emit("control:roue_add_participant_manual", { room: currentRoom, name });
+      });
+      flash("roue", `🎡 ${roueParticipants.length} participant(s) envoyé(s) à la roue`, "success");
     }
 
     // ===================== COMMENTAIRES =====================
