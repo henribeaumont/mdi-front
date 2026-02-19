@@ -1,17 +1,20 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V6.7 (AMÉLIORATIONS UX)
+ * MDI ROUE LOTO - V6.8
  * ============================================================
- * ✅ Aiguille chevauche la roue (overlap 1.15)
- * ✅ Texte retourné 180° si aiguille à gauche
- * ✅ Panel gagnant blanc + texte noir
- * ✅ Fondu affichage/masquage
+ * ✅ Toutes les features V6.7 préservées (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : Mode consécutif — gagnant retiré après spin
+ * ✅ NOUVEAU : Émission roue:winner_selected vers serveur
+ *             (permet au serveur de tenir la liste à jour)
+ * ✅ NOUVEAU : Réception overlay:state pour sync participants
+ *             (ajout/suppression/édition depuis télécommande)
  * ============================================================
  */
 
 const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
 const OVERLAY_TYPE = "roue_loto";
 
+// -------- Helpers CSS Vars (OBS) --------
 function cssVar(name, fallback = "") {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name);
   return v ? v.trim().replace(/^['"]+|['"]+$/g, "") : fallback;
@@ -29,6 +32,7 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+// -------- DOM --------
 const elSecurity = document.getElementById("security-screen");
 const elApp = document.getElementById("app");
 const wheelCanvas = document.getElementById("wheel");
@@ -37,6 +41,7 @@ const elWinnerName = document.getElementById("winnerName");
 const confettiCanvas = document.getElementById("confetti");
 const confettiCtx = confettiCanvas.getContext("2d");
 
+// -------- State --------
 let STATE = "idle";
 let participants = [];
 let winnerIndex = -1;
@@ -52,6 +57,9 @@ let spinDirection = "cw";
 let pointerSide = "left";
 let maxParticipants = 48;
 let spinCooldownMs = 1800;
+
+// ✅ NOUVEAU : mode consécutif (reçu depuis serveur via overlay:state)
+let consecutifMode = false;
 
 function readConfig() {
   spinDirection = cssVar("--spin-direction", "cw").toLowerCase();
@@ -77,12 +85,10 @@ const basePalette = [
 function resizeWheelCanvas() {
   const cssSize = cssNum("--wheel-size", 820);
   const dpr = Math.max(1, window.devicePixelRatio || 1);
-
   wheelCanvas.style.width = cssSize + "px";
   wheelCanvas.style.height = cssSize + "px";
   wheelCanvas.width = Math.floor(cssSize * dpr);
   wheelCanvas.height = Math.floor(cssSize * dpr);
-
   wheelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawWheel();
 }
@@ -94,18 +100,17 @@ function drawWheel() {
   const textWeight = cssNum("--wheel-text-weight", 900);
 
   const W = cssSize, H = cssSize;
-  const cx = W/2, cy = H/2;
-  const r = (W/2) - stroke - 6;
+  const cx = W / 2, cy = H / 2;
+  const r = (W / 2) - stroke - 6;
 
   wheelCtx.clearRect(0, 0, W, H);
-
   wheelCtx.save();
   wheelCtx.translate(cx, cy);
   wheelCtx.rotate(wheelAngle);
 
   if (participants.length === 0) {
     wheelCtx.beginPath();
-    wheelCtx.arc(0, 0, r, 0, Math.PI*2);
+    wheelCtx.arc(0, 0, r, 0, Math.PI * 2);
     wheelCtx.fillStyle = "rgba(10,15,30,0.65)";
     wheelCtx.fill();
     wheelCtx.lineWidth = stroke;
@@ -116,7 +121,7 @@ function drawWheel() {
   }
 
   const n = participants.length;
-  const slice = (Math.PI*2) / n;
+  const slice = (Math.PI * 2) / n;
 
   for (let i = 0; i < n; i++) {
     const a0 = i * slice;
@@ -126,7 +131,6 @@ function drawWheel() {
     wheelCtx.moveTo(0, 0);
     wheelCtx.arc(0, 0, r, a0, a1);
     wheelCtx.closePath();
-
     wheelCtx.fillStyle = basePalette[i % basePalette.length];
     wheelCtx.fill();
 
@@ -145,11 +149,10 @@ function drawWheel() {
     }
 
     const label = participants[i].name || participants[i];
-    const mid = a0 + slice/2;
+    const mid = a0 + slice / 2;
 
     wheelCtx.save();
     wheelCtx.rotate(mid);
-
     wheelCtx.fillStyle = "rgba(255,255,255,0.96)";
     wheelCtx.font = `${textWeight} ${textSize}px Montserrat, sans-serif`;
     wheelCtx.textBaseline = "middle";
@@ -157,11 +160,12 @@ function drawWheel() {
     wheelCtx.strokeStyle = "rgba(0,0,0,0.35)";
 
     const maxChars = 14;
-    const safeLabel = String(label).length > maxChars ? (String(label).slice(0, maxChars-1) + "…") : label;
+    const safeLabel = String(label).length > maxChars
+      ? (String(label).slice(0, maxChars - 1) + "…")
+      : label;
 
-    const tx = Math.max(120, r*0.26);
+    const tx = Math.max(120, r * 0.26);
 
-    // ✅ Retourner texte 180° si aiguille à gauche
     if (pointerSide === "left") {
       wheelCtx.rotate(Math.PI);
       wheelCtx.textAlign = "right";
@@ -177,7 +181,7 @@ function drawWheel() {
   }
 
   wheelCtx.beginPath();
-  wheelCtx.arc(0, 0, r, 0, Math.PI*2);
+  wheelCtx.arc(0, 0, r, 0, Math.PI * 2);
   wheelCtx.lineWidth = stroke;
   wheelCtx.strokeStyle = "rgba(255,255,255,0.22)";
   wheelCtx.stroke();
@@ -185,6 +189,7 @@ function drawWheel() {
   wheelCtx.restore();
 }
 
+// -------- Confettis --------
 let confetti = [];
 let confettiEndTs = 0;
 
@@ -203,7 +208,6 @@ function rand01() {
 
 function startConfetti() {
   if (!cssOnOff("--winner-confetti", true)) return;
-
   document.documentElement.classList.add("mdi-confetti");
   resizeConfetti();
 
@@ -214,15 +218,16 @@ function startConfetti() {
   confettiEndTs = performance.now() + dur;
 
   for (let i = 0; i < density; i++) {
-    const x = rand01() * window.innerWidth;
-    const y = -20 - rand01()*200;
-    const s = 6 + rand01()*10;
-    const vx = (rand01()-0.5)*2.2;
-    const vy = 2.0 + rand01()*4.5;
-    const rot = rand01()*Math.PI*2;
-    const vr = (rand01()-0.5)*0.25;
-    const col = basePalette[i % basePalette.length];
-    confetti.push({x, y, s, vx, vy, rot, vr, col});
+    confetti.push({
+      x: rand01() * window.innerWidth,
+      y: -20 - rand01() * 200,
+      s: 6 + rand01() * 10,
+      vx: (rand01() - 0.5) * 2.2,
+      vy: 2.0 + rand01() * 4.5,
+      rot: rand01() * Math.PI * 2,
+      vr: (rand01() - 0.5) * 0.25,
+      col: basePalette[i % basePalette.length]
+    });
   }
   requestAnimationFrame(tickConfetti);
 }
@@ -238,46 +243,32 @@ function tickConfetti(ts) {
     p.x += p.vx * 3.2;
     p.y += p.vy * 3.6;
     p.rot += p.vr;
-    const t = (confettiEndTs - ts) / 500;
-    const alpha = clamp(t, 0, 1);
-
+    const alpha = clamp((confettiEndTs - ts) / 500, 0, 1);
     confettiCtx.save();
     confettiCtx.translate(p.x, p.y);
     confettiCtx.rotate(p.rot);
     confettiCtx.globalAlpha = alpha;
     confettiCtx.fillStyle = p.col;
-    confettiCtx.fillRect(-p.s/2, -p.s/2, p.s, p.s*0.7);
+    confettiCtx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.7);
     confettiCtx.restore();
   }
   requestAnimationFrame(tickConfetti);
 }
 
+// -------- Helpers --------
 function normalizeText(raw) {
-  let t = String(raw || "");
-  t = t.replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
-  return t;
+  return String(raw || "").replace(/\u00A0/g, " ").replace(/\s+/g, " ").trim();
 }
-
-function keyOfName(name) {
-  return normalizeText(name).toLowerCase();
-}
-
-function normalizeAngle(a) {
-  let x = a % (Math.PI*2);
-  if (x < 0) x += Math.PI*2;
-  return x;
-}
-
+function keyOfName(name) { return normalizeText(name).toLowerCase(); }
+function normalizeAngle(a) { let x = a % (Math.PI * 2); if (x < 0) x += Math.PI * 2; return x; }
 function pickRandomIndex(n) {
   const u = new Uint32Array(1);
   crypto.getRandomValues(u);
   return u[0] % n;
 }
+function pointerTargetAngle() { return (pointerSide === "left") ? Math.PI : 0; }
 
-function pointerTargetAngle() {
-  return (pointerSide === "left") ? Math.PI : 0;
-}
-
+// -------- SPIN --------
 function spin() {
   const now = Date.now();
   if (spinning) return;
@@ -291,35 +282,28 @@ function spin() {
 
   const n = participants.length;
   const selected = pickRandomIndex(n);
-  const slice = (Math.PI*2) / n;
-  const selectedCenter = selected * slice + slice/2;
-
+  const slice = (Math.PI * 2) / n;
+  const selectedCenter = selected * slice + slice / 2;
   const pointerAngle = pointerTargetAngle();
   const desired = pointerAngle - selectedCenter;
-
-  const extraTurns = 6 + Math.floor(rand01()*4);
-  const extra = extraTurns * Math.PI*2;
-
+  const extraTurns = 6 + Math.floor(rand01() * 4);
   const dir = (spinDirection === "cw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
-  targetAngle = desired + dir * extra;
-  spinDurationMs = clamp(3800 + Math.floor(rand01()*2200), 3400, 6500);
+  targetAngle = desired + dir * extraTurns * Math.PI * 2;
+  spinDurationMs = clamp(3800 + Math.floor(rand01() * 2200), 3400, 6500);
   spinStartTs = performance.now();
 
   requestAnimationFrame(tickSpin);
 
   function tickSpin(ts) {
     const t = clamp((ts - spinStartTs) / spinDurationMs, 0, 1);
-    const e = 1 - Math.pow(1 - t, 3);
+    const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
 
     wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
     drawWheel();
 
-    if (t < 1) {
-      requestAnimationFrame(tickSpin);
-      return;
-    }
+    if (t < 1) { requestAnimationFrame(tickSpin); return; }
 
     spinning = false;
 
@@ -328,11 +312,22 @@ function spin() {
     winnerIndex = (idx + n) % n;
 
     drawWheel();
+
     const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
     elWinnerName.textContent = winnerName;
     document.documentElement.classList.add("mdi-show-winner");
     STATE = "winner";
     startConfetti();
+
+    // ✅ NOUVEAU : signaler le gagnant au serveur
+    // Le serveur gère le mode consécutif et met à jour la liste
+    socket.emit("roue:winner_selected", {
+      room: currentRoom,
+      winnerName,
+      winnerIndex: winnerIndex
+    });
+
+    console.log(`🏆 [ROUE] Gagnant: "${winnerName}" (index ${winnerIndex})`);
   }
 }
 
@@ -348,9 +343,22 @@ function clearAll() {
   spinning = false;
   wheelAngle = 0;
   STATE = "idle";
+  consecutifMode = false;
   hideWinner();
   drawWheel();
 }
+
+// -------- Mise à jour participants depuis serveur --------
+function applyParticipantsFromServer(serverList) {
+  if (!Array.isArray(serverList)) return;
+  participants = serverList.map(p =>
+    typeof p === "string" ? { name: p, key: p.toLowerCase() } : p
+  );
+  drawWheel();
+}
+
+// -------- Socket.io --------
+let currentRoom = "";
 
 const socket = io(SERVER_URL, {
   transports: ["websocket", "polling"],
@@ -366,6 +374,18 @@ socket.on("overlay:state", (payload) => {
 
   console.log("📡 [ROUE] État:", payload.state, payload.data);
 
+  // ✅ Synchronisation participants depuis télécommande
+  // (ajout manuel, édition, suppression, mode consécutif)
+  if (payload.data) {
+    if (payload.data.participants !== undefined) {
+      applyParticipantsFromServer(payload.data.participants);
+    }
+    if (payload.data.consecutifMode !== undefined) {
+      consecutifMode = Boolean(payload.data.consecutifMode);
+      console.log(`🔁 [ROUE] Mode consécutif: ${consecutifMode ? "ON" : "OFF"}`);
+    }
+  }
+
   if (payload.state === "idle") {
     console.log("🔴 [ROUE] Masquage overlay");
     elApp.classList.remove("show");
@@ -380,9 +400,7 @@ socket.on("overlay:state", (payload) => {
     console.log("🟢 [ROUE] Affichage overlay");
     elSecurity.classList.add("hidden");
     elApp.classList.remove("hidden");
-    requestAnimationFrame(() => {
-      elApp.classList.add("show");
-    });
+    requestAnimationFrame(() => elApp.classList.add("show"));
     STATE = "idle";
     drawWheel();
   }
@@ -408,6 +426,7 @@ socket.on("roue:spin", () => {
 socket.on("roue:reset", () => {
   console.log("🔄 [ROUE] Reset");
   clearAll();
+  drawWheel();
 });
 
 socket.on("raw_vote", (data) => {
@@ -420,13 +439,10 @@ socket.on("raw_vote", (data) => {
   if (!name) return;
   if (participants.length >= maxParticipants) return;
 
-  if (!participants.some(p => {
-    const pName = p.name || p;
-    return keyOfName(pName) === key;
-  })) {
+  if (!participants.some(p => keyOfName(p.name || p) === key)) {
     participants.push({ name, key });
     drawWheel();
-    console.log(`➕ [ROUE] Participant: ${name} (total: ${participants.length})`);
+    console.log(`➕ [ROUE] Participant chat: ${name} (total: ${participants.length})`);
   }
 });
 
@@ -436,12 +452,15 @@ socket.on("overlay:forbidden", () => {
   elApp.classList.add("hidden");
 });
 
+// -------- Auth (OBS CSS vars) --------
 async function init() {
   await new Promise(resolve => setTimeout(resolve, 800));
 
   const authMode = cssVar("--auth-mode", "strict");
   const room = cssVar("--room-id", "").trim();
   const key = cssVar("--room-key", "").trim();
+
+  currentRoom = room;
 
   readConfig();
   resizeWheelCanvas();
@@ -467,7 +486,6 @@ async function init() {
   }
 
   socket.emit("rejoindre_salle", room);
-
   console.log("✅ [ROUE] Init terminée");
 }
 
