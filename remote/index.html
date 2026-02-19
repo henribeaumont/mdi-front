@@ -184,16 +184,24 @@
     .separator { height: 1px; background: var(--border); margin: 12px 0; }
 
     /* ===================== STATUS INDICATOR ===================== */
+    /* ===================== VOYANTS OVERLAY (2 par overlay) ===================== */
     .overlay-status {
       display: flex; align-items: center; justify-content: center;
-      gap: 8px; margin-bottom: 12px;
+      gap: 20px; margin-bottom: 12px;
+    }
+    .overlay-voyant {
+      display: flex; align-items: center; gap: 6px;
     }
     .overlay-status-dot {
-      width: 12px; height: 12px;
+      width: 10px; height: 10px;
       border-radius: 50%; background: var(--danger);
       transition: all 0.3s; flex-shrink: 0;
     }
-    .overlay-status-label { font-size: 13px; color: var(--text-muted); }
+    .overlay-status-dot.on {
+      background: var(--success);
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+    }
+    .overlay-status-label { font-size: 11px; color: var(--text-muted); }
 
     /* ===================== MESSAGE FLASH ===================== */
     .flash-msg {
@@ -515,8 +523,14 @@
     <!-- ===================== ONGLET QUIZ ===================== -->
     <div id="tabQuiz" class="tab-content active">
       <div class="overlay-status">
-        <div id="statusQuiz" class="overlay-status-dot"></div>
-        <span class="overlay-status-label">Overlay</span>
+        <div class="overlay-voyant">
+          <div id="statusQuizOnline" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Connexion serveur</span>
+        </div>
+        <div class="overlay-voyant">
+          <div id="statusQuizDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Affichage dans OBS</span>
+        </div>
       </div>
       <div class="separator"></div>
 
@@ -542,8 +556,14 @@
     <!-- ===================== ONGLET NUAGE ===================== -->
     <div id="tabNuage" class="tab-content">
       <div class="overlay-status">
-        <div id="statusNuage" class="overlay-status-dot"></div>
-        <span class="overlay-status-label">Overlay</span>
+        <div class="overlay-voyant">
+          <div id="statusNuageOnline" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Connexion serveur</span>
+        </div>
+        <div class="overlay-voyant">
+          <div id="statusNuageDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Affichage dans OBS</span>
+        </div>
       </div>
       <div class="separator"></div>
 
@@ -581,8 +601,14 @@
     <!-- ===================== ONGLET ROUE ===================== -->
     <div id="tabRoue" class="tab-content">
       <div class="overlay-status">
-        <div id="statusRoue" class="overlay-status-dot"></div>
-        <span class="overlay-status-label">Overlay</span>
+        <div class="overlay-voyant">
+          <div id="statusRoueOnline" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Connexion serveur</span>
+        </div>
+        <div class="overlay-voyant">
+          <div id="statusRoueDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Affichage dans OBS</span>
+        </div>
       </div>
       <div class="separator"></div>
 
@@ -651,8 +677,14 @@
       <!-- Header commentaires -->
       <div class="comments-header">
         <div class="comments-overlay-status">
-          <div id="statusCommentaires" class="overlay-status-dot"></div>
-          <span class="overlay-status-label">Overlay</span>
+          <div class="overlay-voyant">
+            <div id="statusCommOnline" class="overlay-status-dot"></div>
+            <span class="overlay-status-label">Connexion</span>
+          </div>
+          <div class="overlay-voyant">
+            <div id="statusCommDisplay" class="overlay-status-dot"></div>
+            <span class="overlay-status-label">Affichage</span>
+          </div>
         </div>
         <div style="flex:1;"></div>
         <div id="messageCommentaires" class="flash-msg" style="margin-top:0; flex:0 0 auto;"></div>
@@ -703,8 +735,14 @@
     <!-- ===================== ONGLET TIMER ===================== -->
     <div id="tabTimer" class="tab-content">
       <div class="overlay-status">
-        <div id="statusTimer" class="overlay-status-dot"></div>
-        <span class="overlay-status-label">Overlay</span>
+        <div class="overlay-voyant">
+          <div id="statusTimerOnline" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Connexion serveur</span>
+        </div>
+        <div class="overlay-voyant">
+          <div id="statusTimerDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Affichage dans OBS</span>
+        </div>
       </div>
       <div class="separator"></div>
 
@@ -800,8 +838,14 @@
     <!-- ===================== ONGLET MATCH ===================== -->
     <div id="tabMatch" class="tab-content">
       <div class="overlay-status">
-        <div id="statusMatch" class="overlay-status-dot"></div>
-        <span class="overlay-status-label">Overlay</span>
+        <div class="overlay-voyant">
+          <div id="statusMatchOnline" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Connexion serveur</span>
+        </div>
+        <div class="overlay-voyant">
+          <div id="statusMatchDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Affichage dans OBS</span>
+        </div>
       </div>
       <div class="separator"></div>
 
@@ -846,7 +890,6 @@
       roue_collecte: false,
       quiz_ou_sondage: false,
       timer_chrono: false,
-      match_equipes: false,
       commentaires: false
     };
 
@@ -875,12 +918,36 @@
     const $ = (id) => document.getElementById(id);
     const pad2 = (n) => String(n).padStart(2, "0");
 
-    function updateStatusDot(id, isActive) {
+    // Mise à jour d'un voyant individuel (online ou display)
+    function setDot(id, active) {
       const el = $(id);
       if (!el) return;
-      el.style.background = isActive ? "#22c55e" : "#ef4444";
-      el.style.boxShadow = isActive ? "0 0 0 3px rgba(34,197,94,0.2)" : "none";
+      if (active) {
+        el.classList.add("on");
+      } else {
+        el.classList.remove("on");
+      }
     }
+
+    // Correspondance overlay → IDs des deux voyants
+    const OVERLAY_DOTS = {
+      "quiz_ou_sondage": { online: "statusQuizOnline",   display: "statusQuizDisplay"   },
+      "nuage_de_mots":   { online: "statusNuageOnline",  display: "statusNuageDisplay"  },
+      "roue_loto":       { online: "statusRoueOnline",   display: "statusRoueDisplay"   },
+      "commentaires":    { online: "statusCommOnline",   display: "statusCommDisplay"   },
+      "timer_chrono":    { online: "statusTimerOnline",  display: "statusTimerDisplay"  },
+      "match_equipes":   { online: "statusMatchOnline",  display: "statusMatchDisplay"  }
+    };
+
+    function updateOverlayDots(overlay, { online, displaying } = {}) {
+      const dots = OVERLAY_DOTS[overlay];
+      if (!dots) return;
+      if (online !== undefined)     setDot(dots.online,  online);
+      if (displaying !== undefined) setDot(dots.display, displaying);
+    }
+
+    // Rétrocompat : certains endroits appellent encore updateStatusDot — on le garde vide
+    function updateStatusDot() {}
 
     function flash(tabId, text, type = "success") {
       const el = $("message" + tabId.charAt(0).toUpperCase() + tabId.slice(1));
@@ -958,6 +1025,13 @@
         handleOverlayState(payload);
       });
 
+      // ✅ NOUVEAU V3.5 : écoute des voyants de présence en temps réel
+      socket.on("overlay:presence", (payload) => {
+        const { overlay, online, displaying } = payload;
+        console.log(`📡 [REMOTE] Présence: ${overlay} online=${online} displaying=${displaying}`);
+        updateOverlayDots(overlay, { online, displaying });
+      });
+
       socket.on("overlay:forbidden", () => {
         flash("quiz", "❌ Accès refusé", "error");
         connected = false;
@@ -973,7 +1047,9 @@
         const isActive = state === "active";
         overlayStates.nuage_de_mots = isActive;
         $("toggleNuage").className = isActive ? "toggle-switch active" : "toggle-switch";
-        updateStatusDot("statusNuage", isActive);
+        // Voyant affichage mis à jour par overlay:presence depuis l'overlay lui-même
+        // On met à jour ici uniquement si l'overlay est idle (on sait qu'il n'affiche rien)
+        if (!isActive) updateOverlayDots(overlay, { displaying: false });
 
         if (isActive && data && data.words) {
           nuageWords = { ...data.words };
@@ -988,7 +1064,7 @@
         overlayStates.roue_loto = isActive;
         $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
         $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
-        updateStatusDot("statusRoue", isActive);
+        if (!isActive) updateOverlayDots(overlay, { displaying: false });
 
         if (data && data.participants) {
           roueParticipants = data.participants.map(p => typeof p === "string" ? { name: p, key: p.toLowerCase() } : p);
@@ -998,7 +1074,6 @@
         renderParticipants();
 
         if (isActive && !overlayStates.roue_collecte) {
-          // Auto-start collecte si la roue vient d'être activée
           if (state === "active") {
             setTimeout(() => startCollect(), 300);
           }
@@ -1013,14 +1088,15 @@
         const isActive = state !== "idle";
         const questionType = data?.question?.type || null;
         updateQuizUI(isActive, questionType);
+        if (!isActive) updateOverlayDots(overlay, { displaying: false });
       }
 
       if (overlay === "timer_chrono") {
-        updateStatusDot("statusTimer", state === "active");
+        if (state === "idle") updateOverlayDots(overlay, { displaying: false });
       }
 
       if (overlay === "match_equipes") {
-        updateStatusDot("statusMatch", state === "active");
+        if (state === "idle") updateOverlayDots(overlay, { displaying: false });
         if (data) {
           if (data.teamA) { matchScoreA = data.teamA.score || 0; $("matchScoreA").textContent = matchScoreA; }
           if (data.teamB) { matchScoreB = data.teamB.score || 0; $("matchScoreB").textContent = matchScoreB; }
@@ -1031,10 +1107,10 @@
         const isActive = state !== "idle";
         overlayStates.commentaires = isActive;
         $("toggleCommentaires").className = isActive ? "toggle-switch active" : "toggle-switch";
-        updateStatusDot("statusCommentaires", isActive);
+        if (!isActive) updateOverlayDots(overlay, { displaying: false });
 
         if (data) {
-          if (data.flux) fluxMessages = data.flux;
+          if (data.flux)  fluxMessages  = data.flux;
           if (data.queue) queueMessages = data.queue;
         }
         renderFlux();
@@ -1047,7 +1123,6 @@
       overlayStates.quiz_ou_sondage = isActive;
       currentQuestionType = questionType;
       const status = $("quizStatus");
-      updateStatusDot("statusQuiz", isActive);
 
       if (isActive) {
         status.textContent = questionType === "poll" ? "Sondage" : "Quiz";
