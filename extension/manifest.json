@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "MDI Live Watchtower",
+  "version": "2.2",
+  "description": "Alimentation des overlays MDI Live — Zoom, Meet, Teams, WebinarJam uniquement",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.zoom.us/*",
+        "https://meet.google.com/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://*.webinarjam.com/*",
+        "https://*.everwebinar.com/*"
+      ],
+      "js": ["socket.io.js", "content.js"]
+    }
+  ]
+}
