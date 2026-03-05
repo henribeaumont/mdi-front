@@ -541,9 +541,13 @@
         <span id="quizStatus" class="quiz-status idle">Inactif</span>
       </div>
 
-      <select id="questionSelect">
-        <option value="">-- Connectez-vous d'abord --</option>
-      </select>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="questionSelect" style="flex:1">
+          <option value="">-- Connectez-vous d'abord --</option>
+        </select>
+        <button onclick="loadQuestionCatalog()" style="padding:6px 10px;background:var(--secondary);border:1px solid #444;border-radius:6px;color:#fff;cursor:pointer;font-size:13px;" title="Recharger la liste">↻</button>
+      </div>
+      <div id="catalogStatus" style="font-size:11px;color:#aaa;margin-top:2px;"></div>
 
       <div class="quiz-grid">
         <button class="btn-success" onclick="loadQuestion()">1. ❓ Charger</button>
@@ -1134,10 +1138,22 @@
     }
 
     async function loadQuestionCatalog() {
+      const statusEl = $("catalogStatus");
+      if (!currentRoom) return;
+      statusEl.textContent = "Chargement...";
+      statusEl.style.color = "#aaa";
       try {
-        const res = await fetch(`${SERVER_URL}/debug/questions?room=${currentRoom}`);
+        const res = await fetch(`${SERVER_URL}/api/client/questions`, {
+          headers: { 'x-room-id': currentRoom, 'x-room-key': currentKey }
+        });
         const json = await res.json();
-        questions = json.data || [];
+        if (!json.ok) {
+          statusEl.textContent = `❌ Erreur : ${json.error || res.status}`;
+          statusEl.style.color = "#f87171";
+          console.error("❌ Catalogue:", json);
+          return;
+        }
+        questions = json.questions || [];
         const select = $("questionSelect");
         select.innerHTML = '<option value="">-- Choisir --</option>';
         questions.forEach(q => {
@@ -1147,7 +1163,13 @@
           opt.dataset.type = q.type;
           select.appendChild(opt);
         });
-      } catch (e) { console.error("❌ Catalogue:", e); }
+        statusEl.textContent = questions.length ? `${questions.length} question(s) chargée(s)` : "⚠️ Aucune question pour cette room";
+        statusEl.style.color = questions.length ? "#86efac" : "#fbbf24";
+      } catch (e) {
+        statusEl.textContent = `❌ Connexion échouée`;
+        statusEl.style.color = "#f87171";
+        console.error("❌ Catalogue:", e);
+      }
     }
 
     function loadQuestion() {
