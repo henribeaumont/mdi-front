@@ -1,4 +1,26 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — DÉCOMPTE POKER (JETONS)
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+
+   Ce widget affiche un score sous forme de pile de jetons de poker.
+   ================================================================ */
+
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap');
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── BADGE DE SCORE ──────────────────────────────────────────
+     Petit cercle en bas de la pile qui affiche le score total.  */
+  --poker-score-bg:   #FFC107; /* Couleur de fond du badge de score  */
+  --poker-score-text: #000000; /* Couleur du chiffre dans le badge   */
+}
 
 body {
     background-color: transparent; margin: 0; padding: 0; overflow: hidden;

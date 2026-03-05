@@ -2,11 +2,15 @@
   "manifest_version": 3,
   "name": "MDI Live Watchtower",
   "version": "2.2",
-  "description": "Alimentation des overlays MDI Live — Zoom, Meet, Teams, WebinarJam uniquement",
+  "description": "Connecte le chat Zoom, Meet, Teams et WebinarJam aux overlays MDI Live en temps réel.",
+  "homepage_url": "https://henri-beaumont.com",
   "permissions": [
     "activeTab",
     "scripting",
     "storage"
+  ],
+  "host_permissions": [
+    "https://magic-digital-impact-live.onrender.com/*"
   ],
   "action": {
     "default_popup": "popup.html",

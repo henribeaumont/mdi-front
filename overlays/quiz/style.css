@@ -1,3 +1,22 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — QUIZ / SONDAGE
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+   ================================================================ */
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── MISE EN PAGE ────────────────────────────────────────────  */
+  --panel-gap:   18px;         /* Espace entre le panneau question et les réponses */
+  --font-family: "Montserrat"; /* Police utilisée pour tout le quiz */
+}
+
 /* ==========================================================
    MDI QUIZ / SONDAGE — DESIGN FINAL
    ========================================================== */

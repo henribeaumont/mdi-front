@@ -1,0 +1,15 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : QUIZ / SONDAGE
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── MISE EN PAGE ─────────────────────────────────────────── */
+  --panel-gap:   18px;          /* Espace entre question et réponses */
+  --font-family: "Montserrat";  /* Police de caractères              */
+}

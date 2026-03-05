@@ -1,0 +1,29 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : MOT MAGIQUE
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── FOND DU PANNEAU ──────────────────────────────────────── */
+  --panel-bg-color:   #0A0F1E;
+  --panel-bg-opacity: 0.80;
+  --panel-radius:     22px;
+  --panel-padding-x:  40px;
+  --panel-padding-y:  20px;
+
+  /* ── MOT EN ATTENTE ───────────────────────────────────────── */
+  --start-color: #6b6b6b;  /* Couleur avant activation (gris)   */
+  --start-size:  72px;
+
+  /* ── MOT ACTIVÉ ───────────────────────────────────────────── */
+  --end-color: #ffd700;  /* Couleur après activation (or)       */
+  --end-size:  140px;
+
+  /* ── POLICE ──────────────────────────────────────────────── */
+  --font-family: "Montserrat";
+}

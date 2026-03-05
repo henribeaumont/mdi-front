@@ -1,0 +1,36 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : ROUE LOTO
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── TAILLE DE LA ROUE ────────────────────────────────────── */
+  --wheel-size:       820px;  /* Diamètre de la roue             */
+  --wheel-stroke:      16px;  /* Épaisseur des contours          */
+  --wheel-text-size:   30px;  /* Taille du texte sur la roue     */
+  --wheel-text-weight: 900;   /* Graisse du texte                */
+
+  /* ── FLÈCHE ──────────────────────────────────────────────── */
+  --pointer-side:       "left";   /* "left" ou "right"           */
+  --pointer-size:        34px;
+  --pointer-color:      #ffffff;
+  --pointer-rotate-180: "on";     /* "on" ou "off"               */
+  --pointer-overlap:     1.15;
+
+  /* ── ROTATION ────────────────────────────────────────────── */
+  --spin-direction: "cw";  /* "cw"=horaire | "ccw"=anti-horaire  */
+
+  /* ── CONFETTIS ───────────────────────────────────────────── */
+  --winner-confetti:     "on";   /* "on" ou "off"                */
+  --confetti-density:     180;   /* 50=peu | 200=beaucoup        */
+  --confetti-duration-ms: 2200;
+
+  /* ── DIVERS ──────────────────────────────────────────────── */
+  --label-rotate-180: "off";
+  --max-participants:   48;
+}

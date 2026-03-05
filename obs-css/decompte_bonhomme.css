@@ -1,0 +1,19 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : DÉCOMPTE BONHOMME
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── DISQUE DE SCORE ──────────────────────────────────────── */
+  --disk-fill:   #222222;  /* Fond du disque                    */
+  --disk-stroke: #FFCC00;  /* Contour du disque (jaune)         */
+  --text-color:  #FFFFFF;  /* Couleur du chiffre                */
+
+  /* ── MAIN ────────────────────────────────────────────────── */
+  --hand-fill: #F9AD48;    /* Couleur de la main (orange chair) */
+}

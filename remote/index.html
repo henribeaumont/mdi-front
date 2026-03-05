@@ -1156,7 +1156,7 @@
       if (!questionKey) { flash("quiz", "⚠️ Choisissez une question", "error"); return; }
       if (overlayStates.nuage_de_mots) socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "nuage_de_mots" });
       if (overlayStates.roue_loto) socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "roue_loto" });
-      socket.emit("control:load_question", { room: currentRoom, overlay: "quiz_ou_sondage", question_key: questionKey });
+      socket.emit("control:load_question", { room: currentRoom, key: currentKey, overlay: "quiz_ou_sondage", question_key: questionKey });
     }
     function showOptions() { if (!connected) return; socket.emit("control:show_options", { room: currentRoom, overlay: "quiz_ou_sondage" }); }
     function showResults() { if (!connected) return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "results" }); }

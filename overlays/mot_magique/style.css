@@ -1,8 +1,39 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — MOT MAGIQUE
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+
+   Ce widget affiche un mot en attente, puis l'anime en grand
+   quand il est "activé" depuis le panneau de contrôle.
+   ================================================================ */
+
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');
 
 :root {
-    --panel-padding-y: 20px;
-    --panel-padding-x: 40px;
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── FOND DU PANNEAU ─────────────────────────────────────────  */
+  --panel-bg-color:   #0A0F1E; /* Couleur de fond du panneau        */
+  --panel-bg-opacity: 0.80;    /* Transparence : 0=invisible, 1=opaque */
+  --panel-radius:     22px;    /* Arrondi des coins                 */
+  --panel-padding-x:  40px;    /* Espace intérieur gauche/droite    */
+  --panel-padding-y:  20px;    /* Espace intérieur haut/bas         */
+
+  /* ── MOT EN ATTENTE (avant activation) ──────────────────────  */
+  --start-color: #6b6b6b; /* Couleur du mot avant activation       */
+  --start-size:  72px;    /* Taille du mot avant activation        */
+
+  /* ── MOT ACTIVÉ (après clic sur le bouton) ──────────────────  */
+  --end-color: #ffd700; /* Couleur du mot après activation — ex: #ffd700 (or) */
+  --end-size:  140px;   /* Taille du mot après activation (plus grand)        */
+
+  /* ── POLICE ──────────────────────────────────────────────────  */
+  --font-family: "Montserrat"; /* Police de caractères              */
 }
 
 body {

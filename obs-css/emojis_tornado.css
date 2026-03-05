@@ -1,0 +1,31 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : TORNADE D'EMOJIS
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── FORME DE LA TORNADE ──────────────────────────────────── */
+  --tornado-density:    0.30;  /* 0.1=épars → 0.5=dense          */
+  --tornado-width:      0.40;  /* 0.2=étroite → 0.8=large        */
+  --tornado-height:     1.00;  /* 0.5=mi-écran → 1.0=plein écran */
+  --tornado-rise-speed: 1.00;  /* 0.5=lent → 2.0=rapide          */
+
+  /* ── EMOJIS ──────────────────────────────────────────────── */
+  --emoji-opacity:       0.90;   /* 0=invisible → 1=opaque        */
+  --only-emoji-messages: "on";   /* "on"=emojis seul | "off"=tout */
+
+  /* ── EMOJIS DE DÉMARRAGE ──────────────────────────────────── */
+  --seed-enabled: "on";
+  --seed-emojis:  "✨,🔥,❤️,😂";   /* Séparés par virgule          */
+  --seed-mode:    "blend";
+
+  /* ── AVANCÉ ──────────────────────────────────────────────── */
+  --particle-max:   220;
+  --history-window: 220;
+  --auto-reset:     "false";
+}

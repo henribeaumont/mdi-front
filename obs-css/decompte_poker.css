@@ -1,0 +1,15 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : DÉCOMPTE POKER (JETONS)
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── BADGE DE SCORE ───────────────────────────────────────── */
+  --poker-score-bg:   #FFC107;  /* Fond du badge (jaune/or)      */
+  --poker-score-text: #000000;  /* Couleur du chiffre (noir)     */
+}

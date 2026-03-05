@@ -1,3 +1,48 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — MATCH ÉQUIPES (SCORE)
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+
+   Les couleurs s'écrivent en code hexadécimal : #RRGGBB
+   Exemples : #3b82f6=bleu  #ef4444=rouge  #2ecc71=vert  #FFD700=or
+   ================================================================ */
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── COULEURS DES ÉQUIPES ────────────────────────────────────  */
+  --team-a-color: #3b82f6; /* Équipe gauche  — ex: #3b82f6 (bleu)  */
+  --team-b-color: #ef4444; /* Équipe droite  — ex: #ef4444 (rouge) */
+
+  /* ── FOND DU PANNEAU ─────────────────────────────────────────
+     Le fond supporte un dégradé entre 2 couleurs.               */
+  --panel-bg-gradient-start: #1a1a2e; /* Couleur de départ du dégradé  */
+  --panel-bg-gradient-end:   #16213e; /* Couleur de fin du dégradé     */
+  --panel-bg-angle:          135deg;  /* Angle : 0=horizontal, 90=vertical */
+  --panel-bg-opacity:        0.90;    /* Transparence : 0=invisible, 1=opaque */
+
+  /* ── CONTOUR DU PANNEAU ──────────────────────────────────────  */
+  --panel-border-width:  2px;     /* Épaisseur : 0px = sans contour   */
+  --panel-border-color:  #ffffff; /* Couleur du contour               */
+  --panel-border-radius: 16px;    /* Arrondi : 0px=carré, 50px=arrondi */
+
+  /* ── NOMS DES ÉQUIPES ────────────────────────────────────────  */
+  --name-font-size:   24px;         /* Taille du texte des noms        */
+  --name-font-weight: 700;          /* Graisse : 400=normal, 900=très gras */
+  --name-font-family: "Montserrat"; /* Police de caractères            */
+
+  /* ── SCORES ──────────────────────────────────────────────────  */
+  --score-color:       #ffffff;      /* Couleur des chiffres            */
+  --score-font-size:   48px;         /* Taille : 36px=petit, 72px=grand */
+  --score-font-weight: 900;          /* Graisse des chiffres            */
+  --score-font-family: "Montserrat"; /* Police des chiffres             */
+}
+
 html, body {
   background-color: transparent;
   margin: 0; padding: 0; overflow: hidden;

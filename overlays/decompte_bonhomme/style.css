@@ -1,4 +1,29 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — DÉCOMPTE BONHOMME
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+
+   Ce widget affiche un score sous forme de disque + main animée.
+   ================================================================ */
+
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── DISQUE DE SCORE ─────────────────────────────────────────  */
+  --disk-fill:   #222222; /* Couleur de fond du disque            */
+  --disk-stroke: #FFCC00; /* Couleur du contour du disque         */
+  --text-color:  #FFFFFF; /* Couleur du chiffre dans le disque    */
+
+  /* ── MAIN ────────────────────────────────────────────────────  */
+  --hand-fill: #F9AD48; /* Couleur de la main — ex: #F9AD48 (orange chair) */
+}
 
 body {
     background-color: transparent;

@@ -1,0 +1,16 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : NUAGE DE MOTS
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── TAILLE ET POSITION ───────────────────────────────────── */
+  --cloud-width:  650px;  /* Largeur du nuage                  */
+  --cloud-height: 850px;  /* Hauteur du nuage                  */
+  --cloud-right:   50px;  /* Distance depuis le bord droit     */
+}

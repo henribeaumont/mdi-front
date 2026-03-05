@@ -1,23 +1,40 @@
-:root{
-  --auth-mode: "strict";
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — TORNADE D'EMOJIS
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
 
-  --tornado-density: 0.30;
-  --tornado-width: 0.40;
-  --tornado-rise-speed: 1.00;
-  --emoji-opacity: 0.90;
+   Ce widget affiche une tornade d'emojis envoyés par le public.
+   Les emojis sont collectés depuis les messages du chat.
+   ================================================================ */
 
-  --particle-max: 220;
-  --history-window: 220;
+:root {
 
-  --only-emoji-messages: "on";
-  --auto-reset: "false";
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
 
-  --seed-enabled: "on";
-  --seed-emojis: "✨,🔥,❤️,😂";
-  --seed-mode: "blend";
+  /* ── FORME DE LA TORNADE ─────────────────────────────────────  */
+  --tornado-density:   0.30; /* Densité d'emojis : 0.1=épars, 0.5=dense  */
+  --tornado-width:     0.40; /* Largeur de la tornade : 0.2=étroite, 0.8=large */
+  --tornado-height:    1.00; /* Hauteur : 0.5=mi-écran, 1.0=plein écran   */
+  --tornado-rise-speed: 1.00; /* Vitesse de montée : 0.5=lent, 2.0=rapide */
 
-  /* ✅ NOUVEAU : hauteur de tornade (1.0 = plein écran) */
-  --tornado-height: 1.00; /* 0.5 → 1.0 */
+  /* ── EMOJIS ──────────────────────────────────────────────────  */
+  --emoji-opacity:        0.90; /* Transparence des emojis : 0=invisible, 1=opaque */
+  --only-emoji-messages: "on";  /* "on"=emojis seulement | "off"=tout le texte      */
+
+  /* ── EMOJIS DE DÉMARRAGE (seed) ─────────────────────────────
+     Lance quelques emojis au démarrage avant que le public vote. */
+  --seed-enabled: "on";               /* "on"=activer | "off"=désactiver          */
+  --seed-emojis:  "✨,🔥,❤️,😂";      /* Emojis de démarrage, séparés par virgule */
+  --seed-mode:    "blend";            /* "blend"=mélanger avec les votes réels    */
+
+  /* ── PARAMÈTRES AVANCÉS ──────────────────────────────────────  */
+  --particle-max:   220; /* Nombre max d'emojis simultanés à l'écran   */
+  --history-window: 220; /* Fenêtre mémoire des messages récents        */
+  --auto-reset:     "false"; /* Réinitialisation auto : "true"/"false"  */
 }
 
 html, body{
