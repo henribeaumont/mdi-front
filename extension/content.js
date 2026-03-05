@@ -14,8 +14,11 @@
 //     V11.9 utilisait uniquement querySelector() (cherche les descendants),
 //     ce qui ratait les cas où le node ajouté EST lui-même l'élément message.
 // [B] Teams : ajout des sélecteurs New Teams 2024/2025
-//     → [data-tid="chat-pane-message"], div[class*="message-body"],
-//        div[dir="auto"] à l'intérieur d'un message-body
+//     → [data-tid="chat-pane-message"], [data-tid="messageBodyContent"],
+//        div[class*="message-body"]
+// [C] Teams : fallback universel div[dir="auto"]
+//     Résistant aux changements de DOM — Teams utilise cet attribut
+//     pour tout contenu textuel utilisateur, quelle que soit la version.
 // ==================================================
 let CLIENT_ID = "DEMO_CLIENT";
 let socket = null;
@@ -225,19 +228,29 @@ const observateur = new MutationObserver((mutations) => {
       // === TEAMS ===
       if (host.includes("teams")) {
         // Cherche sur le node lui-même (node.matches) ET ses descendants (node.querySelector)
-        // car Teams peut ajouter directement l'élément message OU un conteneur parent.
         const TEAMS_SELECTORS = [
-          '[data-tid="message-body"]',           // Classic Teams + New Teams
-          '[data-tid="chat-pane-message"]',       // New Teams 2024
-          '[class*="ui-chat__item__message"]',    // Older Teams web
-          'p[class*="text-module"]',              // Fallback classe CSS
-          'div[class*="message-body"]',           // Variante New Teams
+          '[data-tid="message-body"]',
+          '[data-tid="chat-pane-message"]',
+          '[data-tid="messageBodyContent"]',
+          '[class*="ui-chat__item__message"]',
+          'p[class*="text-module"]',
+          'div[class*="message-body"]',
         ];
         let cible = null;
         for (const sel of TEAMS_SELECTORS) {
           if (node.matches?.(sel)) { cible = node; break; }
           const found = node.querySelector?.(sel);
           if (found) { cible = found; break; }
+        }
+        // Fallback universel : div[dir="auto"] = conteneur texte directionnel
+        // utilisé par Teams pour tout contenu textuel utilisateur.
+        if (!cible) {
+          const dirAuto = node.matches?.('div[dir="auto"]') ? node
+            : node.querySelector?.('div[dir="auto"]');
+          if (dirAuto) {
+            const txt = (dirAuto.innerText || dirAuto.textContent || "").trim();
+            if (txt.length >= 2) cible = dirAuto;
+          }
         }
         if (cible && !seenNodes.has(cible)) {
           const raw = cible.innerText || cible.textContent || "";
