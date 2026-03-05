@@ -541,13 +541,13 @@
         <span id="quizStatus" class="quiz-status idle">Inactif</span>
       </div>
 
-      <div style="position:relative;margin-bottom:4px;">
-        <select id="questionSelect" style="width:100%;padding-right:36px;margin-bottom:0;">
-          <option value="">-- Connectez-vous d'abord --</option>
-        </select>
-        <button onclick="loadQuestionCatalog()" title="Recharger" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#aaa;cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;">↻</button>
+      <select id="questionSelect">
+        <option value="">-- Connectez-vous d'abord --</option>
+      </select>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:-6px;margin-bottom:6px;">
+        <div id="catalogStatus" style="font-size:11px;color:#aaa;"></div>
+        <button onclick="loadQuestionCatalog()" style="background:transparent;border:none;color:#666;cursor:pointer;font-size:11px;padding:0;">↻ Recharger</button>
       </div>
-      <div id="catalogStatus" style="font-size:11px;color:#aaa;margin-bottom:6px;"></div>
 
       <div class="quiz-grid">
         <button class="btn-success" onclick="loadQuestion()">1. ❓ Charger</button>
