@@ -17,6 +17,12 @@
   --cloud-width:  650px; /* Largeur du nuage de mots             */
   --cloud-height: 850px; /* Hauteur du nuage de mots             */
   --cloud-right:   50px; /* Distance depuis le bord droit        */
+
+  /* ── TAILLE DES MOTS ─────────────────────────────────────────
+     Écart entre les mots les moins votés et les plus votés.
+     Plus l'écart est grand, plus la hiérarchie visuelle est marquée. */
+  --cloud-font-min:  30px; /* Taille du mot le moins voté         */
+  --cloud-font-max: 120px; /* Taille du mot le plus voté          */
 }
 
 html, body {

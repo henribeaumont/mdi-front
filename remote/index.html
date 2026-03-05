@@ -1228,6 +1228,7 @@
           <span class="nuage-word-count">${count}×</span>
           <div class="nuage-word-actions">
             <button class="btn-small btn-success" onclick="nuageIncrementWord('${escJs(word)}')" title="+1 vote">+1</button>
+            <button class="btn-small btn-secondary" onclick="nuageDecrementWord('${escJs(word)}')" title="-1 vote">-1</button>
             <button class="btn-small btn-danger" onclick="nuageRemoveWord('${escJs(word)}')" title="Supprimer">❌</button>
           </div>
         </div>
@@ -1250,6 +1251,17 @@
       nuageWords[word] = (nuageWords[word] || 0) + 1;
       renderNuageWords();
       console.log(`+1 [NUAGE] Mot incrémenté: ${word}`);
+    }
+
+    function nuageDecrementWord(word) {
+      if (!connected) return;
+      socket.emit("control:nuage_word_decrement", { room: currentRoom, word });
+      // Mise à jour locale optimiste (min 1)
+      if (nuageWords[word] > 1) {
+        nuageWords[word]--;
+      }
+      renderNuageWords();
+      console.log(`-1 [NUAGE] Mot décrémenté: ${word}`);
     }
 
     function clearAllNuage() {

@@ -164,6 +164,10 @@ function render() {
   const maxPx = clamp(cssPx("--cloud-font-max", 120), 10, 300);
   const safeMax = Math.max(minPx, maxPx);
 
+  // Supprimer les éléments DOM des mots qui n'existent plus
+  const validIds = new Set(words.map(w => `mot-${w.text.replace(/\s+/g, '-')}`));
+  Array.from(zone.children).forEach(el => { if (!validIds.has(el.id)) el.remove(); });
+
   words.forEach((mot) => {
     const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
     let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);

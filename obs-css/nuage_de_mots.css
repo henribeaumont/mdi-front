@@ -13,4 +13,8 @@
   --cloud-width:  650px;  /* Largeur du nuage                  */
   --cloud-height: 850px;  /* Hauteur du nuage                  */
   --cloud-right:   50px;  /* Distance depuis le bord droit     */
+
+  /* ── TAILLE DES MOTS ─────────────────────────────────────── */
+  --cloud-font-min:  30px; /* Taille min (mot le moins voté)   */
+  --cloud-font-max: 120px; /* Taille max (mot le plus voté)    */
 }
