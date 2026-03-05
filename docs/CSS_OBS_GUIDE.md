@@ -321,6 +321,12 @@ ont écrit le mot déclencheur dans le chat. Idéal pour créer un effet de vote
   --end-color: #ffd700;  /* Couleur du mot activé (or par défaut)               */
   --end-size:  140px;    /* Taille du mot activé (plus grand pour l'effet)      */
 
+  /* ── MOT ET DÉCLENCHEUR ── Ce que vous et vos participants configurez ── */
+  --display-word: "VICTOIRE";  /* Mot affiché à l'écran (en majuscules)             */
+  --trigger-chat: "GG";        /* Mot que les participants tapent dans Teams         */
+  --threshold:    0.9;         /* Part de participants requis : 0.5=50% | 0.9=90%   */
+  --sticky:       "false";     /* "true" = reste activé même si le ratio redescend  */
+
   /* ── POLICE ── */
   --font-family: "Montserrat";
 }
@@ -329,6 +335,10 @@ html, body {
   background: rgba(0,0,0,0) !important;
 }
 ```
+
+> **Comment ça marche :** L'overlay affiche `--display-word` en gris. Quand assez de participants
+> ont écrit `--trigger-chat` dans le chat Teams (selon `--threshold`), le mot s'anime en couleur.
+> Envoyer `RESET` dans le chat remet le compteur à zéro.
 
 ---
 

@@ -32,6 +32,12 @@
   --end-color: #ffd700; /* Couleur du mot après activation — ex: #ffd700 (or) */
   --end-size:  140px;   /* Taille du mot après activation (plus grand)        */
 
+  /* ── LOGIQUE DU MOT MAGIQUE ─────────────────────────────────  */
+  --display-word:  "VICTOIRE"; /* Mot affiché à l'écran                            */
+  --trigger-chat:  "GG";       /* Mot que les participants tapent dans Teams        */
+  --threshold:     0.9;        /* Part de participants requis : 0.9 = 90%           */
+  --sticky:        "false";    /* "true" = reste activé même si le ratio redescend  */
+
   /* ── POLICE ──────────────────────────────────────────────────  */
   --font-family: "Montserrat"; /* Police de caractères              */
 }
