@@ -27,6 +27,7 @@
   --panel-max-width: 1200px;
 
   /* ── NOM DE L'AUTEUR ─────────────────────────────────────── */
+  --show-author:        "on";  /* "on" = affiché | "off" = masqué    */
   --author-color:       #00d4ff;
   --author-font-size:   16px;
   --author-font-weight: 700;
