@@ -254,6 +254,17 @@ const observateur = new MutationObserver((mutations) => {
             if (txt.length >= 2) cible = dirAuto;
           }
         }
+        // Rejeter les nœuds dans la zone de saisie (compose box)
+        if (cible) {
+          let cur = cible;
+          while (cur) {
+            if (cur.getAttribute?.('role') === 'textbox' ||
+                cur.getAttribute?.('data-tid') === 'ckeditor') {
+              cible = null; break;
+            }
+            cur = cur.parentElement;
+          }
+        }
         if (cible && !seenNodes.has(cible)) {
           const raw = cible.innerText || cible.textContent || "";
           const clean = cleanAndValidate(raw);
