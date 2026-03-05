@@ -172,7 +172,7 @@ async function start() {
   socket.on("overlay:state", (payload) => {
     if (payload?.overlay === cfg.overlay) {
       unlock();
-      if (lower(cssVar("--confetti-auto", "off")) === "on") lancerCelebration();
+      lancerCelebration();
     }
   });
 
