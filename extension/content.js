@@ -35,6 +35,7 @@ const BLACKLIST = [
   "EN ATTENTE", "PENDING"
 ];
 // --- Chargement room-id depuis popup ---
+console.log(`[MDI] Script chargé sur: ${location.href.substring(0, 100)}`);
 if (typeof chrome !== "undefined" && chrome.storage) {
   chrome.storage.local.get(["mdi_room_id"], (result) => {
     if (result.mdi_room_id) CLIENT_ID = result.mdi_room_id;
