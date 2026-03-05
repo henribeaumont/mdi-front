@@ -1,0 +1,34 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : TUG OF WAR (VOTE EN DIRECT)
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── NOMS DES ÉQUIPES ─────────────────────────────────────── */
+  --name-left:  "OUI";   /* Texte affiché à gauche              */
+  --name-right: "NON";   /* Texte affiché à droite              */
+
+  /* ── TOUCHES DE VOTE ─────────────────────────────────────── */
+  --trigger-left:  "O";  /* Mot/lettre pour voter à gauche      */
+  --trigger-right: "N";  /* Mot/lettre pour voter à droite      */
+
+  /* ── COULEURS ────────────────────────────────────────────── */
+  --color-left:  #2ecc71;  /* Vert par défaut                   */
+  --color-right: #e74c3c;  /* Rouge par défaut                  */
+
+  /* ── FOND DU PANNEAU ──────────────────────────────────────── */
+  --panel-bg-color:   #0A0F1E;
+  --panel-bg-opacity: 0.75;
+  --panel-radius:     22px;
+  --panel-padding:    25px;
+
+  /* ── TEXTE D'AIDE ────────────────────────────────────────── */
+  --hint-color:     #ffffff;
+  --hint-opacity:   0.92;
+  --hint-font-size: 25px;
+}

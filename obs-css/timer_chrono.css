@@ -1,0 +1,27 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : TIMER / CHRONO
+   ================================================================
+   1. Dans OBS, faites clic droit sur la source → Propriétés
+   2. Copiez-collez CE BLOC dans le champ "CSS personnalisé"
+   3. Remplissez room-id et room-key, puis ajustez les couleurs
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";   /* <-- à remplir             */
+  --room-key:  "VOTRE_ROOM_KEY";  /* <-- à remplir             */
+  --auth-mode: "strict";
+
+  /* ── FOND DU PANNEAU ──────────────────────────────────────── */
+  --panel-bg-color: #0A0F1E;  /* Couleur de fond               */
+  --panel-opacity:  0.78;     /* 0=transparent → 1=opaque      */
+  --panel-radius:   22px;     /* Arrondi des coins             */
+  --panel-pad-x:    28px;     /* Marge gauche/droite           */
+  --panel-pad-y:    18px;     /* Marge haut/bas                */
+
+  /* ── TEXTE DU TEMPS ───────────────────────────────────────── */
+  --time-color:       #ffffff;      /* Couleur des chiffres    */
+  --time-font-size:   72px;         /* Taille des chiffres     */
+  --time-font-family: "Montserrat"; /* Police                  */
+}

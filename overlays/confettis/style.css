@@ -1,3 +1,21 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — CONFETTIS
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+
+   Cet overlay n'a pas de personnalisation visuelle avancée :
+   les confettis sont contrôlés depuis le panneau de contrôle.
+   ================================================================ */
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+}
+
 body, html {
   margin: 0;
   padding: 0;

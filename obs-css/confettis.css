@@ -1,0 +1,14 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : CONFETTIS
+   ================================================================
+   Pas de personnalisation visuelle — les confettis sont
+   déclenchés depuis le panneau de contrôle.
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+}

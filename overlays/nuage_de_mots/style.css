@@ -1,3 +1,24 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — NUAGE DE MOTS
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+   ================================================================ */
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── TAILLE ET POSITION DU NUAGE ────────────────────────────
+     Le nuage de mots s'affiche sur le côté droit de l'écran.   */
+  --cloud-width:  650px; /* Largeur du nuage de mots             */
+  --cloud-height: 850px; /* Hauteur du nuage de mots             */
+  --cloud-right:   50px; /* Distance depuis le bord droit        */
+}
+
 html, body {
   background-color: transparent;
   margin: 0; padding: 0; overflow: hidden;

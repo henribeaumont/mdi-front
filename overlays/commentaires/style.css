@@ -1,3 +1,50 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — COMMENTAIRES
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+   ================================================================ */
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── FOND DU PANNEAU ─────────────────────────────────────────  */
+  --panel-bg-gradient-start: #1a1a2e; /* Couleur de départ du dégradé  */
+  --panel-bg-gradient-end:   #16213e; /* Couleur de fin du dégradé     */
+  --panel-bg-angle:          135deg;  /* Angle : 0=horizontal, 90=vertical */
+  --panel-bg-opacity:        0.90;    /* Transparence : 0=invisible, 1=opaque */
+
+  /* ── CONTOUR DU PANNEAU ──────────────────────────────────────  */
+  --panel-border-width:  2px;     /* Épaisseur : 0px = sans contour   */
+  --panel-border-color:  #00d4ff; /* Couleur du contour               */
+  --panel-border-radius: 16px;    /* Arrondi : 0px=carré, 50px=arrondi */
+
+  /* ── DIMENSIONS DU PANNEAU ───────────────────────────────────  */
+  --panel-padding-x:  30px;   /* Espace intérieur gauche/droite      */
+  --panel-padding-y:  20px;   /* Espace intérieur haut/bas           */
+  --panel-min-width:  600px;  /* Largeur minimale du panneau         */
+  --panel-max-width:  1200px; /* Largeur maximale du panneau         */
+  --panel-width:      auto;   /* Largeur fixe (auto = adaptatif)     */
+
+  /* ── NOM DE L'AUTEUR ─────────────────────────────────────────  */
+  --author-color:       #00d4ff;      /* Couleur du nom de l'auteur   */
+  --author-font-size:   16px;         /* Taille du nom                */
+  --author-font-weight: 700;          /* Graisse : 400=normal, 700=gras */
+  --author-font-family: "Montserrat"; /* Police                       */
+
+  /* ── TEXTE DU MESSAGE ────────────────────────────────────────  */
+  --message-color:          #ffffff;      /* Couleur du message        */
+  --message-font-size:      20px;         /* Taille du message         */
+  --message-font-weight:    400;          /* Graisse du message        */
+  --message-font-family:    "Montserrat"; /* Police du message         */
+  --message-line-height:    1.4;          /* Interligne                */
+  --message-text-transform: none;         /* none=normal, uppercase=MAJUSCULES */
+}
+
 html, body {
   background-color: transparent;
   margin: 0; padding: 0; overflow: hidden;

@@ -1,19 +1,41 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — ROUE LOTO
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+   ================================================================ */
+
 :root {
-  --wheel-size: 820px;
-  --wheel-stroke: 16px;
-  --wheel-text-size: 30px;
-  --wheel-text-weight: 900;
-  --pointer-side: "left";
-  --pointer-size: 34px;
-  --pointer-color: #ffffff;
-  --pointer-rotate-180: "on";
-  --pointer-overlap: 1.15;
-  --spin-direction: "cw";
-  --winner-confetti: "on";
-  --confetti-density: 180;
-  --confetti-duration-ms: 2200;
-  --label-rotate-180: "off";
-  --max-participants: 48;
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── TAILLE DE LA ROUE ───────────────────────────────────────  */
+  --wheel-size:        820px; /* Diamètre de la roue en pixels        */
+  --wheel-stroke:       16px; /* Épaisseur du contour des segments    */
+  --wheel-text-size:    30px; /* Taille des textes sur la roue        */
+  --wheel-text-weight:  900;  /* Graisse du texte : 400=normal, 900=gras */
+
+  /* ── FLÈCHE / POINTEUR ───────────────────────────────────────  */
+  --pointer-side:       "left";  /* Côté de la flèche : "left" ou "right" */
+  --pointer-size:        34px;   /* Taille de la flèche en pixels        */
+  --pointer-color:      #ffffff; /* Couleur de la flèche                 */
+  --pointer-rotate-180: "on";    /* Retourner la flèche : "on" ou "off"  */
+  --pointer-overlap:     1.15;   /* Chevauchement de la flèche sur la roue */
+
+  /* ── ROTATION ────────────────────────────────────────────────  */
+  --spin-direction: "cw"; /* Sens de rotation : "cw"=horaire, "ccw"=anti-horaire */
+
+  /* ── CONFETTIS DU GAGNANT ────────────────────────────────────  */
+  --winner-confetti:    "on";  /* Confettis à l'annonce du gagnant : "on"/"off" */
+  --confetti-density:    180;  /* Quantité de confettis : 50=peu, 200=beaucoup  */
+  --confetti-duration-ms: 2200; /* Durée des confettis en millisecondes         */
+
+  /* ── DIVERS ──────────────────────────────────────────────────  */
+  --label-rotate-180: "off"; /* Retourner les étiquettes : "on" ou "off"    */
+  --max-participants:   48;   /* Nombre max de participants sur la roue      */
 }
 
 html, body {

@@ -1,0 +1,37 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : MATCH ÉQUIPES (SCORE)
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── COULEURS DES ÉQUIPES ─────────────────────────────────── */
+  --team-a-color: #3b82f6;  /* Équipe gauche  (bleu par défaut)  */
+  --team-b-color: #ef4444;  /* Équipe droite  (rouge par défaut) */
+
+  /* ── FOND DU PANNEAU ──────────────────────────────────────── */
+  --panel-bg-gradient-start: #1a1a2e;
+  --panel-bg-gradient-end:   #16213e;
+  --panel-bg-angle:          135deg;
+  --panel-bg-opacity:        0.90;
+
+  /* ── CONTOUR ─────────────────────────────────────────────── */
+  --panel-border-width:  2px;
+  --panel-border-color:  #ffffff;
+  --panel-border-radius: 16px;
+
+  /* ── NOMS DES ÉQUIPES ─────────────────────────────────────── */
+  --name-font-size:   24px;
+  --name-font-weight: 700;
+  --name-font-family: "Montserrat";
+
+  /* ── SCORES ──────────────────────────────────────────────── */
+  --score-color:       #ffffff;
+  --score-font-size:   48px;
+  --score-font-weight: 900;
+  --score-font-family: "Montserrat";
+}

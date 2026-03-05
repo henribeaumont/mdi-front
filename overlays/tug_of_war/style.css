@@ -1,17 +1,43 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — TUG OF WAR (VOTE EN DIRECT)
+   ================================================================
+   Dans OBS → Propriétés de la source → CSS personnalisé,
+   copiez-collez le bloc :root { } et modifiez les valeurs.
+
+   Ce widget affiche une barre qui se déplace selon les votes
+   du public (ex: OUI vs NON, ÉQUIPE A vs ÉQUIPE B).
+   ================================================================ */
+
 :root {
-  --name-left: "OUI";
-  --name-right: "NON";
-  --trigger-left: "O";
-  --trigger-right: "N";
-  --color-left: #2ecc71;
-  --color-right: #e74c3c;
-  --panel-bg-color: #0A0F1E;
-  --panel-bg-opacity: 0.75;
-  --panel-radius: 22px;
-  --panel-padding: 25px;
-  --hint-color: #ffffff;
-  --hint-opacity: 0.92;
-  --hint-font-size: 25px;
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
+
+  /* ── NOMS DES ÉQUIPES / OPTIONS ─────────────────────────────  */
+  --name-left:  "OUI"; /* Texte affiché à gauche               */
+  --name-right: "NON"; /* Texte affiché à droite               */
+
+  /* ── TOUCHES DE VOTE (pour les participants) ─────────────────
+     Les participants votent en tapant ces touches dans le chat. */
+  --trigger-left:  "O"; /* Touche/mot pour voter à gauche       */
+  --trigger-right: "N"; /* Touche/mot pour voter à droite       */
+
+  /* ── COULEURS ────────────────────────────────────────────────  */
+  --color-left:  #2ecc71; /* Couleur équipe gauche — ex: #2ecc71 (vert) */
+  --color-right: #e74c3c; /* Couleur équipe droite — ex: #e74c3c (rouge) */
+
+  /* ── FOND DU PANNEAU ─────────────────────────────────────────  */
+  --panel-bg-color:   #0A0F1E; /* Couleur de fond                 */
+  --panel-bg-opacity: 0.75;    /* Transparence : 0=invisible, 1=opaque */
+  --panel-radius:     22px;    /* Arrondi des coins               */
+  --panel-padding:    25px;    /* Espace intérieur                */
+
+  /* ── TEXTE D'AIDE (instructions de vote) ────────────────────  */
+  --hint-color:     #ffffff; /* Couleur du texte d'instructions   */
+  --hint-opacity:   0.92;    /* Transparence du texte             */
+  --hint-font-size: 25px;    /* Taille du texte d'instructions    */
 }
 
 html, body {

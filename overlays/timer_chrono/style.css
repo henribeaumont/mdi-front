@@ -1,3 +1,41 @@
+/* ================================================================
+   ⚙️  PERSONNALISATION MDI — TIMER / CHRONO
+   ================================================================
+   Comment personnaliser votre overlay dans OBS :
+   1. Clic droit sur la source Navigateur → Propriétés
+   2. Dans "CSS personnalisé", copiez-collez le bloc :root { }
+      ci-dessous et modifiez uniquement les VALEURS.
+
+   Les couleurs s'écrivent en code hexadécimal : #RRGGBB
+   Exemples de couleurs courantes :
+     #ffffff = blanc    #000000 = noir     transparent = sans fond
+     #FFD700 = or       #ff3b30 = rouge    #3b82f6 = bleu
+   ================================================================ */
+
+:root {
+
+  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────
+     Ces deux lignes connectent l'overlay à votre session.      */
+  --room-id:   "";        /* Identifiant de votre room           */
+  --room-key:  "";        /* Clé secrète de la room              */
+  --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé)
+                             "lenient" = accès sans vérification  */
+
+  /* ── FOND DU PANNEAU ─────────────────────────────────────────
+     Le rectangle coloré derrière les chiffres.                 */
+  --panel-bg-color: #0A0F1E; /* Couleur de fond du panneau        */
+  --panel-opacity:  0.78;    /* Transparence : 0=invisible, 1=opaque */
+  --panel-radius:   22px;    /* Arrondi des coins : 0px=carré      */
+  --panel-pad-x:    28px;    /* Espace intérieur gauche/droite     */
+  --panel-pad-y:    18px;    /* Espace intérieur haut/bas          */
+
+  /* ── TEXTE DU TEMPS ──────────────────────────────────────────
+     Apparence des chiffres affichés (ex : 02:30).              */
+  --time-color:       #ffffff;      /* Couleur des chiffres       */
+  --time-font-size:   72px;         /* Taille : 48px=petit, 96px=grand */
+  --time-font-family: "Montserrat"; /* Police de caractères       */
+}
+
 html, body {
   background-color: transparent;
   margin: 0; padding: 0; overflow: hidden;

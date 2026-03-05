@@ -1,0 +1,42 @@
+/* ================================================================
+   OBS — SOURCE NAVIGATEUR : COMMENTAIRES
+   ================================================================ */
+
+:root {
+
+  /* ── OBLIGATOIRE ─────────────────────────────────────────── */
+  --room-id:   "VOTRE_ROOM_ID";
+  --room-key:  "VOTRE_ROOM_KEY";
+  --auth-mode: "strict";
+
+  /* ── FOND DU PANNEAU ──────────────────────────────────────── */
+  --panel-bg-gradient-start: #1a1a2e;
+  --panel-bg-gradient-end:   #16213e;
+  --panel-bg-angle:          135deg;
+  --panel-bg-opacity:        0.90;
+
+  /* ── CONTOUR ─────────────────────────────────────────────── */
+  --panel-border-width:  2px;
+  --panel-border-color:  #00d4ff;
+  --panel-border-radius: 16px;
+
+  /* ── DIMENSIONS ───────────────────────────────────────────── */
+  --panel-padding-x: 30px;
+  --panel-padding-y: 20px;
+  --panel-min-width: 600px;
+  --panel-max-width: 1200px;
+
+  /* ── NOM DE L'AUTEUR ─────────────────────────────────────── */
+  --author-color:       #00d4ff;
+  --author-font-size:   16px;
+  --author-font-weight: 700;
+  --author-font-family: "Montserrat";
+
+  /* ── TEXTE DU MESSAGE ─────────────────────────────────────── */
+  --message-color:          #ffffff;
+  --message-font-size:      20px;
+  --message-font-weight:    400;
+  --message-font-family:    "Montserrat";
+  --message-line-height:    1.4;
+  --message-text-transform: none;  /* none=normal | uppercase=MAJUSCULES */
+}
