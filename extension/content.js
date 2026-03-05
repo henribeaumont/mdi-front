@@ -1,5 +1,5 @@
 // ==================================================
-// MDI LIVE WATCHTOWER - V11.9
+// MDI LIVE WATCHTOWER - V11.10
 // - Zoom / Meet / Teams / WebinarJam
 // - ✅ PAS de captation pendant la frappe (pas de characterData observer)
 // - ✅ Préserve les emojis (Zoom surtout)
@@ -9,17 +9,13 @@
 // - ✅ Détection intelligente : Word Cloud (1-2 mots courts) vs Commentaires (4+ mots)
 // - Ne casse pas les overlays qui lisent raw_vote (emoji_tornado, word_cloud, tug_of_war, etc.)
 //
-// CHANGELOG V11.9 :
-// [A] manifest.json v2.2 : matches restreint aux 6 domaines cibles
-//     Suppression de <all_urls> et all_frames:true
-// [B] Teams : nouvelle stratégie de détection DOM 2024
-//     → querySelector('[data-tid="message-body"]') en priorité
-//     → fallback '[class*="ui-chat__item__message"]'
-//     → fallback 'p[class*="text-module"]'
-//     → ne tombe plus dans le fallback générique
-// [C] Suppression du bloc FALLBACK GENERIC
-//     Cause identifiée de la capture sur les onglets non ciblés
-// [D] Version bumped V11.5 → V11.9
+// CHANGELOG V11.10 :
+// [A] Teams : correction critique — node.matches() + node.querySelector()
+//     V11.9 utilisait uniquement querySelector() (cherche les descendants),
+//     ce qui ratait les cas où le node ajouté EST lui-même l'élément message.
+// [B] Teams : ajout des sélecteurs New Teams 2024/2025
+//     → [data-tid="chat-pane-message"], div[class*="message-body"],
+//        div[dir="auto"] à l'intérieur d'un message-body
 // ==================================================
 let CLIENT_ID = "DEMO_CLIENT";
 let socket = null;
@@ -228,12 +224,21 @@ const observateur = new MutationObserver((mutations) => {
       }
       // === TEAMS ===
       if (host.includes("teams")) {
-        // Teams Web 2024 : les messages n'apparaissent plus dans <p> ou div[dir='auto']
-        // Stratégie : cibler l'élément portant le contenu du message uniquement
-        const cible =
-          node.querySelector?.('[data-tid="message-body"]') ||
-          node.querySelector?.('[class*="ui-chat__item__message"]') ||
-          node.querySelector?.('p[class*="text-module"]');
+        // Cherche sur le node lui-même (node.matches) ET ses descendants (node.querySelector)
+        // car Teams peut ajouter directement l'élément message OU un conteneur parent.
+        const TEAMS_SELECTORS = [
+          '[data-tid="message-body"]',           // Classic Teams + New Teams
+          '[data-tid="chat-pane-message"]',       // New Teams 2024
+          '[class*="ui-chat__item__message"]',    // Older Teams web
+          'p[class*="text-module"]',              // Fallback classe CSS
+          'div[class*="message-body"]',           // Variante New Teams
+        ];
+        let cible = null;
+        for (const sel of TEAMS_SELECTORS) {
+          if (node.matches?.(sel)) { cible = node; break; }
+          const found = node.querySelector?.(sel);
+          if (found) { cible = found; break; }
+        }
         if (cible && !seenNodes.has(cible)) {
           const raw = cible.innerText || cible.textContent || "";
           const clean = cleanAndValidate(raw);
