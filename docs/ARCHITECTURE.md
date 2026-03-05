@@ -87,9 +87,6 @@ mdi-front/
 ├── admin/                             # Interface admin (gestion clients / questions quiz)
 │   └── index.html
 │
-├── chat/                              # Interface chat (affichage messages en direct)
-│   └── index.html
-│
 ├── editor/                            # Éditeur (usage interne uniquement)
 │   └── index.html
 │
