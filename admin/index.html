@@ -69,6 +69,7 @@
           <div><label>Clé Secrète</label><input id="c_key" required></div>
         </div>
         <div><label>Actif ?</label><select id="c_active"><option value="true">OUI</option><option value="false">NON</option></select></div>
+        <div style="margin-top:10px"><label>Date de fin d'accès (laisser vide = permanent)</label><input type="date" id="c_expires" style="max-width:200px"></div>
         
         <div style="margin-top:15px">
           <label>Overlays Disponibles</label>
@@ -205,10 +206,13 @@ function renderData(res) {
   // Render Clients
   document.querySelector("#tableClients tbody").innerHTML = res.clients.map(c => {
     const overlaysCount = c.entitlements ? Object.keys(c.entitlements).filter(k => c.entitlements[k]).length : 0;
+    const expiry = c.expires_at ? c.expires_at.slice(0, 10) : '∞';
+    const expired = c.expires_at && new Date(c.expires_at) < new Date();
     return `<tr>
       <td>${c.room_id}</td>
       <td>${c.room_key}</td>
       <td>${c.active?'✅':'❌'}</td>
+      <td style="${expired ? 'color:#ef4444;font-weight:bold' : ''}">${expiry}${expired ? ' ⚠️' : ''}</td>
       <td>${overlaysCount} actifs</td>
       <td><button onclick="editClient('${c.room_id}')">Edit</button></td>
     </tr>`;
@@ -247,10 +251,12 @@ document.getElementById("formClient").onsubmit = async (e) => {
     entitlements[overlay] = toggle ? toggle.classList.contains('active') : false;
   });
   
+  const expiresVal = document.getElementById("c_expires").value;
   const body = {
     room_id: document.getElementById("c_id").value,
     room_key: document.getElementById("c_key").value,
     active: document.getElementById("c_active").value === "true",
+    expires_at: expiresVal ? new Date(expiresVal).toISOString() : null,
     entitlements
   };
   await apiCall("/client", "POST", body); 
@@ -301,9 +307,10 @@ window.deleteOverlay = (name) => {
 window.editClient = (id) => {
   const c = window.rawData.clients.find(x => x.room_id === id);
   if(c) { 
-    document.getElementById("c_id").value = c.room_id; 
+    document.getElementById("c_id").value = c.room_id;
     document.getElementById("c_key").value = c.room_key;
     document.getElementById("c_active").value = c.active ? "true" : "false";
+    document.getElementById("c_expires").value = c.expires_at ? c.expires_at.slice(0, 10) : "";
     
     // Nettoyer les entitlements (retirer emoji_tornado)
     const cleanedEntitlements = {};
