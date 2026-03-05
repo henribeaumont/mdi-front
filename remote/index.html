@@ -556,6 +556,8 @@
         <button id="btnRevealAnswer" class="btn-secondary" onclick="revealAnswer()" disabled>4. ✅ Réponse</button>
       </div>
       <button id="btnResetQuiz" class="btn-danger" onclick="resetQuiz()" disabled>5. 🔄 Réinitialiser</button>
+      <div class="separator"></div>
+      <button class="btn-warning" onclick="fireConfetti()" style="width:100%">🎉 Lancer les confettis</button>
       <div id="messageQuiz" class="flash-msg"></div>
     </div>
 
@@ -1184,6 +1186,7 @@
     function showResults() { if (!connected) return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "results" }); }
     function revealAnswer() { if (!connected || currentQuestionType === "poll") return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "reveal" }); }
     function resetQuiz() { if (!connected) return; socket.emit("control:idle", { room: currentRoom, overlay: "quiz_ou_sondage" }); }
+    function fireConfetti() { if (!connected) return; socket.emit("control:fire_confetti", { room: currentRoom }); }
 
     // ===================== TOGGLE OVERLAY GÉNÉRIQUE =====================
     function toggleOverlay(overlayName) {
