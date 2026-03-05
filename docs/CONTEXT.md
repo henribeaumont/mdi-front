@@ -389,6 +389,12 @@ Body : { "action": "...", "payload": {} }
 - **Exclusion mutuelle overlays** : gérée manuellement par animateur
 - **Expiration accès clients** : non implémenté dans Supabase
 - **Logs connexion par client** : non implémentés
+- **API Stream Deck incomplète** : actions manquantes à ajouter côté serveur :
+  - `match_off` (désactiver overlay match)
+  - `timer_on` / `timer_off` (activer/désactiver overlay timer)
+  - `quiz_on` / `quiz_off` (activer/désactiver overlay quiz sans charger de question)
+  - Overlays sans aucune action REST : `mot_magique`, `tug_of_war`, `decompte_bonhomme`, `decompte_poker`, `emojis_tornado`
+  - Référence : `docs/STREAMDECK_GUIDE.md`
 
 ---
 
