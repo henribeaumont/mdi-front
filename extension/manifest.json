@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MDI Live Watchtower",
-  "version": "2.2",
+  "version": "2.3",
   "description": "Connecte le chat Zoom, Meet, Teams et WebinarJam aux overlays MDI Live en temps réel.",
   "homepage_url": "https://henri-beaumont.com",
   "permissions": [
@@ -35,7 +35,8 @@
         "https://*.webinarjam.com/*",
         "https://*.everwebinar.com/*"
       ],
-      "js": ["socket.io.js", "content.js"]
+      "js": ["socket.io.js", "content.js"],
+      "all_frames": true
     }
   ]
 }
