@@ -106,6 +106,10 @@ Affiche les messages du chat de vos participants en direct sur votre scène OBS.
   --panel-min-width: 600px;  /* Largeur minimale du panneau                   */
   --panel-max-width: 1200px; /* Largeur maximale du panneau                   */
 
+  /* ── AFFICHAGE ── Options d'affichage ── */
+  --show-author:          "on";  /* "on" = affiche le nom de l'auteur | "off" = masque le nom */
+  --panel-border-enabled: "on";  /* "on" = avec contour autour du panneau | "off" = sans      */
+
   /* ── NOM DE L'AUTEUR ── Le nom du participant qui a écrit le message ── */
   --author-color:       #00d4ff;     /* Couleur du nom                        */
   --author-font-size:   16px;        /* Taille du nom                         */

@@ -30,6 +30,10 @@
   --panel-max-width:  1200px; /* Largeur maximale du panneau         */
   --panel-width:      auto;   /* Largeur fixe (auto = adaptatif)     */
 
+  /* ── AFFICHAGE ───────────────────────────────────────────────  */
+  --show-author:         "on";  /* "on" = affiche le nom | "off" = masque le nom */
+  --panel-border-enabled: "on"; /* "on" = avec contour  | "off" = sans contour   */
+
   /* ── NOM DE L'AUTEUR ─────────────────────────────────────────  */
   --author-color:       #00d4ff;      /* Couleur du nom de l'auteur   */
   --author-font-size:   16px;         /* Taille du nom                */
