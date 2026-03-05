@@ -82,15 +82,15 @@ Contient :
 | 1 | quiz_ou_sondage | Monofichier | NON | OUI (5 actions) |
 | 2 | nuage_de_mots | Monofichier | DÉSACTIVÉE | OUI (2 actions) |
 | 3 | roue_loto | Monofichier | DÉSACTIVÉE | OUI (8 actions) |
-| 4 | tug_of_war | Monofichier | OUI | NON |
-| 5 | emoji_tornado | Monofichier | NON | NON |
-| 6 | timer_chrono | Triptyque | N/A | OUI (17 actions) |
-| 7 | commentaires | Triptyque | N/A | OUI (2 actions) |
-| 8 | match_equipes | Triptyque | N/A | OUI (5 actions) |
-| 9 | confettis | Triptyque | N/A | OUI (1 action) |
-| 10 | decompte_bonhomme | Triptyque | N/A | NON |
-| 11 | decompte_poker | Triptyque | N/A | NON |
-| 12 | mot_magique | Triptyque | N/A | NON |
+| 4 | tug_of_war | Monofichier | OUI | OUI (2 actions) |
+| 5 | emojis_tornado | Monofichier | NON | OUI (2 actions) |
+| 6 | timer_chrono | Triptyque | N/A | OUI (19 actions) |
+| 7 | commentaires | Triptyque | N/A | OUI (4 actions) |
+| 8 | match_equipes | Triptyque | N/A | OUI (7 actions) |
+| 9 | confettis | Triptyque | N/A | OUI (3 actions) |
+| 10 | decompte_bonhomme | Triptyque | N/A | OUI (2 actions) |
+| 11 | decompte_poker | Triptyque | N/A | OUI (2 actions) |
+| 12 | mot_magique | Triptyque | N/A | OUI (2 actions) |
 
 ---
 
@@ -346,13 +346,18 @@ Body : { "action": "...", "payload": {} }
 
 | Overlay | Actions disponibles |
 |---------|-------------------|
-| Timer | timer_preset, timer_add/sub_10min/1min/10sec/1sec, timer_start, timer_pause, timer_reset, timer_toggle_pause, timer_mode_timer, timer_mode_chrono |
+| Timer | timer_on, timer_off, timer_preset (payload: {seconds}), timer_add/sub_10min/1min/10sec/1sec, timer_start, timer_pause, timer_reset, timer_toggle_pause, timer_mode_timer, timer_mode_chrono |
 | Commentaires | comment_show (payload: {messageId}), comment_hide, commentaires_on, commentaires_off |
-| Match | match_team_a_increment, match_team_a_decrement, match_team_b_increment, match_team_b_decrement, match_reset, match_on |
+| Match | match_on, match_off, match_team_a_increment, match_team_a_decrement, match_team_b_increment, match_team_b_decrement, match_reset |
 | Nuage | nuage_on, nuage_off |
 | Roue | roue_on, roue_off, roue_start_collect, roue_stop_collect, roue_spin, roue_reset, roue_consecutif_on, roue_consecutif_off |
 | Quiz | quiz_load (payload: {question_key}), quiz_show_options, quiz_show_results, quiz_reveal, quiz_reset |
-| Confettis | confettis_explosion |
+| Confettis | confettis_on, confettis_off, confettis_explosion |
+| Mot Magique | mot_magique_on, mot_magique_off |
+| Tug of War | tug_of_war_on, tug_of_war_off |
+| Décompte Bonhomme | decompte_bonhomme_on, decompte_bonhomme_off |
+| Décompte Poker | decompte_poker_on, decompte_poker_off |
+| Tornade Emojis | emojis_tornado_on, emojis_tornado_off |
 
 ---
 
@@ -389,12 +394,7 @@ Body : { "action": "...", "payload": {} }
 - **Exclusion mutuelle overlays** : gérée manuellement par animateur
 - **Expiration accès clients** : non implémenté dans Supabase
 - **Logs connexion par client** : non implémentés
-- **API Stream Deck incomplète** : actions manquantes à ajouter côté serveur :
-  - `match_off` (désactiver overlay match)
-  - `timer_on` / `timer_off` (activer/désactiver overlay timer)
-  - `quiz_on` / `quiz_off` (activer/désactiver overlay quiz sans charger de question)
-  - Overlays sans aucune action REST : `mot_magique`, `tug_of_war`, `decompte_bonhomme`, `decompte_poker`, `emojis_tornado`
-  - Référence : `docs/STREAMDECK_GUIDE.md`
+- **API Stream Deck** : tous les overlays sont couverts. Seul manque : `quiz_on` / `quiz_off` (activer/désactiver sans charger de question — faible priorité car `quiz_load` active et `quiz_reset` désactive)
 
 ---
 

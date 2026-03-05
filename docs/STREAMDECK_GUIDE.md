@@ -38,6 +38,8 @@ Chaque bouton utilise les mêmes paramètres de base :
 
 | Bouton | Body JSON |
 |--------|-----------|
+| Afficher l'overlay | `{"action": "timer_on"}` |
+| Masquer l'overlay | `{"action": "timer_off"}` |
 | Lancer | `{"action": "timer_start"}` |
 | Pause / Reprendre | `{"action": "timer_toggle_pause"}` |
 | Remettre à zéro | `{"action": "timer_reset"}` |
@@ -75,13 +77,12 @@ Chaque bouton utilise les mêmes paramètres de base :
 | Bouton | Body JSON |
 |--------|-----------|
 | Activer l'overlay | `{"action": "match_on"}` |
+| Désactiver l'overlay | `{"action": "match_off"}` |
 | Équipe A + 1 | `{"action": "match_team_a_increment"}` |
 | Équipe A − 1 | `{"action": "match_team_a_decrement"}` |
 | Équipe B + 1 | `{"action": "match_team_b_increment"}` |
 | Équipe B − 1 | `{"action": "match_team_b_decrement"}` |
 | Remettre à zéro | `{"action": "match_reset"}` |
-
-> ⚠️ `match_off` n'est pas encore disponible — utiliser la télécommande web pour désactiver.
 
 ---
 
@@ -129,22 +130,56 @@ Chaque bouton utilise les mêmes paramètres de base :
 
 | Bouton | Body JSON |
 |--------|-----------|
+| Activer l'overlay | `{"action": "confettis_on"}` |
+| Désactiver l'overlay | `{"action": "confettis_off"}` |
 | Explosion de confettis | `{"action": "confettis_explosion"}` |
 
 ---
 
-## Overlays non encore disponibles via Stream Deck
+### Mot Magique
 
-Les overlays suivants ne sont pas encore pilotables via l'API REST.
-Ils se contrôlent uniquement depuis la **télécommande web** pour l'instant.
+| Bouton | Body JSON |
+|--------|-----------|
+| Activer l'overlay | `{"action": "mot_magique_on"}` |
+| Désactiver l'overlay | `{"action": "mot_magique_off"}` |
 
-| Overlay | Statut |
-|---------|--------|
-| Mot Magique | ❌ À venir |
-| Tug of War | ❌ À venir |
-| Décompte Bonhomme | ❌ À venir |
-| Décompte Poker | ❌ À venir |
-| Tornade d'emojis | ❌ À venir |
+> La logique de vote (mot affiché, trigger, seuil) se configure via les CSS OBS.
+
+---
+
+### Tug of War
+
+| Bouton | Body JSON |
+|--------|-----------|
+| Activer l'overlay | `{"action": "tug_of_war_on"}` |
+| Désactiver l'overlay | `{"action": "tug_of_war_off"}` |
+
+---
+
+### Décompte Bonhomme
+
+| Bouton | Body JSON |
+|--------|-----------|
+| Activer l'overlay | `{"action": "decompte_bonhomme_on"}` |
+| Désactiver l'overlay | `{"action": "decompte_bonhomme_off"}` |
+
+---
+
+### Décompte Poker
+
+| Bouton | Body JSON |
+|--------|-----------|
+| Activer l'overlay | `{"action": "decompte_poker_on"}` |
+| Désactiver l'overlay | `{"action": "decompte_poker_off"}` |
+
+---
+
+### Tornade d'emojis
+
+| Bouton | Body JSON |
+|--------|-----------|
+| Activer l'overlay | `{"action": "emojis_tornado_on"}` |
+| Désactiver l'overlay | `{"action": "emojis_tornado_off"}` |
 
 ---
 
