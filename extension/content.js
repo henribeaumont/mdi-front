@@ -227,6 +227,7 @@ const observateur = new MutationObserver((mutations) => {
       }
       // === TEAMS ===
       if (host.includes("teams")) {
+        console.log(`[MDI-TEAMS] node: <${node.tagName}> tid="${node.getAttribute?.('data-tid')||''}" class="${String(node.className||'').substring(0,60)}"`);
         // Cherche sur le node lui-même (node.matches) ET ses descendants (node.querySelector)
         const TEAMS_SELECTORS = [
           '[data-tid="message-body"]',
