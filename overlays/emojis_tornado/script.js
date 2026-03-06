@@ -31,6 +31,11 @@ function showOverlay() {
   document.getElementById("container").classList.remove("hidden");
   document.body.style.backgroundColor = "transparent";
 }
+function hideOverlay() {
+  document.getElementById("container").classList.add("hidden");
+  document.getElementById("security-screen").classList.add("hidden");
+  document.body.style.backgroundColor = "transparent";
+}
 
 /* ===== EMOJI EXTRACTION ===== */
 function isProbablyEmojiSegment(seg) {
@@ -300,9 +305,22 @@ function start() {
   lastT = performance.now();
   rafId = requestAnimationFrame(loop);
 }
+function stop() {
+  if (!running) return;
+  running = false;
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  particles.length = 0;
+  ctx.clearRect(0, 0, W, H);
+}
 
 /* ===== SOCKET + AUTH ===== */
 const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
+
+let currentRoom = "";
+
+socket.on("connect", () => {
+  if (currentRoom) socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
+});
 
 async function init() {
   await new Promise(r => setTimeout(r, 650));
@@ -317,12 +335,20 @@ async function init() {
     if (!room) { showSecurityDenied(); return; }
   }
 
+  currentRoom = room;
   socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
 
   socket.on("overlay:forbidden", () => showSecurityDenied());
 
   socket.on("overlay:state", (payload) => {
     if (payload?.overlay !== OVERLAY_TYPE) return;
+
+    if (payload.state === "idle") {
+      stop();
+      hideOverlay();
+      return;
+    }
 
     CONFIG = readConfig();
 

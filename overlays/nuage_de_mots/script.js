@@ -45,6 +45,7 @@ const measureZone = document.getElementById("measure-zone");
 
 /* -------- State -------- */
 let STATE = "idle";
+let currentRoom = "";
 let dbMots = {};
 let globalColorIndex = 0;
 let wordPositions = [];
@@ -217,6 +218,7 @@ const socket = io(SERVER_URL, {
 
 socket.on("connect", () => {
   console.log("✅ [NUAGE] Connecté");
+  if (currentRoom) socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
 });
 
 socket.on("overlay:state", (payload) => {
@@ -282,6 +284,8 @@ async function init() {
     return;
   }
 
+  currentRoom = room;
+
   if (authMode === "strict") {
     if (!key) {
       console.error("❌ [NUAGE] Mode strict sans key");
@@ -293,6 +297,7 @@ async function init() {
     socket.emit("overlay:join", { room, key: "", overlay: OVERLAY_TYPE });
   }
 
+  socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
   console.log("✅ [NUAGE] Auth envoyée");
 }
 

@@ -7,28 +7,42 @@ function cssVar(name, fallback = "") {
 
 let globalCount = 0;
 let estAutorise = false;
+let currentRoom = "";
 const container = document.getElementById('stacks-container');
 const scoreEl = document.getElementById('floating-score');
 const gameScene = document.getElementById('game-scene');
 
 const socket = io(ADRESSE_SERVEUR, { transports: ['websocket', 'polling'] });
 
+socket.on('connect', () => {
+    if (currentRoom) socket.emit('overlay:online', { room: currentRoom, overlay: OVERLAY_TYPE });
+});
+
 async function init() {
-    await new Promise(r => setTimeout(r, 800)); 
+    await new Promise(r => setTimeout(r, 800));
     const room = cssVar("--room-id");
     const key = cssVar("--room-key");
 
     if (!room || !key) { showDenied(); return; }
 
+    currentRoom = room;
     // Demande d'accès SaaS V5.5
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
+    socket.emit('overlay:online', { room, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', showDenied);
     socket.on('overlay:state', (payload) => {
-        if (payload?.overlay === OVERLAY_TYPE) {
+        if (payload?.overlay !== OVERLAY_TYPE) return;
+        if (payload.state === "idle") {
+            estAutorise = false;
+            resetGame();
             document.getElementById("security-screen").classList.add("hidden");
-            estAutorise = true;
+            gameScene.classList.add("hidden");
+            return;
         }
+        document.getElementById("security-screen").classList.add("hidden");
+        gameScene.classList.remove("hidden");
+        estAutorise = true;
     });
 
     socket.on('raw_vote', (data) => {
