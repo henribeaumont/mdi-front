@@ -6,7 +6,7 @@
  */
 
 const ADRESSE_SERVEUR = "https://magic-digital-impact-live.onrender.com";
-const OVERLAY_TYPE = "confetti";
+const OVERLAY_TYPE = "confettis";
 
 // ---------- CSS helpers (Extraction OBS) ----------
 function cssVar(name, fallback = "") {
@@ -163,14 +163,35 @@ async function start() {
 
   const socket = io(ADRESSE_SERVEUR, { transports: ["websocket", "polling"] });
 
+  // joinAck : false au début de chaque connexion → le 1er overlay:state déclenche
+  // toujours un burst (auto-trigger à la connexion), quelle que soit l'état serveur.
+  let joinAck = false;
+
   socket.on("connect", () => {
+    joinAck = false;
     socket.emit("overlay:join", { room: cfg.room, key: cfg.key, overlay: cfg.overlay });
+    socket.emit("overlay:online", { room: cfg.room, overlay: cfg.overlay });
   });
 
   socket.on("overlay:forbidden", () => hardLock());
-  
+
   socket.on("overlay:state", (payload) => {
-    if (payload?.overlay === cfg.overlay) {
+    if (payload?.overlay !== cfg.overlay) return;
+    const state = payload.state;
+    const isAutoTrigger = !joinAck;
+    joinAck = true;
+
+    if (state === "idle") {
+      estAutorise = false;
+      // Auto-trigger à la connexion : tire une salve même si le serveur est idle,
+      // puis revient en mode bloqué (raw_vote n'activera pas).
+      if (isAutoTrigger && !hardForbidden) {
+        estAutorise = true;
+        lancerCelebration();
+        estAutorise = false;
+      }
+    } else {
+      // state === "active" (ou tout autre état non-idle)
       unlock();
       lancerCelebration();
     }

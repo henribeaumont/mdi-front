@@ -4,12 +4,17 @@ const OVERLAY_TYPE = "mot_magique";
 let estAutorise = false;
 let triggerCount = 0;
 let participantsActifs = 1;
+let currentRoom = "";
 
 const wordEl = document.getElementById("golden-word");
 const containerEl = document.getElementById("container");
 const securityEl = document.getElementById("security-screen");
 
 const socket = io(ADRESSE_SERVEUR, { transports: ["websocket", "polling"] });
+
+socket.on("connect", () => {
+    if (currentRoom) socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
+});
 
 function cssVar(name, fallback) {
     let val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -23,28 +28,37 @@ async function init() {
     const room = cssVar("--room-id", "");
     const key = cssVar("--room-key", "");
 
-    if (!room || !key) { 
+    if (!room || !key) {
         securityEl.classList.remove("hidden");
-        return; 
+        return;
     }
 
+    currentRoom = room;
     socket.emit('overlay:join', { room, key, overlay: OVERLAY_TYPE });
+    socket.emit('overlay:online', { room, overlay: OVERLAY_TYPE });
 
     socket.on('overlay:forbidden', () => {
         securityEl.classList.remove("hidden");
     });
-    
+
     socket.on('overlay:state', (payload) => {
-        if (payload?.overlay === OVERLAY_TYPE) {
-            estAutorise = true;
-            participantsActifs = payload.room_count || 1;
-            
-            // 1. Appliquer les textes et config
-            syncConfig(); 
-            
-            // 2. Afficher d'un seul coup
-            containerEl.classList.add("ready");
+        if (payload?.overlay !== OVERLAY_TYPE) return;
+
+        if (payload.state === "idle") {
+            estAutorise = false;
+            triggerCount = 0;
+            containerEl.classList.remove("ready");
+            return;
         }
+
+        estAutorise = true;
+        participantsActifs = payload.room_count || 1;
+
+        // 1. Appliquer les textes et config
+        syncConfig();
+
+        // 2. Afficher d'un seul coup
+        containerEl.classList.add("ready");
     });
 
     socket.on('room:user_count', (count) => {

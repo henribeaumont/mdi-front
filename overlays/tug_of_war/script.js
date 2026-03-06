@@ -27,11 +27,18 @@ function showGame() {
   document.body.style.backgroundColor = "transparent";
 }
 
+function hideGame() {
+  document.getElementById("container").classList.add("hidden");
+  document.getElementById("security-screen").classList.add("hidden");
+  document.body.style.backgroundColor = "transparent";
+}
+
 /* --- LOGIQUE DE JEU --- */
 let scoreLeft = 0;
 let scoreRight = 0;
 const votersSeen = new Set();
 let CONFIG = { nameL: "OUI", nameR: "NON", trigL: "O", trigR: "N" };
+let currentRoom = "";
 
 function updateDisplay() {
   const total = scoreLeft + scoreRight;
@@ -55,6 +62,10 @@ function applyVisualConfig() {
 /* --- CONNEXION --- */
 const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
 
+socket.on("connect", () => {
+  if (currentRoom) socket.emit("overlay:online", { room: currentRoom, overlay: OVERLAY_TYPE });
+});
+
 async function init() {
   // Attente pour s'assurer qu'OBS a injecté le CSS personnalisé
   await new Promise(r => setTimeout(r, 600));
@@ -67,25 +78,34 @@ async function init() {
     return;
   }
 
+  currentRoom = room;
   // Demande d'accès au serveur
   socket.emit("overlay:join", { room, key, overlay: OVERLAY_TYPE });
+  socket.emit("overlay:online", { room, overlay: OVERLAY_TYPE });
 
   socket.on("overlay:forbidden", () => {
     showSecurityDenied();
   });
 
   socket.on("overlay:state", (payload) => {
-    if (payload?.overlay === OVERLAY_TYPE) {
-      applyVisualConfig();
-      
-      // Reset si configuré dans OBS
-      if (cssVar("--auto-reset") === "true") {
-        scoreLeft = 0; scoreRight = 0; votersSeen.clear();
-      }
-      
+    if (payload?.overlay !== OVERLAY_TYPE) return;
+
+    if (payload.state === "idle") {
+      scoreLeft = 0; scoreRight = 0; votersSeen.clear();
       updateDisplay();
-      showGame(); // Apparition unique et fluide
+      hideGame();
+      return;
     }
+
+    applyVisualConfig();
+
+    // Reset si configuré dans OBS
+    if (cssVar("--auto-reset") === "true") {
+      scoreLeft = 0; scoreRight = 0; votersSeen.clear();
+    }
+
+    updateDisplay();
+    showGame(); // Apparition unique et fluide
   });
 
   // Écoute des votes via le canal agnostique du serveur
