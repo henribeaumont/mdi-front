@@ -402,6 +402,10 @@ socket.on("roue:stop_collect", () => {
 
 socket.on("roue:spin", () => {
   console.log("🎡 [ROUE] SPIN");
+  if (consecutifMode && STATE === "winner") {
+    hideWinner();
+    STATE = "ready";
+  }
   spin();
 });
 
