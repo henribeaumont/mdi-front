@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDI Live - Télécommande V3.5</title>
+  <title>MDI Live - Télécommande V3.7</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1076,9 +1076,29 @@
           renderParticipants();
         }
 
+        // Sync liste participants depuis le serveur (retire gagnant en mode consécutif, etc.)
+        if (data && Array.isArray(data.participants)) {
+          roueParticipants = data.participants.map(p =>
+            typeof p === "string" ? { name: p, key: p.toLowerCase() } : p
+          );
+          renderParticipants();
+        }
+
+        // Sync mode consécutif depuis le serveur (ex : changement via Stream Deck)
+        if (data && data.consecutifMode !== undefined) {
+          consecutifMode = Boolean(data.consecutifMode);
+          $("toggleConsecutif").className = consecutifMode ? "toggle-switch active" : "toggle-switch";
+        }
+
+        // Sync état collecte
         if (state === "collecting") overlayStates.roue_collecte = true;
-        if (state === "ready" || state === "idle") overlayStates.roue_collecte = false;
+        if (state !== "collecting") overlayStates.roue_collecte = false;
         updateCollecteToggle(state === "collecting");
+
+        // Afficher le gagnant dans la télécommande si état "winner"
+        if (state === "winner" && data && data.winnerName) {
+          flash("roue", `🏆 Gagnant : ${data.winnerName}`, "success");
+        }
       }
 
       if (overlay === "quiz_ou_sondage") {
@@ -1315,7 +1335,8 @@
     function spinRoue() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:spin", { room: currentRoom });
-      flash("roue", "🎡 Roue lancée !", "success");
+      // Le message sera confirmé via overlay:state (winner / ready / spinning)
+      flash("roue", "🎡 Commande envoyée…", "success");
     }
 
     function resetRoue() {

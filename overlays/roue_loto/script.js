@@ -1,13 +1,15 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V6.9
+ * MDI ROUE LOTO - V7.0
  * ============================================================
- * ✅ Tout V6.8 préservé (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : émission overlay:online / overlay:offline
- *    → deux voyants télécommande :
- *      • Connexion serveur
- *      • Affichage dans OBS (vert dès que l'overlay est visible,
- *        quelque soit l'état : collecting, ready, spinning, winner)
+ * ✅ Tout V6.9 préservé (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : machine à états deux étapes (winner → ready → spinning)
+ *    → 1er spin après winner : affiche panel "PRÊT", retire gagnant si consécutif
+ *    → 2e spin : lance la roue
+ * ✅ NOUVEAU : panel "PRÊT" visuel entre chaque spin
+ * ✅ NOUVEAU : overlay:state géré pour "ready", "winner", "collecting"
+ *    → symétrie parfaite Stream Deck ↔ remote ↔ overlay
+ * ✅ NOUVEAU : CSS vars cartouche gagnant (couleur fond, texte, contour, opacité)
  * ============================================================
  */
 
@@ -36,6 +38,7 @@ const elApp = document.getElementById("app");
 const wheelCanvas = document.getElementById("wheel");
 const wheelCtx = wheelCanvas.getContext("2d");
 const elWinnerName = document.getElementById("winnerName");
+const elReadyPanel = document.getElementById("ready-panel");
 const confettiCanvas = document.getElementById("confetti");
 const confettiCtx = confettiCanvas.getContext("2d");
 
@@ -271,6 +274,7 @@ function spin() {
   lastSpinAt = now;
   spinning = true;
   STATE = "spinning";
+  hideReady();
 
   const n = participants.length;
   const selected = pickRandomIndex(n);
@@ -322,6 +326,14 @@ function hideWinner() {
   winnerIndex = -1;
 }
 
+function showReady() {
+  if (elReadyPanel) document.documentElement.classList.add("mdi-show-ready");
+}
+
+function hideReady() {
+  if (elReadyPanel) document.documentElement.classList.remove("mdi-show-ready");
+}
+
 function clearAll() {
   participants = [];
   winnerIndex = -1;
@@ -330,6 +342,7 @@ function clearAll() {
   STATE = "idle";
   consecutifMode = false;
   hideWinner();
+  hideReady();
   drawWheel();
 }
 
@@ -384,6 +397,42 @@ socket.on("overlay:state", (payload) => {
     STATE = "idle";
     drawWheel();
     emitPresence(true);
+    return;
+  }
+
+  if (payload.state === "collecting") {
+    // Sync depuis le serveur (ex : Stream Deck déclenche start_collect)
+    if (STATE !== "collecting") {
+      clearAll();
+      STATE = "collecting";
+      drawWheel();
+    }
+    emitPresence(true);
+    return;
+  }
+
+  if (payload.state === "ready") {
+    // Transition vers PRÊT : masquer le gagnant, afficher le panel Prêt
+    hideWinner();
+    hideReady();
+    STATE = "ready";
+    drawWheel();
+    showReady();
+    emitPresence(true);
+    return;
+  }
+
+  if (payload.state === "winner") {
+    // Afficher le gagnant (sync depuis serveur ou confirmation post-animation)
+    const name = payload.data?.winnerName || elWinnerName.textContent;
+    if (name) {
+      elWinnerName.textContent = name;
+      document.documentElement.classList.add("mdi-show-winner");
+    }
+    hideReady();
+    STATE = "winner";
+    emitPresence(true);
+    return;
   }
 });
 
@@ -397,15 +446,18 @@ socket.on("roue:start_collect", () => {
 
 socket.on("roue:stop_collect", () => {
   console.log("🔒 [ROUE] Fermeture collecte");
-  if (STATE === "collecting") STATE = "ready";
+  if (STATE === "collecting") {
+    STATE = "ready";
+    showReady();
+  }
 });
 
 socket.on("roue:spin", () => {
   console.log("🎡 [ROUE] SPIN");
-  if (consecutifMode && STATE === "winner") {
-    hideWinner();
-    STATE = "ready";
-  }
+  hideWinner();
+  hideReady();
+  // Assurer l'état local correct avant le spin (le serveur a déjà validé)
+  if (STATE !== "ready") STATE = "ready";
   spin();
 });
 
