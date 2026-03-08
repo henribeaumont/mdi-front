@@ -1,5 +1,5 @@
 /* ================================================================
-   ⚙️  PERSONNALISATION MDI — ROUE LOTO V7.0
+   ⚙️  PERSONNALISATION MDI — ROUE LOTO V7.1
    ================================================================
    Dans OBS → Propriétés de la source → CSS personnalisé,
    copiez-collez le bloc :root { } et modifiez les valeurs.
@@ -39,6 +39,9 @@
   --winner-border-color: #333333; /* Couleur du trait de contour               */
   --winner-border-width: 3px;     /* Épaisseur du trait de contour             */
   --winner-opacity:      1;       /* Opacité globale (0=transparent, 1=opaque) */
+
+  /* ── MESSAGE D'ATTENTE (MODE CHAT) ───────────────────────────  */
+  --waiting-message: "Saisissez votre prénom dans le chat"; /* Texte affiché pendant la collecte */
 
   /* ── DIVERS ──────────────────────────────────────────────────  */
   --label-rotate-180: "off"; /* Retourner les étiquettes : "on" ou "off"    */
@@ -214,5 +217,49 @@ canvas.confetti {
 }
 
 .mdi-confetti canvas.confetti {
+  display: block;
+}
+
+/* ── ÉTAT STANDBY : cache le contenu de la roue ─────────────── */
+.mdi-standby .stage {
+  display: none;
+}
+
+/* ── MESSAGE D'ATTENTE (collecte ouverte en mode chat) ─────────── */
+.roue-waiting-message {
+  display: none;
+  position: fixed;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 180;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.roue-waiting-message::after {
+  content: var(--waiting-message, "Saisissez votre prénom dans le chat");
+  display: block;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: clamp(18px, 2.5vw, 32px);
+  color: #ffffff;
+  background: rgba(10, 20, 40, 0.78);
+  padding: 14px 32px;
+  border-radius: 40px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  animation: waitingPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes waitingPulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%       { opacity: 1;    transform: scale(1.02); }
+}
+
+.mdi-collecting .roue-waiting-message {
   display: block;
 }
