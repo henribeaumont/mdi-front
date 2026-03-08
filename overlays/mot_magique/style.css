@@ -5,7 +5,7 @@
    copiez-collez le bloc :root { } et modifiez les valeurs.
 
    Ce widget affiche un mot en attente, puis l'anime en grand
-   quand il est "activé" depuis le panneau de contrôle.
+   quand suffisamment de participants ont tapé le mot déclencheur.
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');
@@ -26,17 +26,18 @@
 
   /* ── MOT EN ATTENTE (avant activation) ──────────────────────  */
   --start-color: #6b6b6b; /* Couleur du mot avant activation       */
-  --start-size:  72px;    /* Taille du mot avant activation        */
+  --start-size:  72px;    /* Taille de base du mot                 */
 
-  /* ── MOT ACTIVÉ (après clic sur le bouton) ──────────────────  */
-  --end-color: #ffd700; /* Couleur du mot après activation — ex: #ffd700 (or) */
-  --end-size:  140px;   /* Taille du mot après activation (plus grand)        */
+  /* ── MOT ACTIVÉ (seuil atteint à 100%) ──────────────────────  */
+  --end-color: #ffd700; /* Couleur finale — ex: #ffd700 (or)         */
+  --end-size:  140px;   /* Taille finale (plus grand)                */
 
   /* ── LOGIQUE DU MOT MAGIQUE ─────────────────────────────────  */
-  --display-word:  "VICTOIRE"; /* Mot affiché à l'écran                            */
-  --trigger-chat:  "GG";       /* Mot que les participants tapent dans Teams        */
-  --threshold:     0.9;        /* Part de participants requis : 0.9 = 90%           */
-  --sticky:        "false";    /* "true" = reste activé même si le ratio redescend  */
+  --display-word:        "VICTOIRE"; /* Mot affiché à l'écran                              */
+  --trigger-chat:        "GG";       /* Mot que les participants tapent dans Teams          */
+  --threshold:           0.9;        /* Seuil de déclenchement : 0.2 = 20%, 0.9 = 90%      */
+  --participants-offset: 2;          /* Participants à exclure du total (organisateur + web) */
+  --sticky:              "false";    /* "true" = reste activé même si le ratio redescend    */
 
   /* ── POLICE ──────────────────────────────────────────────────  */
   --font-family: "Montserrat"; /* Police de caractères              */
@@ -53,25 +54,24 @@ body {
 
 /* Sécurité */
 .mdi-security {
-    width: 100%; height: 100%; display: flex; align-items: center; 
-    justify-content: center; flex-direction: column; background: #000; 
+    width: 100%; height: 100%; display: flex; align-items: center;
+    justify-content: center; flex-direction: column; background: #000;
     color: #ff3b30; z-index: 1000; position: absolute;
 }
 
 /* CONTAINER RESPONSIVE */
 #container {
     position: relative;
-    display: inline-flex; /* S'ajuste à la largeur du texte */
+    display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: var(--panel-padding-y) var(--panel-padding-x);
-    opacity: 0; /* Invisible par défaut pour éviter le tressautement */
+    opacity: 0;
     transition: opacity 0.4s ease-out;
     z-index: 1;
 }
 
-/* AFFICHAGE FINAL SANS FLASH */
 #container.ready {
     opacity: 1;
 }
@@ -89,19 +89,29 @@ body {
 #golden-word {
     font-weight: 900;
     text-transform: uppercase;
-    white-space: nowrap; /* Empêche le retour à la ligne */
+    white-space: nowrap;
     line-height: 1;
-    color: var(--start-color, #6b6b6b);
-    font-size: var(--start-size, 72px);
     letter-spacing: 2px;
-    /* Transition sur font-size pour le mode activé */
-    transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* Taille de base — le JS applique scale() par-dessus pour la progression */
+    font-size: var(--start-size, 72px);
+    color: #6b6b6b;
+    /* scale() est GPU-accelerated : pas de flicker */
+    transform: scale(1);
+    transform-origin: center center;
+    will-change: transform, color;
+    /* Transitions fluides sur couleur et transform uniquement */
+    transition: color 0.35s ease, transform 0.35s ease, text-shadow 0.35s ease;
 }
 
-#golden-word.activated {
-    color: var(--end-color, #ffd700);
-    font-size: var(--end-size, 140px);
-    text-shadow: 0 0 15px var(--end-color), 0 0 30px #ffffff;
+/* Scintillement à 100% du seuil — géré via la classe .shimmer ajoutée par JS */
+@keyframes scintille {
+    0%   { filter: brightness(1)   drop-shadow(0 0  8px transparent); }
+    50%  { filter: brightness(1.7) drop-shadow(0 0 18px var(--end-color, #ffd700)); }
+    100% { filter: brightness(1)   drop-shadow(0 0  8px transparent); }
+}
+
+#golden-word.shimmer {
+    animation: scintille 0.9s ease-in-out infinite;
 }
 
 #stats {
