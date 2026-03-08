@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDI Live - Télécommande V3.7</title>
+  <title>MDI Live - Télécommande V3.8</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -240,6 +240,26 @@
     .roue-controls { display: none; margin-top: 12px; }
     .roue-controls.active { display: block; }
     .roue-action-btn { margin-bottom: 8px; }
+
+    /* Feed mode toggle */
+    .roue-feed-mode {
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .roue-feed-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .roue-feed-btns { display: flex; gap: 6px; }
+    .feed-mode-btn {
+      flex: 1; padding: 8px 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-dark); color: var(--text-muted);
+      border-radius: 6px; cursor: pointer;
+      font-size: 12px; font-weight: 600; transition: all 0.2s;
+    }
+    .feed-mode-btn.active { border-color: var(--accent); background: var(--accent); color: white; }
+    .feed-mode-btn:hover:not(.active) { background: var(--border); color: var(--text); }
 
     /* Mode consécutif toggle */
     .consecutive-toggle {
@@ -617,7 +637,7 @@
       </div>
       <div class="separator"></div>
 
-      <!-- Activation overlay -->
+      <!-- Activation overlay (source OBS ON/OFF) -->
       <div class="toggle-container">
         <div class="toggle-label">
           <span class="icon">🎡</span>
@@ -628,53 +648,88 @@
 
       <div id="roueControls" class="roue-controls">
 
-        <!-- Mode consécutif -->
-        <div class="consecutive-toggle">
-          <div class="consecutive-label">
-            🔁 Mode consécutif — <span>gagnant retiré après chaque spin</span>
+        <!-- Sélection du mode de collecte -->
+        <div class="roue-feed-mode">
+          <div class="roue-feed-label">Mode de collecte</div>
+          <div class="roue-feed-btns">
+            <button id="btnFeedChat" class="feed-mode-btn active" onclick="setFeedMode('chat')">💬 Chat</button>
+            <button id="btnFeedRemote" class="feed-mode-btn" onclick="setFeedMode('remote')">📋 Télécommande</button>
           </div>
-          <div id="toggleConsecutif" class="toggle-switch" onclick="toggleConsecutifMode()"></div>
         </div>
 
-        <!-- Collecte ouverte / fermée -->
-        <div class="toggle-container" style="margin-bottom: 10px;">
-          <div class="toggle-label">
-            <span style="font-size: 13px;">📝 Collecte ouverte</span>
-          </div>
-          <div id="toggleCollecte" class="toggle-switch" onclick="toggleCollecte()"></div>
-        </div>
-
-        <!-- Modération participants (visible dès que la roue est active) -->
+        <!-- Liste organisateur (persistante, gérée indépendamment) -->
         <div class="moderation-section">
-          <div class="moderation-header" onclick="toggleModerationRoue()">
+          <div class="moderation-header" onclick="toggleRemoteSection()">
             <div class="moderation-header-left">
-              👥 Participants en attente
-              <span id="roueParticipantCount" class="moderation-count">0</span>
+              📋 Liste organisateur
+              <span id="roueRemoteCount" class="moderation-count">0</span>
             </div>
-            <span id="roueChevron" class="moderation-chevron">▼</span>
+            <span id="roueRemoteChevron" class="moderation-chevron">▼</span>
           </div>
-          <div id="roueModerationBody" class="moderation-body">
-            <!-- Ajout manuel -->
+          <div id="roueRemoteBody" class="moderation-body">
             <div class="add-participant-row">
-              <input type="text" id="newParticipantInput" placeholder="Ajouter un nom…" maxlength="40"
-                     onkeydown="if(event.key==='Enter') addParticipantManual()">
-              <button class="btn-primary btn-small" onclick="addParticipantManual()" style="padding:7px 12px;">➕</button>
+              <input type="text" id="newRemoteInput" placeholder="Ajouter un prénom…" maxlength="40"
+                     onkeydown="if(event.key==='Enter') addRemoteParticipant()">
+              <button class="btn-primary btn-small" onclick="addRemoteParticipant()" style="padding:7px 12px;">➕</button>
             </div>
-            <!-- Liste de modération (chat → roue) -->
-            <div id="participantsList" class="participants-list">
-              <div class="empty-participants">Aucun participant pour l'instant</div>
+            <div id="remoteParticipantsList" class="participants-list">
+              <div class="empty-participants">Liste vide</div>
             </div>
             <div class="separator"></div>
-            <!-- Bouton alimenter la roue -->
-            <button class="btn-success" style="width:100%; margin-top:4px;" onclick="alimenterRoue()">
-              🎡 Alimenter la roue
+            <button class="btn-danger" style="width:100%; margin-top:4px; font-size:12px;" onclick="clearRemoteParticipants()">
+              🗑️ Vider la liste organisateur
             </button>
           </div>
         </div>
 
-        <!-- Lancer / Reset -->
-        <button class="btn-success roue-action-btn" style="margin-top:10px;" onclick="spinRoue()">🎡 Lancer la roue</button>
-        <button class="btn-danger" onclick="resetRoue()">🔄 Reset Roue</button>
+        <!-- Actions en standby (roue cachée, prête à être affichée) -->
+        <div id="roueStandbyActions">
+          <button class="btn-success roue-action-btn" style="margin-top:10px;" onclick="showRoue()">
+            ▶ Afficher la roue
+          </button>
+        </div>
+
+        <!-- Contrôles actifs (roue visible) -->
+        <div id="roueActiveActions" style="display:none;">
+
+          <!-- Mode consécutif -->
+          <div class="consecutive-toggle">
+            <div class="consecutive-label">
+              🔁 Mode consécutif — <span>gagnant retiré après chaque spin</span>
+            </div>
+            <div id="toggleConsecutif" class="toggle-switch" onclick="toggleConsecutifMode()"></div>
+          </div>
+
+          <!-- Rouvrir / Fermer collecte (mode chat uniquement) -->
+          <button id="btnReopenCollect" class="btn-secondary roue-action-btn" style="display:none;" onclick="reopenCollect()">
+            📝 Rouvrir la collecte
+          </button>
+          <button id="btnCloseCollect" class="btn-secondary roue-action-btn" style="display:none;" onclick="stopCollect()">
+            🔒 Fermer la collecte
+          </button>
+
+          <!-- Participants sur la roue (modération) -->
+          <div class="moderation-section">
+            <div class="moderation-header" onclick="toggleModerationRoue()">
+              <div class="moderation-header-left">
+                👥 Participants sur la roue
+                <span id="roueParticipantCount" class="moderation-count">0</span>
+              </div>
+              <span id="roueChevron" class="moderation-chevron">▼</span>
+            </div>
+            <div id="roueModerationBody" class="moderation-body">
+              <div id="participantsList" class="participants-list">
+                <div class="empty-participants">Aucun participant pour l'instant</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lancer / Reset / Masquer -->
+          <button class="btn-success roue-action-btn" style="margin-top:10px;" onclick="spinRoue()">🎡 Lancer la roue</button>
+          <button class="btn-danger roue-action-btn" onclick="resetRoue()">🔄 Reset Roue</button>
+          <button class="btn-secondary" style="width:100%; font-size:12px;" onclick="hideRoue()">⬇ Masquer la roue</button>
+
+        </div>
 
       </div>
 
@@ -911,9 +966,12 @@
     // Nuage — mots locaux (mis à jour depuis overlay:state)
     let nuageWords = {}; // { mot: count }
 
-    // Roue — participants locaux
-    let roueParticipants = []; // [{ name, key }] ou [string]
+    // Roue
+    let roueParticipants = []; // participants sur la roue (wheel)
+    let remoteParticipants = []; // liste organisateur (persistante)
     let consecutifMode = false;
+    let feedMode = "chat"; // "chat" | "remote"
+    let roueCurrentState = "idle"; // "idle" | "standby" | "collecting" | "ready" | "spinning" | "winner"
 
     // Commentaires
     let fluxMessages = [];
@@ -1066,17 +1124,33 @@
       }
 
       if (overlay === "roue_loto") {
-        const isActive = state !== "idle";
-        overlayStates.roue_loto = isActive;
-        $("toggleRoue").className = isActive ? "toggle-switch active" : "toggle-switch";
-        $("roueControls").className = isActive ? "roue-controls active" : "roue-controls";
-        if (!isActive) {
+        roueCurrentState = state;
+        const isOn = state !== "idle";
+        overlayStates.roue_loto = isOn;
+        $("toggleRoue").className = isOn ? "toggle-switch active" : "toggle-switch";
+        $("roueControls").className = isOn ? "roue-controls active" : "roue-controls";
+
+        if (!isOn) {
           updateOverlayDots(overlay, { displaying: false });
           roueParticipants = [];
           renderParticipants();
         }
 
-        // Sync liste participants depuis le serveur (retire gagnant en mode consécutif, etc.)
+        // Sync feed mode
+        if (data && data.feed_mode) {
+          feedMode = data.feed_mode;
+          updateFeedModeUI();
+        }
+
+        // Sync liste organisateur (remote_participants)
+        if (data && Array.isArray(data.remote_participants)) {
+          remoteParticipants = data.remote_participants.map(p =>
+            typeof p === "string" ? { name: p, key: p.toLowerCase() } : p
+          );
+          renderRemoteParticipants();
+        }
+
+        // Sync participants sur la roue
         if (data && Array.isArray(data.participants)) {
           roueParticipants = data.participants.map(p =>
             typeof p === "string" ? { name: p, key: p.toLowerCase() } : p
@@ -1084,18 +1158,15 @@
           renderParticipants();
         }
 
-        // Sync mode consécutif depuis le serveur (ex : changement via Stream Deck)
+        // Sync mode consécutif
         if (data && data.consecutifMode !== undefined) {
           consecutifMode = Boolean(data.consecutifMode);
           $("toggleConsecutif").className = consecutifMode ? "toggle-switch active" : "toggle-switch";
         }
 
-        // Sync état collecte
-        if (state === "collecting") overlayStates.roue_collecte = true;
-        if (state !== "collecting") overlayStates.roue_collecte = false;
-        updateCollecteToggle(state === "collecting");
+        overlayStates.roue_collecte = state === "collecting";
+        updateRoueUI(state);
 
-        // Afficher le gagnant dans la télécommande si état "winner"
         if (state === "winner" && data && data.winnerName) {
           flash("roue", `🏆 Gagnant : ${data.winnerName}`, "success");
         }
@@ -1293,14 +1364,37 @@
     }
 
     // ===================== ROUE =====================
+
+    function updateFeedModeUI() {
+      $("btnFeedChat").className   = feedMode === "chat"   ? "feed-mode-btn active" : "feed-mode-btn";
+      $("btnFeedRemote").className = feedMode === "remote" ? "feed-mode-btn active" : "feed-mode-btn";
+    }
+
+    function updateRoueUI(state) {
+      const isStandby = state === "standby";
+      const isActive  = state !== "idle" && state !== "standby";
+      const isChat    = feedMode === "chat";
+      const isCollecting = state === "collecting";
+
+      $("roueStandbyActions").style.display = isStandby ? "" : "none";
+      $("roueActiveActions").style.display  = isActive  ? "" : "none";
+
+      // Boutons rouvrir / fermer collecte (mode chat uniquement)
+      const btnReopen = $("btnReopenCollect");
+      const btnClose  = $("btnCloseCollect");
+      if (isActive && isChat) {
+        btnReopen.style.display = isCollecting ? "none" : "";
+        btnClose.style.display  = isCollecting ? "" : "none";
+      } else {
+        btnReopen.style.display = "none";
+        btnClose.style.display  = "none";
+      }
+    }
+
     function toggleRoueOverlay() {
       if (!connected) { flash("roue", "❌ Connectez-vous", "error"); return; }
-      const isActive = overlayStates.roue_loto;
-      if (isActive) {
+      if (overlayStates.roue_loto) {
         socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "roue_loto" });
-        updateCollecteToggle(false);
-        roueParticipants = [];
-        renderParticipants();
       } else {
         if (overlayStates.nuage_de_mots) socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "nuage_de_mots" });
         if (overlayStates.quiz_ou_sondage) socket.emit("control:idle", { room: currentRoom, overlay: "quiz_ou_sondage" });
@@ -1308,58 +1402,161 @@
       }
     }
 
-    function toggleCollecte() {
-      if (!connected || !overlayStates.roue_loto) return;
-      if (overlayStates.roue_collecte) stopCollect(); else startCollect();
+    function setFeedMode(mode) {
+      if (!connected || !overlayStates.roue_loto) {
+        // Mise à jour locale seulement si pas connecté (sera envoyée à l'activation)
+        feedMode = mode;
+        updateFeedModeUI();
+        return;
+      }
+      feedMode = mode;
+      updateFeedModeUI();
+      socket.emit("roue:set_feed_mode", { room: currentRoom, mode });
+      flash("roue", mode === "chat" ? "💬 Mode Chat" : "📋 Mode Télécommande", "success");
     }
 
-    function startCollect() {
+    function showRoue() {
       if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:start_collect", { room: currentRoom });
-      updateCollecteToggle(true);
-      flash("roue", "📝 Collecte ouverte", "success");
+      socket.emit("roue:show", { room: currentRoom });
+      flash("roue", feedMode === "chat" ? "📝 Collecte ouverte" : "📋 Noms chargés depuis la liste", "success");
+    }
+
+    function hideRoue() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:hide", { room: currentRoom });
+      flash("roue", "⬇ Roue masquée (standby)", "success");
+    }
+
+    function reopenCollect() {
+      if (!connected || !overlayStates.roue_loto) return;
+      socket.emit("roue:reopen_collect", { room: currentRoom });
+      flash("roue", "📝 Collecte rouverte", "success");
     }
 
     function stopCollect() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:stop_collect", { room: currentRoom });
-      updateCollecteToggle(false);
       flash("roue", "🔒 Collecte fermée", "success");
-    }
-
-    function updateCollecteToggle(isActive) {
-      overlayStates.roue_collecte = isActive;
-      $("toggleCollecte").className = isActive ? "toggle-switch active" : "toggle-switch";
     }
 
     function spinRoue() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:spin", { room: currentRoom });
-      // Le message sera confirmé via overlay:state (winner / ready / spinning)
       flash("roue", "🎡 Commande envoyée…", "success");
     }
 
     function resetRoue() {
       if (!connected || !overlayStates.roue_loto) return;
       socket.emit("roue:reset", { room: currentRoom });
-      updateCollecteToggle(false);
       roueParticipants = [];
       renderParticipants();
-      flash("roue", "🔄 Roue réinitialisée", "success");
+      flash("roue", "🔄 Roue réinitialisée (standby)", "success");
     }
 
-    // Mode consécutif
     function toggleConsecutifMode() {
       consecutifMode = !consecutifMode;
       $("toggleConsecutif").className = consecutifMode ? "toggle-switch active" : "toggle-switch";
-      // Informer le serveur
-      if (connected) {
-        socket.emit("roue:set_consecutif", { room: currentRoom, enabled: consecutifMode });
-      }
+      if (connected) socket.emit("roue:set_consecutif", { room: currentRoom, enabled: consecutifMode });
       flash("roue", consecutifMode ? "🔁 Mode consécutif ON" : "🔁 Mode consécutif OFF", "success");
     }
 
-    // ===================== ROUE — MODÉRATION =====================
+    // ===================== ROUE — LISTE ORGANISATEUR =====================
+    let roueRemoteSectionOpen = false;
+
+    function toggleRemoteSection() {
+      roueRemoteSectionOpen = !roueRemoteSectionOpen;
+      $("roueRemoteBody").className   = "moderation-body" + (roueRemoteSectionOpen ? " open" : "");
+      $("roueRemoteChevron").className = "moderation-chevron" + (roueRemoteSectionOpen ? " open" : "");
+    }
+
+    function renderRemoteParticipants() {
+      const list = $("remoteParticipantsList");
+      $("roueRemoteCount").textContent = remoteParticipants.length;
+      if (!remoteParticipants.length) {
+        list.innerHTML = '<div class="empty-participants">Liste vide</div>';
+        return;
+      }
+      list.innerHTML = remoteParticipants.map((p, idx) => {
+        const name = typeof p === "string" ? p : p.name;
+        return `
+          <div class="participant-item" id="ritem-${idx}">
+            <span class="participant-name" id="rname-${idx}">${escHtml(name)}</span>
+            <div class="participant-actions">
+              <button class="btn-small btn-secondary" onclick="startEditRemote(${idx})" title="Éditer">✏️</button>
+              <button class="btn-small btn-danger" onclick="removeRemoteParticipant(${idx})" title="Supprimer">❌</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function addRemoteParticipant() {
+      if (!connected) { flash("roue", "❌ Connectez-vous", "error"); return; }
+      const input = $("newRemoteInput");
+      const name = input.value.trim();
+      if (!name) return;
+      socket.emit("roue:add_remote_participant", { room: currentRoom, name });
+      input.value = "";
+      input.focus();
+    }
+
+    function removeRemoteParticipant(idx) {
+      if (!connected) return;
+      const p = remoteParticipants[idx];
+      const name = typeof p === "string" ? p : p.name;
+      socket.emit("roue:remove_remote_participant", { room: currentRoom, name, index: idx });
+      remoteParticipants.splice(idx, 1);
+      renderRemoteParticipants();
+    }
+
+    function clearRemoteParticipants() {
+      if (!connected || !overlayStates.roue_loto) { flash("roue", "❌ Roue inactive", "error"); return; }
+      socket.emit("roue:clear_remote_participants", { room: currentRoom });
+      remoteParticipants = [];
+      renderRemoteParticipants();
+      flash("roue", "🗑️ Liste organisateur vidée", "success");
+    }
+
+    function startEditRemote(idx) {
+      const nameEl = $(`rname-${idx}`);
+      const currentName = nameEl.textContent;
+      nameEl.outerHTML = `<input class="participant-edit-input" id="redit-${idx}"
+        value="${escHtml(currentName)}"
+        onkeydown="handleRemoteEditKey(event, ${idx})"
+        onblur="cancelRemoteEdit(${idx}, '${escJs(currentName)}')" />`;
+      const input = $(`redit-${idx}`);
+      input.focus();
+      input.select();
+    }
+
+    function handleRemoteEditKey(event, idx) {
+      if (event.key === "Enter") commitRemoteEdit(idx);
+      if (event.key === "Escape") {
+        const input = $(`redit-${idx}`);
+        cancelRemoteEdit(idx, input.defaultValue);
+      }
+    }
+
+    function commitRemoteEdit(idx) {
+      const input = $(`redit-${idx}`);
+      if (!input) return;
+      const newName = input.value.trim();
+      const oldName = typeof remoteParticipants[idx] === "string" ? remoteParticipants[idx] : remoteParticipants[idx].name;
+      if (!newName || newName === oldName) { cancelRemoteEdit(idx, oldName); return; }
+      if (connected) socket.emit("roue:edit_remote_participant", { room: currentRoom, index: idx, newName });
+      remoteParticipants[idx] = { name: newName, key: newName.toLowerCase() };
+      renderRemoteParticipants();
+    }
+
+    function cancelRemoteEdit(idx, originalName) {
+      const item = $(`ritem-${idx}`);
+      if (!item) return;
+      const input = $(`redit-${idx}`);
+      if (!input) return;
+      input.outerHTML = `<span class="participant-name" id="rname-${idx}">${escHtml(originalName)}</span>`;
+    }
+
+    // ===================== ROUE — PARTICIPANTS SUR LA ROUE =====================
     let roueModerationOpen = false;
 
     function toggleModerationRoue() {
@@ -1394,13 +1591,10 @@
     function startEditParticipant(idx) {
       const nameEl = $(`pname-${idx}`);
       const currentName = nameEl.textContent;
-
-      // Remplacer le span par un input
       nameEl.outerHTML = `<input class="participant-edit-input" id="pedit-${idx}"
         value="${escHtml(currentName)}"
         onkeydown="handleEditKey(event, ${idx})"
         onblur="cancelEdit(${idx}, '${escJs(currentName)}')" />`;
-
       const input = $(`pedit-${idx}`);
       input.focus();
       input.select();
@@ -1410,8 +1604,7 @@
       if (event.key === "Enter") { commitEdit(idx); }
       if (event.key === "Escape") {
         const input = $(`pedit-${idx}`);
-        const original = input.defaultValue;
-        cancelEdit(idx, original);
+        cancelEdit(idx, input.defaultValue);
       }
     }
 
@@ -1420,30 +1613,16 @@
       if (!input) return;
       const newName = input.value.trim();
       const oldName = typeof roueParticipants[idx] === "string" ? roueParticipants[idx] : roueParticipants[idx].name;
-
       if (!newName || newName === oldName) { cancelEdit(idx, oldName); return; }
-
       if (connected) {
-        socket.emit("control:roue_edit_participant", {
-          room: currentRoom,
-          index: idx,
-          oldName,
-          newName
-        });
+        socket.emit("control:roue_edit_participant", { room: currentRoom, index: idx, oldName, newName });
       }
-
-      // Mise à jour locale
-      if (typeof roueParticipants[idx] === "string") {
-        roueParticipants[idx] = newName;
-      } else {
-        roueParticipants[idx] = { name: newName, key: newName.toLowerCase() };
-      }
+      roueParticipants[idx] = { name: newName, key: newName.toLowerCase() };
       renderParticipants();
       flash("roue", `✏️ "${oldName}" → "${newName}"`, "success");
     }
 
     function cancelEdit(idx, originalName) {
-      // Remettre le span
       const item = $(`pitem-${idx}`);
       if (!item) return;
       const input = $(`pedit-${idx}`);
@@ -1456,45 +1635,8 @@
       const p = roueParticipants[idx];
       const name = typeof p === "string" ? p : p.name;
       socket.emit("control:roue_remove_participant", { room: currentRoom, name, index: idx });
-      // Mise à jour locale optimiste
       roueParticipants.splice(idx, 1);
       renderParticipants();
-      console.log(`❌ [ROUE] Participant supprimé: ${name}`);
-    }
-
-    function addParticipantManual() {
-      if (!connected) { flash("roue", "❌ Connectez-vous", "error"); return; }
-      const input = $("newParticipantInput");
-      const name = input.value.trim();
-      if (!name) return;
-
-      // Ajout local uniquement (liste de modération)
-      // La liste n'est envoyée à la roue que via "Alimenter la roue"
-      const key = name.toLowerCase();
-      if (!roueParticipants.some(p => (typeof p === "string" ? p : p.name).toLowerCase() === key)) {
-        roueParticipants.push({ name, key });
-        renderParticipants();
-        flash("roue", `➕ "${name}" ajouté`, "success");
-      }
-
-      input.value = "";
-      input.focus();
-    }
-
-    // Envoie la liste de modération vers la roue (overlay OBS)
-    function alimenterRoue() {
-      if (!connected || !overlayStates.roue_loto) {
-        flash("roue", "❌ Activez la roue d'abord", "error"); return;
-      }
-      if (!roueParticipants.length) {
-        flash("roue", "⚠️ Aucun participant", "error"); return;
-      }
-      // Envoyer la liste complète au serveur pour qu'il mette à jour l'overlay
-      roueParticipants.forEach(p => {
-        const name = typeof p === "string" ? p : p.name;
-        socket.emit("control:roue_add_participant_manual", { room: currentRoom, name });
-      });
-      flash("roue", `🎡 ${roueParticipants.length} participant(s) envoyé(s) à la roue`, "success");
     }
 
     // ===================== COMMENTAIRES =====================

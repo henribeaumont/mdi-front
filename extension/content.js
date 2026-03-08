@@ -1,5 +1,5 @@
 // ==================================================
-// MDI LIVE WATCHTOWER - V11.10
+// MDI LIVE WATCHTOWER - V12.0
 // - Zoom / Meet / Teams / WebinarJam
 // - ✅ PAS de captation pendant la frappe (pas de characterData observer)
 // - ✅ Préserve les emojis (Zoom surtout)
@@ -9,16 +9,15 @@
 // - ✅ Détection intelligente : Word Cloud (1-2 mots courts) vs Commentaires (4+ mots)
 // - Ne casse pas les overlays qui lisent raw_vote (emoji_tornado, word_cloud, tug_of_war, etc.)
 //
-// CHANGELOG V11.10 :
-// [A] Teams : correction critique — node.matches() + node.querySelector()
-//     V11.9 utilisait uniquement querySelector() (cherche les descendants),
-//     ce qui ratait les cas où le node ajouté EST lui-même l'élément message.
-// [B] Teams : ajout des sélecteurs New Teams 2024/2025
-//     → [data-tid="chat-pane-message"], [data-tid="messageBodyContent"],
-//        div[class*="message-body"]
-// [C] Teams : fallback universel div[dir="auto"]
-//     Résistant aux changements de DOM — Teams utilise cet attribut
-//     pour tout contenu textuel utilisateur, quelle que soit la version.
+// CHANGELOG V12.0 :
+// [A] NOUVEAU : extraction automatique du nom d'affichage de l'expéditeur
+//     → Zoom  : .chat-message__name + fallbacks [class*="displayName"] etc.
+//     → Teams : [data-tid="message-author-name"] + fallbacks [class*="authorName"] etc.
+//     → Le nom réel est envoyé comme `user` (fini "Anonyme" sur Zoom/Teams)
+// [B] Zoom : sélecteurs de contenu enrichis pour UI 2024/2025
+//     → Ajout de [class*="chatMessage"][class*="content"], [class*="message-text"] etc.
+// [C] Teams : extraction du nom via closest('[data-tid="chat-pane-message"]')
+//     → Utilise data-tid (stable, maintenu par Microsoft pour les tests)
 // ==================================================
 let CLIENT_ID = "DEMO_CLIENT";
 let socket = null;
@@ -176,16 +175,75 @@ function cleanAndValidate(rawText) {
   // Trop long ou incohérent
   return null;
 }
+// --- Extraction nom expéditeur Zoom ---
+// Cherche le nom dans le conteneur parent du message.
+// Les class* sont des fallbacks car Zoom change ses noms de classes.
+function extractZoomSenderName(cible) {
+  const ZOOM_AUTHOR_SELS = [
+    '.chat-message__name',
+    '.chat-message__display-name',
+    '[class*="displayName"]',
+    '[class*="display-name"]',
+    '[class*="senderName"]',
+    '[class*="sender-name"]',
+    '[class*="authorName"]',
+    '[class*="author-name"]',
+  ];
+  // Remonte vers le conteneur message (chat-message, message-item, etc.)
+  const container =
+    cible.closest('[class*="chat-message"]') ||
+    cible.closest('[class*="message-item"]') ||
+    cible.parentElement;
+  if (!container) return null;
+  for (const sel of ZOOM_AUTHOR_SELS) {
+    const el = container.querySelector(sel);
+    if (el) {
+      const name = (el.innerText || el.textContent || "").trim();
+      if (name && name.length >= 2 && name.length < 80) return name;
+    }
+  }
+  return null;
+}
+
+// --- Extraction nom expéditeur Teams ---
+// data-tid est maintenu par Microsoft pour leurs tests internes → stable.
+function extractTeamsSenderName(cible) {
+  const TEAMS_AUTHOR_SELS = [
+    '[data-tid="message-author-name"]',
+    '[data-tid="messageAuthorName"]',
+    '[class*="authorName"]',
+    '[class*="author-name"]',
+    '[class*="displayName"]',
+  ];
+  // Remonte vers le conteneur du message complet
+  const container =
+    cible.closest('[data-tid="chat-pane-message"]') ||
+    cible.closest('[data-tid="message-thread-item"]') ||
+    cible.closest('[data-tid="messageThread"]') ||
+    cible.parentElement;
+  if (!container) return null;
+  for (const sel of TEAMS_AUTHOR_SELS) {
+    const el = container.querySelector(sel);
+    if (el) {
+      const name = (el.innerText || el.textContent || "").trim();
+      if (name && name.length >= 2 && name.length < 80) return name;
+    }
+  }
+  return null;
+}
+
 // --- Envoi serveur ---
-function envoyerVote(voteFinal) {
+// auteur : nom réel extrait du DOM (Zoom/Teams), ou null → "Anonyme"
+function envoyerVote(voteFinal, auteur) {
   if (!voteFinal) return;
   if (!socket) return;
+  const user = (auteur && auteur.length >= 2) ? auteur : USER_NAME;
   socket.emit("nouveau_vote", {
     room: CLIENT_ID,
     vote: voteFinal,
-    user: USER_NAME
+    user
   });
-  console.log(`⚡ [MDI] -> "${voteFinal}"`);
+  console.log(`⚡ [MDI] -> "${voteFinal}" (user: ${user})`);
 }
 // --- Anti-spam dédup ---
 const seenNodes = new WeakSet();
@@ -213,15 +271,29 @@ const observateur = new MutationObserver((mutations) => {
       }
       // === ZOOM ===
       if (host.includes("zoom.us")) {
-        const cible =
-          node.classList?.contains("chat-message__content")
-            ? node
-            : node.querySelector?.(".chat-message__content") ||
-              node.querySelector?.(".new-chat-message__text-box");
+        // Sélecteurs enrichis pour Zoom web 2023→2025 (les class names changent)
+        const ZOOM_CONTENT_SELS = [
+          '.chat-message__content',
+          '.new-chat-message__text-box',
+          '[class*="chatMessage"][class*="content"]',
+          '[class*="chat-message"][class*="text"]',
+          '[class*="message-text"]',
+          '[class*="messageText"]',
+          '[class*="message-body"]',
+        ];
+        let cible = null;
+        for (const sel of ZOOM_CONTENT_SELS) {
+          if (node.matches?.(sel)) { cible = node; break; }
+          const found = node.querySelector?.(sel);
+          if (found) { cible = found; break; }
+        }
         if (cible && !seenNodes.has(cible)) {
           const raw = extractZoomTextPreserveEmojis(cible);
           const clean = cleanAndValidate(raw);
-          if (clean) envoyerVote(clean);
+          if (clean) {
+            const auteur = extractZoomSenderName(cible);
+            envoyerVote(clean, auteur);
+          }
           seenNodes.add(cible);
         }
         continue;
@@ -268,7 +340,10 @@ const observateur = new MutationObserver((mutations) => {
         if (cible && !seenNodes.has(cible)) {
           const raw = cible.innerText || cible.textContent || "";
           const clean = cleanAndValidate(raw);
-          if (clean) envoyerVote(clean);
+          if (clean) {
+            const auteur = extractTeamsSenderName(cible);
+            envoyerVote(clean, auteur);
+          }
           seenNodes.add(cible);
         }
         continue;

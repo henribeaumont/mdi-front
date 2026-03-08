@@ -1,15 +1,12 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V7.0
+ * MDI ROUE LOTO - V7.1
  * ============================================================
- * ✅ Tout V6.9 préservé (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : machine à états deux étapes (winner → ready → spinning)
- *    → 1er spin après winner : affiche panel "PRÊT", retire gagnant si consécutif
- *    → 2e spin : lance la roue
- * ✅ NOUVEAU : panel "PRÊT" visuel entre chaque spin
- * ✅ NOUVEAU : overlay:state géré pour "ready", "winner", "collecting"
- *    → symétrie parfaite Stream Deck ↔ remote ↔ overlay
- * ✅ NOUVEAU : CSS vars cartouche gagnant (couleur fond, texte, contour, opacité)
+ * ✅ Tout V7.0 préservé (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : état "standby" — overlay source active, roue cachée
+ * ✅ NOUVEAU : feed_mode "chat" | "remote" (texte d'attente en mode chat)
+ * ✅ NOUVEAU : message d'attente CSS-personnalisable (--waiting-message)
+ * ✅ NOUVEAU : reset → standby (liste organisateur conservée côté serveur)
  * ============================================================
  */
 
@@ -57,6 +54,7 @@ let pointerSide = "left";
 let maxParticipants = 48;
 let spinCooldownMs = 1800;
 let consecutifMode = false;
+let feedMode = "chat"; // "chat" | "remote"
 let currentRoom = "";
 
 /* -------- Presence -------- */
@@ -334,6 +332,23 @@ function hideReady() {
   if (elReadyPanel) document.documentElement.classList.remove("mdi-show-ready");
 }
 
+function showCollecting() {
+  document.documentElement.classList.add("mdi-collecting");
+}
+
+function hideCollecting() {
+  document.documentElement.classList.remove("mdi-collecting");
+}
+
+function showStage() {
+  document.documentElement.classList.remove("mdi-standby");
+}
+
+function hideStage() {
+  document.documentElement.classList.add("mdi-standby");
+  hideCollecting();
+}
+
 function clearAll() {
   participants = [];
   winnerIndex = -1;
@@ -343,6 +358,7 @@ function clearAll() {
   consecutifMode = false;
   hideWinner();
   hideReady();
+  hideCollecting();
   drawWheel();
 }
 
@@ -381,38 +397,58 @@ socket.on("overlay:state", (payload) => {
       consecutifMode = Boolean(payload.data.consecutifMode);
       console.log(`🔁 [ROUE] Mode consécutif: ${consecutifMode ? "ON" : "OFF"}`);
     }
+    if (payload.data.feed_mode !== undefined) {
+      feedMode = payload.data.feed_mode;
+      console.log(`📡 [ROUE] Feed mode: ${feedMode}`);
+    }
   }
 
   if (payload.state === "idle") {
     elApp.classList.remove("show");
-    setTimeout(() => { elApp.classList.add("hidden"); clearAll(); }, 800);
+    setTimeout(() => {
+      elApp.classList.add("hidden");
+      clearAll();
+      document.documentElement.classList.remove("mdi-standby", "mdi-collecting");
+    }, 800);
     emitPresence(false);
     return;
   }
 
-  if (payload.state === "active") {
+  if (payload.state === "standby") {
+    // Overlay source visible, mais contenu de la roue caché
     elSecurity.classList.add("hidden");
     elApp.classList.remove("hidden");
     requestAnimationFrame(() => elApp.classList.add("show"));
-    STATE = "idle";
+    hideWinner();
+    hideReady();
+    hideCollecting();
+    hideStage();
+    STATE = "standby";
     drawWheel();
     emitPresence(true);
     return;
   }
 
   if (payload.state === "collecting") {
-    // Sync depuis le serveur (ex : Stream Deck déclenche start_collect)
-    if (STATE !== "collecting") {
-      clearAll();
-      STATE = "collecting";
-      drawWheel();
-    }
+    elSecurity.classList.add("hidden");
+    elApp.classList.remove("hidden");
+    requestAnimationFrame(() => elApp.classList.add("show"));
+    showStage();
+    showCollecting();
+    hideWinner();
+    hideReady();
+    STATE = "collecting";
+    drawWheel();
     emitPresence(true);
     return;
   }
 
   if (payload.state === "ready") {
-    // Transition vers PRÊT : masquer le gagnant, afficher le panel Prêt
+    elSecurity.classList.add("hidden");
+    elApp.classList.remove("hidden");
+    requestAnimationFrame(() => elApp.classList.add("show"));
+    showStage();
+    hideCollecting();
     hideWinner();
     hideReady();
     STATE = "ready";
@@ -423,7 +459,8 @@ socket.on("overlay:state", (payload) => {
   }
 
   if (payload.state === "winner") {
-    // Afficher le gagnant (sync depuis serveur ou confirmation post-animation)
+    showStage();
+    hideCollecting();
     const name = payload.data?.winnerName || elWinnerName.textContent;
     if (name) {
       elWinnerName.textContent = name;
@@ -436,17 +473,10 @@ socket.on("overlay:state", (payload) => {
   }
 });
 
-socket.on("roue:start_collect", () => {
-  console.log("📝 [ROUE] Démarrage collecte");
-  clearAll();
-  STATE = "collecting";
-  drawWheel();
-  emitPresence(true);
-});
-
 socket.on("roue:stop_collect", () => {
   console.log("🔒 [ROUE] Fermeture collecte");
   if (STATE === "collecting") {
+    hideCollecting();
     STATE = "ready";
     showReady();
   }
@@ -462,23 +492,35 @@ socket.on("roue:spin", () => {
 });
 
 socket.on("roue:reset", () => {
-  console.log("🔄 [ROUE] Reset");
-  clearAll();
+  console.log("🔄 [ROUE] Reset → standby");
+  participants = [];
+  winnerIndex = -1;
+  spinning = false;
+  wheelAngle = 0;
+  hideWinner();
+  hideReady();
+  hideCollecting();
+  hideStage();
+  STATE = "standby";
   drawWheel();
-  emitPresence(false);
+  emitPresence(true);
 });
 
 socket.on("raw_vote", (data) => {
   if (!data || !data.vote) return;
   if (STATE !== "collecting") return;
-  const name = normalizeText(data.vote);
+  if (feedMode !== "chat") return;
+  // Priorité au nom d'affichage réel (user) si l'extension a pu l'extraire,
+  // sinon fallback sur le contenu du message (comportement historique).
+  const rawName = (data.user && data.user !== "Anonyme") ? data.user : data.vote;
+  const name = normalizeText(rawName);
   const key = keyOfName(name);
   if (!name) return;
   if (participants.length >= maxParticipants) return;
   if (!participants.some(p => keyOfName(p.name || p) === key)) {
     participants.push({ name, key });
     drawWheel();
-    console.log(`➕ [ROUE] Participant chat: ${name} (total: ${participants.length})`);
+    console.log(`➕ [ROUE] Participant: ${name} (source: ${data.user && data.user !== "Anonyme" ? "nom affiché" : "message"}, total: ${participants.length})`);
   }
 });
 
