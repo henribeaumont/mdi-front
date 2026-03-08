@@ -471,14 +471,17 @@ socket.on("roue:reset", () => {
 socket.on("raw_vote", (data) => {
   if (!data || !data.vote) return;
   if (STATE !== "collecting") return;
-  const name = normalizeText(data.vote);
+  // Priorité au nom d'affichage réel (user) si l'extension a pu l'extraire,
+  // sinon fallback sur le contenu du message (comportement historique).
+  const rawName = (data.user && data.user !== "Anonyme") ? data.user : data.vote;
+  const name = normalizeText(rawName);
   const key = keyOfName(name);
   if (!name) return;
   if (participants.length >= maxParticipants) return;
   if (!participants.some(p => keyOfName(p.name || p) === key)) {
     participants.push({ name, key });
     drawWheel();
-    console.log(`➕ [ROUE] Participant chat: ${name} (total: ${participants.length})`);
+    console.log(`➕ [ROUE] Participant: ${name} (source: ${data.user && data.user !== "Anonyme" ? "nom affiché" : "message"}, total: ${participants.length})`);
   }
 });
 
