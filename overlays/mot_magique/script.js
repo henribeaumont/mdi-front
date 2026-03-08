@@ -53,8 +53,9 @@ function lerpColor(a, b, t) {
 function updateVisuals(progress) {
     const startSize = parseFloat(cssVar("--start-size", "72")) || 72;
     const endSize   = parseFloat(cssVar("--end-size",   "140")) || 140;
-    const scaleValue = 1 + ((endSize / startSize) - 1) * progress;
-    wordEl.style.transform = `scale(${scaleValue.toFixed(4)})`;
+    const currentSize = startSize + (endSize - startSize) * progress;
+    // font-size directement : le container inline-flex s'adapte automatiquement
+    wordEl.style.fontSize = `${currentSize.toFixed(2)}px`;
 
     const startColor = parseColor(cssVar("--start-color", "#6b6b6b"));
     const endColor   = parseColor(cssVar("--end-color",   "#ffd700"));

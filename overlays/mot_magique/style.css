@@ -92,15 +92,11 @@ body {
     white-space: nowrap;
     line-height: 1;
     letter-spacing: 2px;
-    /* Taille de base — le JS applique scale() par-dessus pour la progression */
+    /* Taille de base — le JS écrit font-size directement pour l'interpolation */
     font-size: var(--start-size, 72px);
     color: #6b6b6b;
-    /* scale() est GPU-accelerated : pas de flicker */
-    transform: scale(1);
-    transform-origin: center center;
-    will-change: transform, color;
-    /* Transitions fluides sur couleur et transform uniquement */
-    transition: color 0.35s ease, transform 0.35s ease, text-shadow 0.35s ease;
+    /* Transitions fluides sans cubic-bezier à rebond (source du flicker) */
+    transition: color 0.35s ease, font-size 0.35s ease, text-shadow 0.35s ease;
 }
 
 /* Scintillement à 100% du seuil — géré via la classe .shimmer ajoutée par JS */
