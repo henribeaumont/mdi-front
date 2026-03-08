@@ -1,5 +1,8 @@
 /* ================================================================
    OBS — SOURCE NAVIGATEUR : MOT MAGIQUE
+   ================================================================
+   Copiez ce bloc dans :
+   OBS → Propriétés de la source → CSS personnalisé
    ================================================================ */
 
 :root {
@@ -18,11 +21,29 @@
 
   /* ── MOT EN ATTENTE ───────────────────────────────────────── */
   --start-color: #6b6b6b;  /* Couleur avant activation (gris)   */
-  --start-size:  72px;
+  --start-size:  72px;     /* Taille de base du mot              */
 
   /* ── MOT ACTIVÉ ───────────────────────────────────────────── */
-  --end-color: #ffd700;  /* Couleur après activation (or)       */
-  --end-size:  140px;
+  --end-color: #ffd700;  /* Couleur finale (or)                 */
+  --end-size:  140px;    /* Taille finale                        */
+
+  /* ── LOGIQUE ─────────────────────────────────────────────── */
+
+  /* Mot tapé par les participants dans le chat pour déclencher  */
+  --trigger-chat: "GG";
+
+  /* Seuil de déclenchement (proportion de participants requis)
+     Exemples :  0.20 = 20%  |  0.50 = 50%  |  0.75 = 75%
+     La couleur et la taille progressent linéairement de 0% à ce seuil.
+     Ex : seuil 0.50 → à 25% des participants le mot est à mi-taille.  */
+  --threshold: 0.9;
+
+  /* Participants à soustraire du total (organisateur + onglet web OBS).
+     Valeur recommandée : 2                                        */
+  --participants-offset: 2;
+
+  /* "true" = le mot reste activé même si des participants quittent */
+  --sticky: "false";
 
   /* ── POLICE ──────────────────────────────────────────────── */
   --font-family: "Montserrat";
