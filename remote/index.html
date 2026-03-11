@@ -332,6 +332,36 @@
     }
     .moderation-body.open { display: block; }
 
+    /* ===================== MATCH — PERSONNALISATION ===================== */
+    .match-custom-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .match-custom-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .match-team-field { margin-bottom: 10px; }
+    .match-team-field label {
+      display: block; font-size: 11px; color: var(--text-muted);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .match-team-field input[type="text"] {
+      width: 100%; padding: 8px 10px;
+      border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-dark); color: var(--text);
+      font-size: 13px;
+    }
+    .match-team-field input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    .match-color-swatches {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
+    }
+    .match-color-swatch {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .match-color-swatch:hover { transform: scale(1.15); }
+    .match-color-swatch.selected { border-color: #fff; transform: scale(1.15); }
+
     /* Ajout manuel participant */
     .add-participant-row {
       display: flex; gap: 6px; margin-bottom: 10px;
@@ -947,6 +977,48 @@
         </div>
       </div>
       <button class="btn-danger" onclick="matchReset()">🔄 Réinitialiser les scores</button>
+
+      <!-- Personnalisation des équipes -->
+      <div class="moderation-section" style="margin-top:16px;">
+        <div class="moderation-header" onclick="matchToggleCustomSection()">
+          <div class="moderation-header-left">🎨 Personnaliser les équipes</div>
+          <span id="matchCustomChevron" class="moderation-chevron">▼</span>
+        </div>
+        <div id="matchCustomBody" class="moderation-body">
+
+          <!-- Toggle activation -->
+          <div class="match-custom-toggle-row">
+            <span class="match-custom-label">Activer la personnalisation</span>
+            <div id="toggleMatchCustom" class="toggle-switch" onclick="matchToggleCustom()"></div>
+          </div>
+
+          <!-- Équipe A -->
+          <div style="margin-bottom:14px;">
+            <div class="match-team-field">
+              <label>Nom équipe A</label>
+              <input type="text" id="matchTeamANameInput" placeholder="ÉQUIPE A" oninput="matchSendUpdate()" />
+            </div>
+            <div class="match-team-field">
+              <label>Couleur équipe A</label>
+              <div class="match-color-swatches" id="matchSwatchesA"></div>
+            </div>
+          </div>
+
+          <!-- Équipe B -->
+          <div>
+            <div class="match-team-field">
+              <label>Nom équipe B</label>
+              <input type="text" id="matchTeamBNameInput" placeholder="ÉQUIPE B" oninput="matchSendUpdate()" />
+            </div>
+            <div class="match-team-field">
+              <label>Couleur équipe B</label>
+              <div class="match-color-swatches" id="matchSwatchesB"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <div id="messageMatch" class="flash-msg"></div>
     </div>
 
@@ -980,6 +1052,21 @@
     // Match
     let matchScoreA = 0;
     let matchScoreB = 0;
+    let matchCustomEnabled = false;
+    let matchTeamAColor = "#3b82f6";
+    let matchTeamBColor = "#ef4444";
+
+    const MATCH_COLORS = [
+      { hex: "#3b82f6", label: "Bleu" },
+      { hex: "#ef4444", label: "Rouge" },
+      { hex: "#ec4899", label: "Rose" },
+      { hex: "#22c55e", label: "Vert" },
+      { hex: "#f97316", label: "Orange" },
+      { hex: "#eab308", label: "Jaune" },
+      { hex: "#a855f7", label: "Violet" },
+      { hex: "#06b6d4", label: "Cyan" },
+      { hex: "#ffffff", label: "Blanc" },
+    ];
 
     // Nuage — mots locaux (mis à jour depuis overlay:state)
     let nuageWords = {}; // { mot: count }
@@ -1206,6 +1293,25 @@
         if (data) {
           if (data.teamA) { matchScoreA = data.teamA.score || 0; $("matchScoreA").textContent = matchScoreA; }
           if (data.teamB) { matchScoreB = data.teamB.score || 0; $("matchScoreB").textContent = matchScoreB; }
+          // Sync état personnalisation
+          if (data.teamCustomization !== undefined) {
+            matchCustomEnabled = !!data.teamCustomization.enabled;
+            $("toggleMatchCustom").className = matchCustomEnabled ? "toggle-switch active" : "toggle-switch";
+          }
+          if (data.teamA?.name) $("matchTeamANameInput").value = data.teamA.name !== "ÉQUIPE A" ? data.teamA.name : "";
+          if (data.teamB?.name) $("matchTeamBNameInput").value = data.teamB.name !== "ÉQUIPE B" ? data.teamB.name : "";
+          if (data.teamA?.color && data.teamA.color !== matchTeamAColor) {
+            matchTeamAColor = data.teamA.color;
+            document.querySelectorAll("#matchSwatchesA .match-color-swatch").forEach(s => {
+              s.classList.toggle("selected", s.dataset.color === matchTeamAColor);
+            });
+          }
+          if (data.teamB?.color && data.teamB.color !== matchTeamBColor) {
+            matchTeamBColor = data.teamB.color;
+            document.querySelectorAll("#matchSwatchesB .match-color-swatch").forEach(s => {
+              s.classList.toggle("selected", s.dataset.color === matchTeamBColor);
+            });
+          }
         }
       }
 
@@ -1829,6 +1935,65 @@
       socket.emit("control:match_reset", { room: currentRoom });
     }
 
+    function matchToggleCustomSection() {
+      const body = $("matchCustomBody");
+      const chevron = $("matchCustomChevron");
+      body.classList.toggle("open");
+      chevron.classList.toggle("open");
+    }
+
+    function matchToggleCustom() {
+      if (!connected) { flash("match", "❌ Connectez-vous", "error"); return; }
+      matchCustomEnabled = !matchCustomEnabled;
+      $("toggleMatchCustom").className = matchCustomEnabled ? "toggle-switch active" : "toggle-switch";
+      matchSendUpdate();
+    }
+
+    function matchSetColor(team, color) {
+      if (team === "A") {
+        matchTeamAColor = color;
+        document.querySelectorAll("#matchSwatchesA .match-color-swatch").forEach(s => {
+          s.classList.toggle("selected", s.dataset.color === color);
+        });
+      } else {
+        matchTeamBColor = color;
+        document.querySelectorAll("#matchSwatchesB .match-color-swatch").forEach(s => {
+          s.classList.toggle("selected", s.dataset.color === color);
+        });
+      }
+      if (matchCustomEnabled) matchSendUpdate();
+    }
+
+    function matchSendUpdate() {
+      if (!connected) return;
+      const teamAName = $("matchTeamANameInput").value.trim() || "ÉQUIPE A";
+      const teamBName = $("matchTeamBNameInput").value.trim() || "ÉQUIPE B";
+      socket.emit("control:match_update_teams", {
+        room: currentRoom,
+        teamA: { name: teamAName, color: matchTeamAColor },
+        teamB: { name: teamBName, color: matchTeamBColor },
+        customizationEnabled: matchCustomEnabled
+      });
+    }
+
+    function matchInitSwatches() {
+      ["A", "B"].forEach(team => {
+        const container = $("matchSwatches" + team);
+        MATCH_COLORS.forEach(({ hex, label }) => {
+          const div = document.createElement("div");
+          div.className = "match-color-swatch";
+          div.dataset.color = hex;
+          div.style.background = hex;
+          div.title = label;
+          div.onclick = () => matchSetColor(team, hex);
+          if ((team === "A" && hex === matchTeamAColor) || (team === "B" && hex === matchTeamBColor)) {
+            div.classList.add("selected");
+          }
+          container.appendChild(div);
+        });
+      });
+    }
+
     // ===================== SÉCURITÉ — ÉCHAPPEMENT HTML/JS =====================
     function escHtml(str) {
       return String(str)
@@ -1844,6 +2009,7 @@
     }
 
     // ===================== INIT =====================
+    matchInitSwatches();
     $("btnConnect").onclick = connect;
 
     const urlParams = new URLSearchParams(window.location.search);
