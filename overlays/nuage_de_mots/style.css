@@ -19,10 +19,15 @@
   --cloud-right:   50px; /* Distance depuis le bord droit        */
 
   /* ── TAILLE DES MOTS ─────────────────────────────────────────
-     Écart entre les mots les moins votés et les plus votés.
-     Plus l'écart est grand, plus la hiérarchie visuelle est marquée. */
-  --cloud-font-min:  30px; /* Taille du mot le moins voté         */
-  --cloud-font-max: 120px; /* Taille du mot le plus voté          */
+     Ratio 2:1 : le mot le plus voté est 2× plus grand que le moins voté.
+     Les deux restent lisibles à l'écran. */
+  --cloud-font-min:  48px; /* Taille du mot le moins voté         */
+  --cloud-font-max:  96px; /* Taille du mot le plus voté          */
+
+  /* ── CASSE DES MOTS ──────────────────────────────────────────
+     "on"  → TOUT EN MAJUSCULE
+     "off" → tout en minuscule                                   */
+  --uppercase: "off";
 }
 
 html, body {

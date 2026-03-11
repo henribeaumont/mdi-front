@@ -1,11 +1,14 @@
 /**
  * ============================================================
- * MDI NUAGE DE MOTS - V6.7 (ÉCART TAILLE IMPORTANT)
+ * MDI NUAGE DE MOTS - V6.8
  * ============================================================
- * ✅ Écart taille : par défaut 30px (min) → 120px (max)
- * ✅ MAIS configurable via CSS OBS :
- *    --cloud-font-min: 42px;
- *    --cloud-font-max: 92px;
+ * ✅ Écart taille : par défaut 48px (min) → 96px (max) — ratio 2:1
+ * ✅ Configurable via CSS OBS :
+ *    --cloud-font-min: 48px;
+ *    --cloud-font-max: 96px;
+ * ✅ Casse configurable via CSS OBS :
+ *    --uppercase: "on"  → MAJUSCULE
+ *    --uppercase: "off" → minuscule
  * ✅ Fondu affichage/masquage
  * ✅ Anti-collision
  * ✅ FIX OBS : render différé si container mesuré à 0x0
@@ -161,8 +164,8 @@ function render() {
   const minCount = Math.min(...words.map(w => w.count), 1);
 
   /* ✅ NEW (lié à ta demande) : tailles configurables via CSS OBS */
-  const minPx = clamp(cssPx("--cloud-font-min", 30), 10, 300);
-  const maxPx = clamp(cssPx("--cloud-font-max", 120), 10, 300);
+  const minPx = clamp(cssPx("--cloud-font-min", 48), 10, 300);
+  const maxPx = clamp(cssPx("--cloud-font-max", 96), 10, 300);
   const safeMax = Math.max(minPx, maxPx);
 
   // Supprimer les éléments DOM des mots qui n'existent plus
@@ -170,7 +173,7 @@ function render() {
   Array.from(zone.children).forEach(el => { if (!validIds.has(el.id)) el.remove(); });
 
   words.forEach((mot) => {
-    const displayText = uppercase ? mot.text.toUpperCase() : mot.text;
+    const displayText = uppercase ? mot.text.toUpperCase() : mot.text.toLowerCase();
     let el = document.getElementById(`mot-${mot.text.replace(/\s+/g, '-')}`);
 
     // ✅ Taille basée sur le suffrage (minPx → safeMax)
