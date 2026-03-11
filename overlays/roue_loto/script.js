@@ -45,7 +45,8 @@ let winnerIndex = -1;
 let wheelAngle = 0;
 let spinning = false;
 let spinStartTs = 0;
-let spinDurationMs = 4200;
+let spinDurationMs = 4500;
+let spinTurns = 8;
 let spinStartAngle = 0;
 let targetAngle = 0;
 let lastSpinAt = 0;
@@ -76,7 +77,9 @@ function readConfig() {
   const flip = cssOnOff("--pointer-rotate-180", true);
   document.documentElement.classList.toggle("mdi-pointer-flip", !!flip);
   maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
-  spinCooldownMs = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
+  spinCooldownMs  = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
+  spinDurationMs  = clamp(cssNum("--spin-duration-ms", 4500), 1000, 30000);
+  spinTurns       = clamp(cssNum("--spin-turns", 8), 2, 50);
 }
 
 const basePalette = [
@@ -280,18 +283,16 @@ function spin() {
   const selectedCenter = selected * slice + slice / 2;
   const pointerAngle = pointerTargetAngle();
   const desired = pointerAngle - selectedCenter;
-  const extraTurns = 6 + Math.floor(rand01() * 4);
   const dir = (spinDirection === "cw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
   // Normalise desired so it's always just ahead of spinStartAngle (same direction),
-  // then add extraTurns — ensures identical spin energy on every successive spin.
+  // then add the fixed spinTurns — ensures identical energy on every spin.
   const TWO_PI = Math.PI * 2;
   let normalizedDesired = desired - Math.floor((desired - spinStartAngle) / TWO_PI) * TWO_PI;
   if (dir > 0 && normalizedDesired <= spinStartAngle) normalizedDesired += TWO_PI;
   if (dir < 0 && normalizedDesired >= spinStartAngle) normalizedDesired -= TWO_PI;
-  targetAngle = normalizedDesired + dir * extraTurns * TWO_PI;
-  spinDurationMs = clamp(3800 + Math.floor(rand01() * 2200), 3400, 6500);
+  targetAngle = normalizedDesired + dir * spinTurns * TWO_PI;
   spinStartTs = performance.now();
 
   requestAnimationFrame(tickSpin);
