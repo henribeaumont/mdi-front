@@ -653,7 +653,7 @@
           <div class="roue-feed-label">Mode de collecte</div>
           <div class="roue-feed-btns">
             <button id="btnFeedChat" class="feed-mode-btn active" onclick="setFeedMode('chat')">💬 Chat</button>
-            <button id="btnFeedRemote" class="feed-mode-btn" onclick="setFeedMode('remote')">📋 Télécommande</button>
+            <button id="btnFeedRemote" class="feed-mode-btn" onclick="setFeedMode('remote')">📋 Saisie organisateur</button>
           </div>
         </div>
 
@@ -692,21 +692,21 @@
         <!-- Contrôles actifs (roue visible) -->
         <div id="roueActiveActions" style="display:none;">
 
-          <!-- Mode consécutif -->
+          <!-- Retirer le dernier gagnant -->
           <div class="consecutive-toggle">
             <div class="consecutive-label">
-              🔁 Mode consécutif — <span>gagnant retiré après chaque spin</span>
+              🔁 Retirer le dernier gagnant
             </div>
             <div id="toggleConsecutif" class="toggle-switch" onclick="toggleConsecutifMode()"></div>
           </div>
 
-          <!-- Rouvrir / Fermer collecte (mode chat uniquement) -->
-          <button id="btnReopenCollect" class="btn-secondary roue-action-btn" style="display:none;" onclick="reopenCollect()">
-            📝 Rouvrir la collecte
-          </button>
-          <button id="btnCloseCollect" class="btn-secondary roue-action-btn" style="display:none;" onclick="stopCollect()">
-            🔒 Fermer la collecte
-          </button>
+          <!-- Toggle Ouvrir / Fermer collecte (mode chat uniquement) -->
+          <div id="toggleCollectContainer" class="consecutive-toggle" style="display:none;">
+            <div class="consecutive-label">
+              📝 Ouvrir / Fermer la collecte
+            </div>
+            <div id="toggleCollect" class="toggle-switch active" onclick="toggleCollect()"></div>
+          </div>
 
           <!-- Participants sur la roue (modération) -->
           <div class="moderation-section">
@@ -721,6 +721,10 @@
               <div id="participantsList" class="participants-list">
                 <div class="empty-participants">Aucun participant pour l'instant</div>
               </div>
+              <div class="separator"></div>
+              <button class="btn-danger" style="width:100%; margin-top:4px; font-size:12px;" onclick="clearAllParticipants()">
+                🗑️ Vider tous les participants
+              </button>
             </div>
           </div>
 
@@ -1379,15 +1383,14 @@
       $("roueStandbyActions").style.display = isStandby ? "" : "none";
       $("roueActiveActions").style.display  = isActive  ? "" : "none";
 
-      // Boutons rouvrir / fermer collecte (mode chat uniquement)
-      const btnReopen = $("btnReopenCollect");
-      const btnClose  = $("btnCloseCollect");
+      // Toggle ouvrir / fermer collecte (mode chat uniquement)
+      const toggleCollectContainer = $("toggleCollectContainer");
+      const toggleCollectEl = $("toggleCollect");
       if (isActive && isChat) {
-        btnReopen.style.display = isCollecting ? "none" : "";
-        btnClose.style.display  = isCollecting ? "" : "none";
+        toggleCollectContainer.style.display = "";
+        toggleCollectEl.className = isCollecting ? "toggle-switch active" : "toggle-switch";
       } else {
-        btnReopen.style.display = "none";
-        btnClose.style.display  = "none";
+        toggleCollectContainer.style.display = "none";
       }
     }
 
@@ -1427,16 +1430,15 @@
       flash("roue", "⬇ Roue masquée (standby)", "success");
     }
 
-    function reopenCollect() {
+    function toggleCollect() {
       if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:reopen_collect", { room: currentRoom });
-      flash("roue", "📝 Collecte rouverte", "success");
-    }
-
-    function stopCollect() {
-      if (!connected || !overlayStates.roue_loto) return;
-      socket.emit("roue:stop_collect", { room: currentRoom });
-      flash("roue", "🔒 Collecte fermée", "success");
+      if (roueCurrentState === "collecting") {
+        socket.emit("roue:stop_collect", { room: currentRoom });
+        flash("roue", "🔒 Collecte fermée", "success");
+      } else {
+        socket.emit("roue:reopen_collect", { room: currentRoom });
+        flash("roue", "📝 Collecte rouverte", "success");
+      }
     }
 
     function spinRoue() {
@@ -1515,6 +1517,14 @@
       remoteParticipants = [];
       renderRemoteParticipants();
       flash("roue", "🗑️ Liste organisateur vidée", "success");
+    }
+
+    function clearAllParticipants() {
+      if (!connected || !overlayStates.roue_loto) { flash("roue", "❌ Roue inactive", "error"); return; }
+      socket.emit("roue:clear_participants", { room: currentRoom });
+      roueParticipants = [];
+      renderParticipants();
+      flash("roue", "🗑️ Participants vidés", "success");
     }
 
     function startEditRemote(idx) {
