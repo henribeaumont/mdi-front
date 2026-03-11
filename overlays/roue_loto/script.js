@@ -284,7 +284,13 @@ function spin() {
   const dir = (spinDirection === "cw") ? +1 : -1;
 
   spinStartAngle = wheelAngle;
-  targetAngle = desired + dir * extraTurns * Math.PI * 2;
+  // Normalise desired so it's always just ahead of spinStartAngle (same direction),
+  // then add extraTurns — ensures identical spin energy on every successive spin.
+  const TWO_PI = Math.PI * 2;
+  let normalizedDesired = desired - Math.floor((desired - spinStartAngle) / TWO_PI) * TWO_PI;
+  if (dir > 0 && normalizedDesired <= spinStartAngle) normalizedDesired += TWO_PI;
+  if (dir < 0 && normalizedDesired >= spinStartAngle) normalizedDesired -= TWO_PI;
+  targetAngle = normalizedDesired + dir * extraTurns * TWO_PI;
   spinDurationMs = clamp(3800 + Math.floor(rand01() * 2200), 3400, 6500);
   spinStartTs = performance.now();
 
