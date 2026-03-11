@@ -15,6 +15,9 @@
   --cloud-right:   50px;  /* Distance depuis le bord droit     */
 
   /* ── TAILLE DES MOTS ─────────────────────────────────────── */
-  --cloud-font-min:  30px; /* Taille min (mot le moins voté)   */
-  --cloud-font-max: 120px; /* Taille max (mot le plus voté)    */
+  --cloud-font-min:  48px; /* Taille min (mot le moins voté)   */
+  --cloud-font-max:  96px; /* Taille max (mot le plus voté)    */
+
+  /* ── CASSE DES MOTS ──────────────────────────────────────── */
+  --uppercase: "off";      /* "on" = MAJUSCULE / "off" = minuscule */
 }
