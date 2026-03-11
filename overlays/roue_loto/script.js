@@ -297,75 +297,51 @@ function spin() {
   const TWO_PI = Math.PI * 2;
 
   // ── Durée discrète : 11 valeurs entre 4 000 ms et 6 000 ms (pas 200 ms) ──
-  // 4000 / 4200 / 4400 / 4600 / 4800 / 5000 / 5200 / 5400 / 5600 / 5800 / 6000
-  // La variabilité reste faible (±1 s maxi) — chaque lancer semble identique
-  // en vitesse tout en donnant un résultat différent selon où la roue s'arrête.
   const rBuf = new Uint32Array(1);
   crypto.getRandomValues(rBuf);
   const actualDuration = 4000 + (rBuf[0] % 11) * 200;
 
-  // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
+  // ── Angle final : spinTurns tours complets + ajustement vers la cible ─────
+  // On fusionne l'ancien Phase 1 + Phase 2 en une seule animation pour éviter
+  // le sursaut provoqué par la courbe ease-in-out de l'amortissement.
   spinStartAngle = wheelAngle;
-  const phase1End     = spinStartAngle + dir * Math.max(10, spinTurns) * TWO_PI;
-  const MAX_SETTLE_MS = 600;
-
-  // ── Phase 2 calculée EN PREMIER pour connaître SETTLE_MS exact ─────────────
-  // BUG corrigé : phase1Duration doit utiliser SETTLE_MS réel, pas MAX_SETTLE_MS.
-  // Sinon la durée totale = actualDuration - (MAX_SETTLE_MS - SETTLE_MS) < actualDuration.
+  const baseEnd = spinStartAngle + dir * Math.max(10, spinTurns) * TWO_PI;
   let diff;
   if (dir > 0) {
-    diff =  ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI;
+    diff =  ((desired - baseEnd) % TWO_PI + TWO_PI) % TWO_PI;
   } else {
-    diff = -(((phase1End - desired) % TWO_PI + TWO_PI) % TWO_PI);
+    diff = -(((baseEnd - desired) % TWO_PI + TWO_PI) % TWO_PI);
   }
-  const phase2End = phase1End + diff;
-  const SETTLE_MS = diff === 0 ? 80
-    : clamp(Math.ceil(Math.abs(diff) / TWO_PI * MAX_SETTLE_MS), 80, MAX_SETTLE_MS);
-
-  // phase1Duration + SETTLE_MS = actualDuration exactement ✓
-  const phase1Duration = actualDuration - SETTLE_MS;
+  const finalAngle = baseEnd + diff;
 
   spinStartTs = performance.now();
-  requestAnimationFrame(tickPhase1);
+  requestAnimationFrame(tickSpin);
 
-  function tickPhase1(ts) {
-    const t = clamp((ts - spinStartTs) / phase1Duration, 0, 1);
-    // Vitesse rapide puis décélération globale fluide
+  function tickSpin(ts) {
+    const t = clamp((ts - spinStartTs) / actualDuration, 0, 1);
     const e = swiftDeceleratingEasing(t);
-    wheelAngle = spinStartAngle + (phase1End - spinStartAngle) * e;
+    wheelAngle = spinStartAngle + (finalAngle - spinStartAngle) * e;
     drawWheel();
-    if (t < 1) { requestAnimationFrame(tickPhase1); return; }
+    if (t < 1) { requestAnimationFrame(tickSpin); return; }
 
-    // Phase 1 terminée — amortissement final vers la cible
-    const p2Start = performance.now();
-    requestAnimationFrame(tickPhase2);
+    // Animation terminée — position exacte garantie
+    spinning = false;
+    winnerIndex = selected;
+    wheelAngle = finalAngle;
+    drawWheel();
 
-    function tickPhase2(ts2) {
-      const t2 = clamp((ts2 - p2Start) / SETTLE_MS, 0, 1);
-      const e2 = t2 < 0.5 ? 2 * t2 * t2 : 1 - Math.pow(-2 * t2 + 2, 2) / 2; // ease-in-out
-      wheelAngle = phase1End + (phase2End - phase1End) * e2;
-      drawWheel();
-      if (t2 < 1) { requestAnimationFrame(tickPhase2); return; }
+    const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
+    elWinnerName.textContent = winnerName;
+    document.documentElement.classList.add("mdi-show-winner");
+    STATE = "winner";
+    startConfetti();
 
-      // Les deux phases sont terminées
-      spinning = false;
-      winnerIndex = selected;
-      wheelAngle = phase2End;
-      drawWheel();
-
-      const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
-      elWinnerName.textContent = winnerName;
-      document.documentElement.classList.add("mdi-show-winner");
-      STATE = "winner";
-      startConfetti();
-
-      socket.emit("roue:winner_selected", {
-        room: currentRoom,
-        winnerName,
-        winnerIndex
-      });
-      console.log(`🏆 [ROUE] Gagnant: "${winnerName}" (index ${winnerIndex})`);
-    }
+    socket.emit("roue:winner_selected", {
+      room: currentRoom,
+      winnerName,
+      winnerIndex
+    });
+    console.log(`🏆 [ROUE] Gagnant: "${winnerName}" (index ${winnerIndex})`);
   }
 }
 
@@ -401,8 +377,7 @@ function showStage() {
   // On passe immédiatement l'opacité à 0 avant que le navigateur ne dessine
   stageEl.style.opacity = "0";
 
-  // MODIFICATION 1 : On passe de 600ms à 1500ms (1.5 secondes) pour un vrai fondu fluide
-  const FADE_MS = 1500;
+  const FADE_MS = 750;
   const token = {};
   _stageFadeToken = token;
   let t0 = null;
@@ -435,7 +410,7 @@ function hideStage() {
 
   _stageFadeToken = null;
   const startOpacity = parseFloat(cssVar("opacity", stageEl.style.opacity || "1"));
-  const FADE_MS = 1500;
+  const FADE_MS = 750;
   const token = {};
   _stageFadeToken = token;
   let t0 = null;
