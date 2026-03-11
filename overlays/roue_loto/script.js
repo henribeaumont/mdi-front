@@ -1,11 +1,9 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V7.2
+ * MDI ROUE LOTO - V7.3
  * ============================================================
- * ✅ Tout V7.1 préservé (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : animation roue — vitesse soutenue + ralentissement progressif
- * ✅ NOUVEAU : durée randomisée par lancer (base + 0..3 s, toujours ≥ 4 s)
- * ✅ NOUVEAU : fondu d'apparition/masquage fiable (double RAF — fix OBS)
+ * ✅ Tout V7.2 préservé (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : durée de spin discrète entre 4 et 6 s (pas 200 ms, 11 valeurs)
  * ============================================================
  */
 
@@ -299,11 +297,13 @@ function spin() {
   const dir = (spinDirection === "cw") ? +1 : -1;
   const TWO_PI = Math.PI * 2;
 
-  // ── Durée randomisée : base CSS + 0..3000 ms (crypto), toujours ≥ 4000 ms ──
-  // La variabilité de durée rend chaque lancer visuellement unique.
+  // ── Durée discrète : 11 valeurs entre 4 000 ms et 6 000 ms (pas 200 ms) ──
+  // 4000 / 4200 / 4400 / 4600 / 4800 / 5000 / 5200 / 5400 / 5600 / 5800 / 6000
+  // La variabilité reste faible (±1 s maxi) — chaque lancer semble identique
+  // en vitesse tout en donnant un résultat différent selon où la roue s'arrête.
   const rBuf = new Uint32Array(1);
   crypto.getRandomValues(rBuf);
-  const actualDuration = Math.max(4000, spinDurationMs + (rBuf[0] % 3001));
+  const actualDuration = 4000 + (rBuf[0] % 11) * 200;
 
   // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
   spinStartAngle = wheelAngle;
