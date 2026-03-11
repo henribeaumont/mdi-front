@@ -285,19 +285,26 @@ function spin() {
   const desired = pointerAngle - selectedCenter;
   const dir = (spinDirection === "cw") ? +1 : -1;
   const TWO_PI = Math.PI * 2;
-  const SETTLE_MS = 300;
 
   // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
   // Distance, durée et courbe IDENTIQUES à chaque spin.
   spinStartAngle = wheelAngle;
   const phase1End      = spinStartAngle + dir * spinTurns * TWO_PI;
-  const phase1Duration = spinDurationMs - SETTLE_MS;
+  const MAX_SETTLE_MS  = 600; // budget fixe → phase1Duration est TOUJOURS constant
+  const phase1Duration = spinDurationMs - MAX_SETTLE_MS;
 
-  // ── Phase 2 : amortissement vers le gagnant (chemin le plus court ≤ 180°) ─
-  // Ressemble à une roue mécanique qui "clique" dans sa case.
-  let diff = ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI; // [0, 2π)
-  if (diff > Math.PI) diff -= TWO_PI;                              // ramène à [-π, π]
-  const phase2End = phase1End + diff;
+  // ── Phase 2 : amortissement TOUJOURS dans le sens de rotation ─────────────
+  // Jamais de marche arrière. diff ∈ [0, 2π) pour CW, (-2π, 0] pour CCW.
+  let diff;
+  if (dir > 0) {
+    diff =  ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI;  // [0, 2π)
+  } else {
+    diff = -(((phase1End - desired) % TWO_PI + TWO_PI) % TWO_PI); // (-2π, 0]
+  }
+  const phase2End  = phase1End + diff;
+  // Durée proportionnelle à la distance (80 ms–600 ms) pour toujours paraître naturel
+  const SETTLE_MS  = diff === 0 ? 80
+    : clamp(Math.ceil(Math.abs(diff) / TWO_PI * MAX_SETTLE_MS), 80, MAX_SETTLE_MS);
 
   spinStartTs = performance.now();
   requestAnimationFrame(tickPhase1);
