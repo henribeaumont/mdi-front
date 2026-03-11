@@ -81,7 +81,7 @@ function readConfig() {
   maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
   spinCooldownMs  = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
   spinDurationMs  = clamp(cssNum("--spin-duration-ms", 4500), 1000, 30000);
-  spinTurns       = clamp(cssNum("--spin-turns", 8), 2, 50);
+  spinTurns       = clamp(cssNum("--spin-turns", 8), 8, 50);
 }
 
 const basePalette = [
@@ -312,7 +312,7 @@ function spin() {
 
   // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
   spinStartAngle = wheelAngle;
-  const phase1End     = spinStartAngle + dir * spinTurns * TWO_PI;
+  const phase1End     = spinStartAngle + dir * Math.max(8, spinTurns) * TWO_PI;
   const MAX_SETTLE_MS = 600;
 
   // ── Phase 2 calculée EN PREMIER pour connaître SETTLE_MS exact ─────────────
@@ -401,15 +401,15 @@ function showStage() {
   // Invalide tout fondu d'apparition en cours
   _stageFadeToken = null;
 
-  // Retire la classe standby (CSS opacity:0 sur .stage)
+  // Retire la classe standby
   document.documentElement.classList.remove("mdi-standby");
 
-  // Animation JS explicite opacity 0→1 en 600 ms.
-  // Plus fiable que la transition CSS déclenchée par changement de classe
-  // dans OBS Browser Source (CEF ne détecte pas toujours la valeur de départ).
+  // On passe immédiatement l'opacité à 0 avant que le navigateur ne dessine
   stageEl.style.opacity = "0";
-  const FADE_MS = 600;
-  const token = {};           // objet unique → référence par identité
+
+  // MODIFICATION 1 : On passe de 600ms à 1500ms (1.5 secondes) pour un vrai fondu fluide
+  const FADE_MS = 1500;
+  const token = {};
   _stageFadeToken = token;
   let t0 = null;
 
@@ -417,15 +417,21 @@ function showStage() {
     if (_stageFadeToken !== token) return; // animation annulée par hideStage()
     if (t0 === null) t0 = ts;
     const t = Math.min((ts - t0) / FADE_MS, 1);
-    stageEl.style.opacity = String(t);
-    if (t < 1) {
+    // Application d'un easing progressif (ease-in-out simple) pour adoucir encore plus l'apparition
+    const easeT = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    stageEl.style.opacity = String(easeT);
+    if (easeT < 1) {
       requestAnimationFrame(tick);
     } else {
       stageEl.style.removeProperty("opacity"); // remet le CSS en charge
       _stageFadeToken = null;
     }
   }
-  requestAnimationFrame(tick);
+
+  // MODIFICATION 2 : On attend 50ms avant de démarrer le fondu pour éviter le flash blanc (bug récurrent sur OBS Browser Source)
+  setTimeout(() => {
+    requestAnimationFrame(tick);
+  }, 50);
 }
 
 function hideStage() {
