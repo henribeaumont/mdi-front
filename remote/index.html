@@ -333,11 +333,6 @@
     .moderation-body.open { display: block; }
 
     /* ===================== MATCH — PERSONNALISATION ===================== */
-    .match-custom-toggle-row {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .match-custom-label { font-size: 13px; font-weight: 600; color: var(--text); }
     .match-team-field { margin-bottom: 10px; }
     .match-team-field label {
       display: block; font-size: 11px; color: var(--text-muted);
@@ -986,12 +981,6 @@
         </div>
         <div id="matchCustomBody" class="moderation-body">
 
-          <!-- Toggle activation -->
-          <div class="match-custom-toggle-row">
-            <span class="match-custom-label">Activer la personnalisation</span>
-            <div id="toggleMatchCustom" class="toggle-switch" onclick="matchToggleCustom()"></div>
-          </div>
-
           <!-- Équipe A -->
           <div style="margin-bottom:14px;">
             <div class="match-team-field">
@@ -1052,7 +1041,6 @@
     // Match
     let matchScoreA = 0;
     let matchScoreB = 0;
-    let matchCustomEnabled = false;
     let matchTeamAColor = "#3b82f6";
     let matchTeamBColor = "#ef4444";
 
@@ -1293,13 +1281,8 @@
         if (data) {
           if (data.teamA) { matchScoreA = data.teamA.score || 0; $("matchScoreA").textContent = matchScoreA; }
           if (data.teamB) { matchScoreB = data.teamB.score || 0; $("matchScoreB").textContent = matchScoreB; }
-          // Sync état personnalisation
-          if (data.teamCustomization !== undefined) {
-            matchCustomEnabled = !!data.teamCustomization.enabled;
-            $("toggleMatchCustom").className = matchCustomEnabled ? "toggle-switch active" : "toggle-switch";
-          }
-          if (data.teamA?.name) $("matchTeamANameInput").value = data.teamA.name !== "ÉQUIPE A" ? data.teamA.name : "";
-          if (data.teamB?.name) $("matchTeamBNameInput").value = data.teamB.name !== "ÉQUIPE B" ? data.teamB.name : "";
+          if (data.teamA?.name) $("matchTeamANameInput").value = data.teamA.name;
+          if (data.teamB?.name) $("matchTeamBNameInput").value = data.teamB.name;
           if (data.teamA?.color && data.teamA.color !== matchTeamAColor) {
             matchTeamAColor = data.teamA.color;
             document.querySelectorAll("#matchSwatchesA .match-color-swatch").forEach(s => {
@@ -1942,13 +1925,6 @@
       chevron.classList.toggle("open");
     }
 
-    function matchToggleCustom() {
-      if (!connected) { flash("match", "❌ Connectez-vous", "error"); return; }
-      matchCustomEnabled = !matchCustomEnabled;
-      $("toggleMatchCustom").className = matchCustomEnabled ? "toggle-switch active" : "toggle-switch";
-      matchSendUpdate();
-    }
-
     function matchSetColor(team, color) {
       if (team === "A") {
         matchTeamAColor = color;
@@ -1961,18 +1937,18 @@
           s.classList.toggle("selected", s.dataset.color === color);
         });
       }
-      if (matchCustomEnabled) matchSendUpdate();
+      matchSendUpdate();
     }
 
     function matchSendUpdate() {
       if (!connected) return;
-      const teamAName = $("matchTeamANameInput").value.trim() || "ÉQUIPE A";
-      const teamBName = $("matchTeamBNameInput").value.trim() || "ÉQUIPE B";
+      // Pas de .trim() pour préserver les espaces inter-mots ; chaîne vide = le CSS OBS reprend le contrôle
+      const teamAName = $("matchTeamANameInput").value;
+      const teamBName = $("matchTeamBNameInput").value;
       socket.emit("control:match_update_teams", {
         room: currentRoom,
         teamA: { name: teamAName, color: matchTeamAColor },
-        teamB: { name: teamBName, color: matchTeamBColor },
-        customizationEnabled: matchCustomEnabled
+        teamB: { name: teamBName, color: matchTeamBColor }
       });
     }
 
