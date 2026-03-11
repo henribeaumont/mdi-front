@@ -52,6 +52,21 @@ function emitPresence(displaying) {
 function updateDisplay(data) {
   if (!data) return;
 
+  // Si la personnalisation télécommande est activée, elle prend le pas sur le CSS OBS
+  const customEnabled = data.teamCustomization?.enabled || false;
+  if (customEnabled) {
+    if (data.teamA?.name) document.documentElement.style.setProperty("--team-a-name", data.teamA.name);
+    if (data.teamA?.color) document.documentElement.style.setProperty("--team-a-color", data.teamA.color);
+    if (data.teamB?.name) document.documentElement.style.setProperty("--team-b-name", data.teamB.name);
+    if (data.teamB?.color) document.documentElement.style.setProperty("--team-b-color", data.teamB.color);
+  } else {
+    // Retirer les overrides inline → le CSS OBS reprend le contrôle
+    document.documentElement.style.removeProperty("--team-a-name");
+    document.documentElement.style.removeProperty("--team-a-color");
+    document.documentElement.style.removeProperty("--team-b-name");
+    document.documentElement.style.removeProperty("--team-b-color");
+  }
+
   const teamAName = cssVar("--team-a-name", data.teamA?.name || "ÉQUIPE A");
   const teamBName = cssVar("--team-b-name", data.teamB?.name || "ÉQUIPE B");
   teamANameEl.textContent = teamAName;
