@@ -52,20 +52,24 @@ function emitPresence(displaying) {
 function updateDisplay(data) {
   if (!data) return;
 
-  // Si la télécommande fournit un nom/couleur, elle écrase le CSS OBS ; sinon CSS OBS reprend le contrôle
+  // Nom : télécommande prioritaire ; sinon CSS OBS (via variable) ; sinon défaut
   if (data.teamA?.name) document.documentElement.style.setProperty("--team-a-name", data.teamA.name);
   else document.documentElement.style.removeProperty("--team-a-name");
-  if (data.teamA?.color) document.documentElement.style.setProperty("--team-a-color", data.teamA.color);
-  else document.documentElement.style.removeProperty("--team-a-color");
   if (data.teamB?.name) document.documentElement.style.setProperty("--team-b-name", data.teamB.name);
   else document.documentElement.style.removeProperty("--team-b-name");
-  if (data.teamB?.color) document.documentElement.style.setProperty("--team-b-color", data.teamB.color);
-  else document.documentElement.style.removeProperty("--team-b-color");
 
   const teamAName = cssVar("--team-a-name", "Équipe A");
   const teamBName = cssVar("--team-b-name", "Équipe B");
   teamANameEl.textContent = teamAName;
   teamBNameEl.textContent = teamBName;
+
+  // Couleur : appliquer directement sur les éléments pour contourner tout problème
+  // de cache OBS sur les CSS custom properties.
+  // Priorité : télécommande → CSS OBS (--team-a-color) → défaut codé en dur
+  const colorA = data.teamA?.color || cssVar("--team-a-color", "#3b82f6");
+  const colorB = data.teamB?.color || cssVar("--team-b-color", "#ef4444");
+  teamANameEl.style.color = colorA;
+  teamBNameEl.style.color = colorB;
 
   const newTeamAScore = data.teamA?.score || 0;
   const newTeamBScore = data.teamB?.score || 0;

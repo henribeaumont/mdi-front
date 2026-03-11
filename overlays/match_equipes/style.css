@@ -148,24 +148,6 @@ html, body {
   flex-direction: row-reverse;
 }
 
-/* Indicateur couleur équipe (petit cercle) */
-.team-indicator {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.team-a .team-indicator {
-  background: var(--team-a-color, #3b82f6);
-  box-shadow: 0 0 12px var(--team-a-color, #3b82f6);
-}
-
-.team-b .team-indicator {
-  background: var(--team-b-color, #ef4444);
-  box-shadow: 0 0 12px var(--team-b-color, #ef4444);
-}
-
 /* Nom équipe */
 .team-name {
   font-family: var(--name-font-family, "Montserrat"), sans-serif;
