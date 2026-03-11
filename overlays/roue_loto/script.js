@@ -1,9 +1,10 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V7.3
+ * MDI ROUE LOTO - V7.4
  * ============================================================
- * ✅ Tout V7.2 préservé (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : durée de spin discrète entre 4 et 6 s (pas 200 ms, 11 valeurs)
+ * ✅ Tout V7.3 préservé (ZÉRO RÉGRESSION)
+ * ✅ FIX : durée spin garantie entre 4 et 6 s (phase1Duration calculée après SETTLE_MS)
+ * ✅ FIX : fondu d'apparition roue (showStage) piloté en JS — fiable sous OBS CEF
  * ============================================================
  */
 
@@ -27,14 +28,15 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-const elSecurity = document.getElementById("security-screen");
-const elApp = document.getElementById("app");
-const wheelCanvas = document.getElementById("wheel");
-const wheelCtx = wheelCanvas.getContext("2d");
+const elSecurity   = document.getElementById("security-screen");
+const elApp        = document.getElementById("app");
+const stageEl      = document.querySelector(".stage");
+const wheelCanvas  = document.getElementById("wheel");
+const wheelCtx     = wheelCanvas.getContext("2d");
 const elWinnerName = document.getElementById("winnerName");
 const elReadyPanel = document.getElementById("ready-panel");
 const confettiCanvas = document.getElementById("confetti");
-const confettiCtx = confettiCanvas.getContext("2d");
+const confettiCtx    = confettiCanvas.getContext("2d");
 
 let STATE = "idle";
 let participants = [];
@@ -54,6 +56,9 @@ let spinCooldownMs = 1800;
 let consecutifMode = false;
 let feedMode = "chat"; // "chat" | "remote"
 let currentRoom = "";
+
+// Token d'annulation pour le fondu d'apparition de la roue (showStage)
+let _stageFadeToken = null;
 
 /* -------- Presence -------- */
 function emitPresence(displaying) {
@@ -307,12 +312,12 @@ function spin() {
 
   // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
   spinStartAngle = wheelAngle;
-  const phase1End      = spinStartAngle + dir * spinTurns * TWO_PI;
-  const MAX_SETTLE_MS  = 600;
-  const phase1Duration = actualDuration - MAX_SETTLE_MS;
+  const phase1End     = spinStartAngle + dir * spinTurns * TWO_PI;
+  const MAX_SETTLE_MS = 600;
 
-  // ── Phase 2 : amortissement TOUJOURS dans le sens de rotation ─────────────
-  // diff ∈ [0, 2π) pour CW, (-2π, 0] pour CCW — jamais de marche arrière.
+  // ── Phase 2 calculée EN PREMIER pour connaître SETTLE_MS exact ─────────────
+  // BUG corrigé : phase1Duration doit utiliser SETTLE_MS réel, pas MAX_SETTLE_MS.
+  // Sinon la durée totale = actualDuration - (MAX_SETTLE_MS - SETTLE_MS) < actualDuration.
   let diff;
   if (dir > 0) {
     diff =  ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI;
@@ -322,6 +327,9 @@ function spin() {
   const phase2End = phase1End + diff;
   const SETTLE_MS = diff === 0 ? 80
     : clamp(Math.ceil(Math.abs(diff) / TWO_PI * MAX_SETTLE_MS), 80, MAX_SETTLE_MS);
+
+  // phase1Duration + SETTLE_MS = actualDuration exactement ✓
+  const phase1Duration = actualDuration - SETTLE_MS;
 
   spinStartTs = performance.now();
   requestAnimationFrame(tickPhase1);
@@ -390,15 +398,40 @@ function hideCollecting() {
 }
 
 function showStage() {
-  // Double RAF : garantit que le navigateur a bien rendu l'état courant
-  // avant de retirer mdi-standby, déclenchant la transition CSS opacity.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    document.documentElement.classList.remove("mdi-standby");
-  }));
+  // Invalide tout fondu d'apparition en cours
+  _stageFadeToken = null;
+
+  // Retire la classe standby (CSS opacity:0 sur .stage)
+  document.documentElement.classList.remove("mdi-standby");
+
+  // Animation JS explicite opacity 0→1 en 600 ms.
+  // Plus fiable que la transition CSS déclenchée par changement de classe
+  // dans OBS Browser Source (CEF ne détecte pas toujours la valeur de départ).
+  stageEl.style.opacity = "0";
+  const FADE_MS = 600;
+  const token = {};           // objet unique → référence par identité
+  _stageFadeToken = token;
+  let t0 = null;
+
+  function tick(ts) {
+    if (_stageFadeToken !== token) return; // animation annulée par hideStage()
+    if (t0 === null) t0 = ts;
+    const t = Math.min((ts - t0) / FADE_MS, 1);
+    stageEl.style.opacity = String(t);
+    if (t < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      stageEl.style.removeProperty("opacity"); // remet le CSS en charge
+      _stageFadeToken = null;
+    }
+  }
+  requestAnimationFrame(tick);
 }
 
 function hideStage() {
-  document.documentElement.classList.add("mdi-standby");
+  _stageFadeToken = null;                      // annule tout fondu d'apparition
+  stageEl.style.removeProperty("opacity");     // laisse le CSS mdi-standby prendre le relais
+  document.documentElement.classList.add("mdi-standby"); // CSS : .stage opacity→0
   hideCollecting();
 }
 
