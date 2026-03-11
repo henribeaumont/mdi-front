@@ -1,5 +1,5 @@
 /* ================================================================
-   ⚙️  PERSONNALISATION MDI — ROUE LOTO V7.1
+   ⚙️  PERSONNALISATION MDI — ROUE LOTO V7.2
    ================================================================
    Dans OBS → Propriétés de la source → CSS personnalisé,
    copiez-collez le bloc :root { } et modifiez les valeurs.
@@ -26,9 +26,10 @@
   --pointer-overlap:     1.15;   /* Chevauchement de la flèche sur la roue */
 
   /* ── ROTATION ────────────────────────────────────────────────  */
-  --spin-direction:   "cw"; /* Sens de rotation : "cw"=horaire, "ccw"=anti-horaire */
-  --spin-duration-ms: 4500; /* Durée de chaque spin en millisecondes (identique à chaque fois) */
-  --spin-turns:          8; /* Nombre de tours complets à chaque spin                          */
+  --spin-direction:   "cw"; /* Sens de rotation : "cw"=horaire, "ccw"=anti-horaire                   */
+  --spin-duration-ms: 4500; /* Durée de base du spin (ms). Une durée aléatoire de 0 à 3 s est       */
+                            /* ajoutée automatiquement à chaque lancer (résultat toujours ≥ 4 000 ms) */
+  --spin-turns:          8; /* Nombre de tours complets avant ralentissement                          */
 
   /* ── CONFETTIS DU GAGNANT ────────────────────────────────────  */
   --winner-confetti:    "on";  /* Confettis à l'annonce du gagnant : "on"/"off" */
@@ -94,9 +95,13 @@ html, body {
   height: 100vh;
   position: relative;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.8s ease-in-out;
 }
-#app.show { opacity: 1; }
+#app.show {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .stage {
   position: relative;
