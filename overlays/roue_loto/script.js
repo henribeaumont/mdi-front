@@ -284,44 +284,61 @@ function spin() {
   const pointerAngle = pointerTargetAngle();
   const desired = pointerAngle - selectedCenter;
   const dir = (spinDirection === "cw") ? +1 : -1;
-
-  spinStartAngle = wheelAngle;
-  // Normalise desired so it's always just ahead of spinStartAngle (same direction),
-  // then add the fixed spinTurns — ensures identical energy on every spin.
   const TWO_PI = Math.PI * 2;
-  let normalizedDesired = desired - Math.floor((desired - spinStartAngle) / TWO_PI) * TWO_PI;
-  if (dir > 0 && normalizedDesired <= spinStartAngle) normalizedDesired += TWO_PI;
-  if (dir < 0 && normalizedDesired >= spinStartAngle) normalizedDesired -= TWO_PI;
-  targetAngle = normalizedDesired + dir * spinTurns * TWO_PI;
+  const SETTLE_MS = 300;
+
+  // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
+  // Distance, durée et courbe IDENTIQUES à chaque spin.
+  spinStartAngle = wheelAngle;
+  const phase1End      = spinStartAngle + dir * spinTurns * TWO_PI;
+  const phase1Duration = spinDurationMs - SETTLE_MS;
+
+  // ── Phase 2 : amortissement vers le gagnant (chemin le plus court ≤ 180°) ─
+  // Ressemble à une roue mécanique qui "clique" dans sa case.
+  let diff = ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI; // [0, 2π)
+  if (diff > Math.PI) diff -= TWO_PI;                              // ramène à [-π, π]
+  const phase2End = phase1End + diff;
+
   spinStartTs = performance.now();
+  requestAnimationFrame(tickPhase1);
 
-  requestAnimationFrame(tickSpin);
-
-  function tickSpin(ts) {
-    const t = clamp((ts - spinStartTs) / spinDurationMs, 0, 1);
+  function tickPhase1(ts) {
+    const t = clamp((ts - spinStartTs) / phase1Duration, 0, 1);
     const e = 1 - Math.pow(1 - t, 3);
-    wheelAngle = spinStartAngle + (targetAngle - spinStartAngle) * e;
+    wheelAngle = spinStartAngle + (phase1End - spinStartAngle) * e;
     drawWheel();
-    if (t < 1) { requestAnimationFrame(tickSpin); return; }
+    if (t < 1) { requestAnimationFrame(tickPhase1); return; }
 
-    spinning = false;
-    const ang = normalizeAngle(pointerAngle - wheelAngle);
-    const idx = Math.floor(ang / slice) % n;
-    winnerIndex = (idx + n) % n;
-    drawWheel();
+    // Phase 1 terminée — démarrage amortissement
+    const p2Start = performance.now();
+    requestAnimationFrame(tickPhase2);
 
-    const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
-    elWinnerName.textContent = winnerName;
-    document.documentElement.classList.add("mdi-show-winner");
-    STATE = "winner";
-    startConfetti();
+    function tickPhase2(ts2) {
+      const t2 = clamp((ts2 - p2Start) / SETTLE_MS, 0, 1);
+      const e2 = t2 < 0.5 ? 2 * t2 * t2 : 1 - Math.pow(-2 * t2 + 2, 2) / 2; // ease-in-out
+      wheelAngle = phase1End + (phase2End - phase1End) * e2;
+      drawWheel();
+      if (t2 < 1) { requestAnimationFrame(tickPhase2); return; }
 
-    socket.emit("roue:winner_selected", {
-      room: currentRoom,
-      winnerName,
-      winnerIndex
-    });
-    console.log(`🏆 [ROUE] Gagnant: "${winnerName}" (index ${winnerIndex})`);
+      // Les deux phases sont terminées
+      spinning = false;
+      winnerIndex = selected;
+      wheelAngle = phase2End;
+      drawWheel();
+
+      const winnerName = participants[winnerIndex]?.name || participants[winnerIndex] || "";
+      elWinnerName.textContent = winnerName;
+      document.documentElement.classList.add("mdi-show-winner");
+      STATE = "winner";
+      startConfetti();
+
+      socket.emit("roue:winner_selected", {
+        room: currentRoom,
+        winnerName,
+        winnerIndex
+      });
+      console.log(`🏆 [ROUE] Gagnant: "${winnerName}" (index ${winnerIndex})`);
+    }
   }
 }
 
@@ -348,7 +365,11 @@ function hideCollecting() {
 }
 
 function showStage() {
-  document.documentElement.classList.remove("mdi-standby");
+  // requestAnimationFrame garantit que le navigateur a calculé l'état courant
+  // (opacity:0 en standby) avant de retirer la classe, déclenchant la transition CSS.
+  requestAnimationFrame(() => {
+    document.documentElement.classList.remove("mdi-standby");
+  });
 }
 
 function hideStage() {
