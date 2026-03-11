@@ -27,7 +27,7 @@
 
   /* ── ROTATION ────────────────────────────────────────────────  */
   --spin-direction:   "cw"; /* Sens de rotation : "cw"=horaire, "ccw"=anti-horaire              */
-  --spin-turns:          8; /* Nombre de tours complets avant ralentissement                     */
+  --spin-turns:         10; /* Nombre de tours complets avant ralentissement                     */
   /* ── Note : la durée de chaque spin est automatiquement choisie      */
   /*    parmi 11 valeurs entre 4 000 ms et 6 000 ms (pas de 200 ms).   */
   /*    --spin-duration-ms n'est plus utilisé (conservé pour compat.)  */
