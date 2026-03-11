@@ -1,12 +1,11 @@
 /**
  * ============================================================
- * MDI ROUE LOTO - V7.1
+ * MDI ROUE LOTO - V7.2
  * ============================================================
- * ✅ Tout V7.0 préservé (ZÉRO RÉGRESSION)
- * ✅ NOUVEAU : état "standby" — overlay source active, roue cachée
- * ✅ NOUVEAU : feed_mode "chat" | "remote" (texte d'attente en mode chat)
- * ✅ NOUVEAU : message d'attente CSS-personnalisable (--waiting-message)
- * ✅ NOUVEAU : reset → standby (liste organisateur conservée côté serveur)
+ * ✅ Tout V7.1 préservé (ZÉRO RÉGRESSION)
+ * ✅ NOUVEAU : animation roue — vitesse soutenue + ralentissement progressif
+ * ✅ NOUVEAU : durée randomisée par lancer (base + 0..3 s, toujours ≥ 4 s)
+ * ✅ NOUVEAU : fondu d'apparition/masquage fiable (double RAF — fix OBS)
  * ============================================================
  */
 
@@ -265,6 +264,20 @@ function pickRandomIndex(n) {
 }
 function pointerTargetAngle() { return (pointerSide === "left") ? Math.PI : 0; }
 
+// ── Courbe de vitesse soutenue ─────────────────────────────────────────────
+// Phase linéaire (0→kBreak) : vitesse constante et soutenue.
+// Phase ease-out-quad (kBreak→1) : ralentissement progressif jusqu'à l'arrêt.
+// La jonction est C1-continue (même vitesse des deux côtés).
+function sustainedEasing(t) {
+  const kBreak = 0.70; // 70 % du temps à vitesse constante
+  const eBreak = 2 * kBreak / (1 + kBreak); // ≈ 0.8235 — continuité de vitesse
+  if (t <= kBreak) {
+    return (eBreak / kBreak) * t; // linéaire
+  }
+  const t2 = (t - kBreak) / (1 - kBreak);
+  return eBreak + (1 - eBreak) * (1 - Math.pow(1 - t2, 2)); // ease-out-quad
+}
+
 function spin() {
   const now = Date.now();
   if (spinning) return;
@@ -286,24 +299,28 @@ function spin() {
   const dir = (spinDirection === "cw") ? +1 : -1;
   const TWO_PI = Math.PI * 2;
 
+  // ── Durée randomisée : base CSS + 0..3000 ms (crypto), toujours ≥ 4000 ms ──
+  // La variabilité de durée rend chaque lancer visuellement unique.
+  const rBuf = new Uint32Array(1);
+  crypto.getRandomValues(rBuf);
+  const actualDuration = Math.max(4000, spinDurationMs + (rBuf[0] % 3001));
+
   // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
-  // Distance, durée et courbe IDENTIQUES à chaque spin.
   spinStartAngle = wheelAngle;
   const phase1End      = spinStartAngle + dir * spinTurns * TWO_PI;
-  const MAX_SETTLE_MS  = 600; // budget fixe → phase1Duration est TOUJOURS constant
-  const phase1Duration = spinDurationMs - MAX_SETTLE_MS;
+  const MAX_SETTLE_MS  = 600;
+  const phase1Duration = actualDuration - MAX_SETTLE_MS;
 
   // ── Phase 2 : amortissement TOUJOURS dans le sens de rotation ─────────────
-  // Jamais de marche arrière. diff ∈ [0, 2π) pour CW, (-2π, 0] pour CCW.
+  // diff ∈ [0, 2π) pour CW, (-2π, 0] pour CCW — jamais de marche arrière.
   let diff;
   if (dir > 0) {
-    diff =  ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI;  // [0, 2π)
+    diff =  ((desired - phase1End) % TWO_PI + TWO_PI) % TWO_PI;
   } else {
-    diff = -(((phase1End - desired) % TWO_PI + TWO_PI) % TWO_PI); // (-2π, 0]
+    diff = -(((phase1End - desired) % TWO_PI + TWO_PI) % TWO_PI);
   }
-  const phase2End  = phase1End + diff;
-  // Durée proportionnelle à la distance (80 ms–600 ms) pour toujours paraître naturel
-  const SETTLE_MS  = diff === 0 ? 80
+  const phase2End = phase1End + diff;
+  const SETTLE_MS = diff === 0 ? 80
     : clamp(Math.ceil(Math.abs(diff) / TWO_PI * MAX_SETTLE_MS), 80, MAX_SETTLE_MS);
 
   spinStartTs = performance.now();
@@ -311,12 +328,13 @@ function spin() {
 
   function tickPhase1(ts) {
     const t = clamp((ts - spinStartTs) / phase1Duration, 0, 1);
-    const e = 1 - Math.pow(1 - t, 3);
+    // sustainedEasing : vitesse soutenue puis ralentissement progressif
+    const e = sustainedEasing(t);
     wheelAngle = spinStartAngle + (phase1End - spinStartAngle) * e;
     drawWheel();
     if (t < 1) { requestAnimationFrame(tickPhase1); return; }
 
-    // Phase 1 terminée — démarrage amortissement
+    // Phase 1 terminée — amortissement final vers la cible
     const p2Start = performance.now();
     requestAnimationFrame(tickPhase2);
 
@@ -372,11 +390,11 @@ function hideCollecting() {
 }
 
 function showStage() {
-  // requestAnimationFrame garantit que le navigateur a calculé l'état courant
-  // (opacity:0 en standby) avant de retirer la classe, déclenchant la transition CSS.
-  requestAnimationFrame(() => {
+  // Double RAF : garantit que le navigateur a bien rendu l'état courant
+  // avant de retirer mdi-standby, déclenchant la transition CSS opacity.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     document.documentElement.classList.remove("mdi-standby");
-  });
+  }));
 }
 
 function hideStage() {
@@ -453,7 +471,9 @@ socket.on("overlay:state", (payload) => {
     // Overlay source visible, mais contenu de la roue caché
     elSecurity.classList.add("hidden");
     elApp.classList.remove("hidden");
-    requestAnimationFrame(() => elApp.classList.add("show"));
+    // Double RAF : assure que display:none→block est rendu avant d'amorcer
+    // la transition CSS opacity (fix OBS Browser Source / Chromium).
+    requestAnimationFrame(() => requestAnimationFrame(() => elApp.classList.add("show")));
     hideWinner();
     hideReady();
     hideCollecting();
@@ -467,7 +487,7 @@ socket.on("overlay:state", (payload) => {
   if (payload.state === "collecting") {
     elSecurity.classList.add("hidden");
     elApp.classList.remove("hidden");
-    requestAnimationFrame(() => elApp.classList.add("show"));
+    requestAnimationFrame(() => requestAnimationFrame(() => elApp.classList.add("show")));
     showStage();
     showCollecting();
     hideWinner();
@@ -481,7 +501,7 @@ socket.on("overlay:state", (payload) => {
   if (payload.state === "ready") {
     elSecurity.classList.add("hidden");
     elApp.classList.remove("hidden");
-    requestAnimationFrame(() => elApp.classList.add("show"));
+    requestAnimationFrame(() => requestAnimationFrame(() => elApp.classList.add("show")));
     showStage();
     hideCollecting();
     hideWinner();
