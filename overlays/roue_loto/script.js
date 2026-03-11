@@ -81,7 +81,7 @@ function readConfig() {
   maxParticipants = clamp(cssNum("--max-participants", 48), 4, 200);
   spinCooldownMs  = clamp(cssNum("--spin-cooldown-ms", 1800), 500, 12000);
   spinDurationMs  = clamp(cssNum("--spin-duration-ms", 4500), 1000, 30000);
-  spinTurns       = clamp(cssNum("--spin-turns", 8), 8, 50);
+  spinTurns       = clamp(cssNum("--spin-turns", 10), 10, 50);
 }
 
 const basePalette = [
@@ -267,18 +267,12 @@ function pickRandomIndex(n) {
 }
 function pointerTargetAngle() { return (pointerSide === "left") ? Math.PI : 0; }
 
-// ── Courbe de vitesse soutenue ─────────────────────────────────────────────
-// Phase linéaire (0→kBreak) : vitesse constante et soutenue.
-// Phase ease-out-quad (kBreak→1) : ralentissement progressif jusqu'à l'arrêt.
-// La jonction est C1-continue (même vitesse des deux côtés).
-function sustainedEasing(t) {
-  const kBreak = 0.70; // 70 % du temps à vitesse constante
-  const eBreak = 2 * kBreak / (1 + kBreak); // ≈ 0.8235 — continuité de vitesse
-  if (t <= kBreak) {
-    return (eBreak / kBreak) * t; // linéaire
-  }
-  const t2 = (t - kBreak) / (1 - kBreak);
-  return eBreak + (1 - eBreak) * (1 - Math.pow(1 - t2, 2)); // ease-out-quad
+// ── Courbe de vitesse : Rapide au début puis ralenti progressif ────────────
+// Départ très rapide (au moins 3 tours la première seconde),
+// puis ralentissement long et ultra fluide jusqu'à l'arrêt (easeOutQuart).
+function swiftDeceleratingEasing(t) {
+  // easeOutQuart
+  return 1 - Math.pow(1 - t, 4);
 }
 
 function spin() {
@@ -312,7 +306,7 @@ function spin() {
 
   // ── Phase 1 : exactement spinTurns tours complets ─────────────────────────
   spinStartAngle = wheelAngle;
-  const phase1End     = spinStartAngle + dir * Math.max(8, spinTurns) * TWO_PI;
+  const phase1End     = spinStartAngle + dir * Math.max(10, spinTurns) * TWO_PI;
   const MAX_SETTLE_MS = 600;
 
   // ── Phase 2 calculée EN PREMIER pour connaître SETTLE_MS exact ─────────────
@@ -336,8 +330,8 @@ function spin() {
 
   function tickPhase1(ts) {
     const t = clamp((ts - spinStartTs) / phase1Duration, 0, 1);
-    // sustainedEasing : vitesse soutenue puis ralentissement progressif
-    const e = sustainedEasing(t);
+    // Vitesse rapide puis décélération globale fluide
+    const e = swiftDeceleratingEasing(t);
     wheelAngle = spinStartAngle + (phase1End - spinStartAngle) * e;
     drawWheel();
     if (t < 1) { requestAnimationFrame(tickPhase1); return; }
@@ -434,11 +428,37 @@ function showStage() {
   }, 50);
 }
 
+// MODIFICATION : On utilise le Javascript pour faire un fondu doux au masquage aussi.
 function hideStage() {
-  _stageFadeToken = null;                      // annule tout fondu d'apparition
-  stageEl.style.removeProperty("opacity");     // laisse le CSS mdi-standby prendre le relais
-  document.documentElement.classList.add("mdi-standby"); // CSS : .stage opacity→0
   hideCollecting();
+  if (document.documentElement.classList.contains("mdi-standby")) return;
+
+  _stageFadeToken = null;
+  const startOpacity = parseFloat(cssVar("opacity", stageEl.style.opacity || "1"));
+  const FADE_MS = 1500;
+  const token = {};
+  _stageFadeToken = token;
+  let t0 = null;
+
+  function tick(ts) {
+    if (_stageFadeToken !== token) return;
+    if (t0 === null) t0 = ts;
+    const t = Math.min((ts - t0) / FADE_MS, 1);
+    
+    // ease-in-out pour la disparition
+    const easeT = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    stageEl.style.opacity = String(startOpacity * (1 - easeT));
+    
+    if (easeT < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      stageEl.style.removeProperty("opacity");
+      document.documentElement.classList.add("mdi-standby");
+      _stageFadeToken = null;
+    }
+  }
+
+  requestAnimationFrame(tick);
 }
 
 function clearAll() {
