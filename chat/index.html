@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chat MDI</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    /* ============================================================
+       CHAT MDI — Page participant V1.0
+       Mobile-first, responsive
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --bg-card:   #1a1d27;
+      --bg-input:  #252836;
+      --accent:    #7c5cfc;
+      --accent-h:  #6a4ce0;
+      --text:      #e8eaf0;
+      --text-muted:#8b90a0;
+      --border:    #2e3244;
+      --danger:    #e74c3c;
+      --success:   #2ecc71;
+      --radius:    12px;
+      --radius-sm: 8px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── ÉCRAN D'ERREUR ──────────────────────────────────────── */
+    #screen-error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 24px;
+      text-align: center;
+      gap: 12px;
+    }
+    #screen-error .icon { font-size: 48px; }
+    #screen-error h2 { font-size: 20px; color: var(--danger); }
+    #screen-error p  { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+    /* ─── ÉCRAN CONNEXION ─────────────────────────────────────── */
+    #screen-login {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 24px;
+      gap: 0;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 28px 24px 24px;
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .login-logo .logo-badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 5px 14px;
+      border-radius: 20px;
+    }
+    .login-logo h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-top: 12px;
+      color: var(--text);
+    }
+    .login-logo p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    .login-form { display: flex; flex-direction: column; gap: 12px; }
+    .login-form label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .login-form input {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .login-form input:focus { border-color: var(--accent); }
+    .login-form input::placeholder { color: var(--text-muted); opacity: 0.6; }
+    .btn-join {
+      margin-top: 4px;
+      width: 100%;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-join:hover  { background: var(--accent-h); }
+    .btn-join:active { transform: scale(0.98); }
+    .btn-join:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .login-error {
+      font-size: 13px;
+      color: var(--danger);
+      text-align: center;
+      min-height: 18px;
+      margin-top: -4px;
+    }
+
+    /* ─── ÉCRAN CHAT ──────────────────────────────────────────── */
+    #screen-chat {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    /* Header */
+    .chat-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+    }
+    .chat-header .logo-badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 3px 10px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .chat-header .user-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chat-header .conn-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      flex-shrink: 0;
+    }
+    .chat-header .conn-dot.online { background: var(--success); }
+
+    /* Messages */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .msg {
+      max-width: 80%;
+      padding: 9px 13px;
+      border-radius: 16px;
+      font-size: 15px;
+      line-height: 1.45;
+      word-break: break-word;
+      animation: msgIn 0.2s ease;
+    }
+    @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .msg.mine {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.other {
+      align-self: flex-start;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+    .msg .msg-author {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    .msg.mine .msg-author { display: none; }
+    .msg .msg-text { }
+    .msg .msg-time {
+      font-size: 10px;
+      opacity: 0.5;
+      margin-top: 3px;
+      text-align: right;
+    }
+
+    .msg-system {
+      align-self: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+    }
+
+    /* Zone de saisie */
+    .chat-input-area {
+      flex-shrink: 0;
+      padding: 10px 12px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+    }
+    .input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .btn-emoji {
+      flex-shrink: 0;
+      width: 42px; height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg-input);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+    }
+    .btn-emoji:hover { border-color: var(--accent); }
+    .btn-emoji.open   { border-color: var(--accent); background: var(--bg); }
+    #msgInput {
+      flex: 1;
+      resize: none;
+      min-height: 42px;
+      max-height: 110px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+      line-height: 1.4;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+      overflow-y: auto;
+    }
+    #msgInput:focus { border-color: var(--accent); }
+    #msgInput::placeholder { color: var(--text-muted); opacity: 0.6; }
+    .btn-send {
+      flex-shrink: 0;
+      width: 42px; height: 42px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-send:hover   { background: var(--accent-h); }
+    .btn-send:active  { transform: scale(0.95); }
+    .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* Picker emoji */
+    .emoji-picker {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      width: 280px;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 100;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .emoji-picker.open { display: block; }
+    .emoji-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 2px;
+    }
+    .emoji-btn {
+      font-size: 22px;
+      padding: 4px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 6px;
+      text-align: center;
+      transition: background 0.1s;
+      line-height: 1.2;
+    }
+    .emoji-btn:hover { background: var(--bg-input); }
+
+    /* Hidden utility */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     ÉCRAN ERREUR
+════════════════════════════════════════════════════ -->
+<div id="screen-error" class="hidden">
+  <div class="icon">🔒</div>
+  <h2 id="errorTitle">Lien invalide</h2>
+  <p id="errorMsg">Ce lien n'est pas valide ou a expiré.<br>Demandez un nouveau lien à l'organisateur.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     ÉCRAN CONNEXION
+════════════════════════════════════════════════════ -->
+<div id="screen-login" class="hidden">
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-badge">Chat MDI</span>
+      <h1>Rejoindre le chat</h1>
+      <p>Entrez votre prénom et votre nom pour participer</p>
+    </div>
+    <div class="login-form">
+      <div>
+        <label for="inputPrenom">Prénom</label>
+        <input type="text" id="inputPrenom" placeholder="Jean" autocomplete="given-name" maxlength="30">
+      </div>
+      <div>
+        <label for="inputNom">Nom</label>
+        <input type="text" id="inputNom" placeholder="Dupont" autocomplete="family-name" maxlength="30">
+      </div>
+      <div class="login-error" id="loginError"></div>
+      <button class="btn-join" id="btnJoin" onclick="joinChat()">Rejoindre</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     ÉCRAN CHAT
+════════════════════════════════════════════════════ -->
+<div id="screen-chat" class="hidden">
+  <div class="chat-header">
+    <span class="logo-badge">Chat MDI</span>
+    <span class="user-name" id="headerName"></span>
+    <span class="conn-dot" id="connDot"></span>
+  </div>
+  <div class="chat-messages" id="msgList"></div>
+  <div class="chat-input-area">
+    <div class="input-row">
+      <div class="btn-emoji" id="emojiToggle" onclick="toggleEmojiPicker()" title="Emojis">
+        😊
+        <div class="emoji-picker" id="emojiPicker">
+          <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+      </div>
+      <textarea id="msgInput" placeholder="Votre message…" rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="btn-send" id="btnSend" onclick="sendMessage()" title="Envoyer">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CHAT MDI — Client V1.0
+// ============================================================
+const SERVER_URL = "https://magic-digital-impact-live.onrender.com";
+
+// Emojis fréquents
+const EMOJIS = [
+  "😀","😂","😍","🥳","👏","🙌","🔥","💯",
+  "👍","👎","❤️","💪","🎉","🎊","🤔","😮",
+  "😎","🤩","😅","🥲","👀","💡","✅","❌",
+  "🚀","⭐","💬","📣","🎯","🏆","💥","🌟",
+  "😁","😇","🤗","😜","🤝","👋","✌️","🫶",
+  "😴","🤣","😬","🥸","🤭","😤","🫡","💫"
+];
+
+const params  = new URLSearchParams(location.search);
+const TOKEN   = params.get("t") || "";
+let myPrenom  = "";
+let myNom     = "";
+let socket    = null;
+let joined    = false;
+
+// ─── INITIALISATION ────────────────────────────────────────
+async function init() {
+  buildEmojiGrid();
+
+  if (!TOKEN) {
+    showError("Lien invalide", "Aucun token trouvé dans l'URL.");
+    return;
+  }
+
+  // Validation du token côté serveur
+  try {
+    const res = await fetch(`${SERVER_URL}/api/chat/validate?t=${encodeURIComponent(TOKEN)}`);
+    const data = await res.json();
+    if (!data.ok) {
+      const msgs = {
+        invalid_token: "Ce lien est invalide ou a expiré.",
+        chat_inactive: "Le chat n'est pas encore ouvert par l'organisateur.",
+        missing_token: "Lien malformé."
+      };
+      showError("Accès refusé", msgs[data.error] || "Lien invalide.");
+      return;
+    }
+  } catch (e) {
+    showError("Erreur réseau", "Impossible de joindre le serveur. Vérifiez votre connexion.");
+    return;
+  }
+
+  show("screen-login");
+  document.getElementById("inputPrenom").focus();
+}
+
+// ─── CONNEXION SOCKET ──────────────────────────────────────
+function connectSocket(onConnected) {
+  socket = io(SERVER_URL, { transports: ["websocket", "polling"], reconnection: true });
+
+  socket.on("connect", () => {
+    document.getElementById("connDot").classList.add("online");
+    if (onConnected) { onConnected(); onConnected = null; }
+  });
+
+  socket.on("disconnect", () => {
+    document.getElementById("connDot").classList.remove("online");
+    appendSystemMsg("Connexion perdue… reconnexion en cours");
+  });
+
+  socket.on("connect_error", () => {
+    document.getElementById("connDot").classList.remove("online");
+  });
+
+  socket.on("chat:broadcast", (msg) => {
+    const isMine = (msg.prenom === myPrenom && msg.nom === myNom);
+    appendMsg(msg.author, msg.text, msg.timestamp, isMine);
+  });
+
+  socket.on("chat:join_error", (p) => {
+    const msgs = {
+      duplicate_name:  "Ce nom est déjà utilisé. Choisissez un autre prénom ou nom.",
+      chat_inactive:   "Le chat vient d'être fermé par l'organisateur.",
+      invalid_token:   "Token invalide. Demandez un nouveau lien.",
+      missing_fields:  "Veuillez renseigner prénom et nom.",
+      invalid_name:    "Prénom ou nom invalide."
+    };
+    setLoginError(msgs[p.reason] || "Erreur inconnue.");
+    document.getElementById("btnJoin").disabled = false;
+  });
+
+  socket.on("chat:join_ok", (p) => {
+    myPrenom = p.prenom;
+    myNom    = p.nom;
+    joined   = true;
+    show("screen-chat");
+    document.getElementById("headerName").textContent = `${p.prenom} ${p.nom}`;
+    document.getElementById("msgInput").focus();
+    appendSystemMsg(`Bienvenue, ${p.prenom} ! 👋`);
+  });
+}
+
+// ─── REJOINDRE ─────────────────────────────────────────────
+function joinChat() {
+  const prenom = document.getElementById("inputPrenom").value.trim();
+  const nom    = document.getElementById("inputNom").value.trim();
+
+  if (!prenom) { setLoginError("Veuillez saisir votre prénom."); return; }
+  if (!nom)    { setLoginError("Veuillez saisir votre nom."); return; }
+
+  setLoginError("");
+  document.getElementById("btnJoin").disabled = true;
+
+  if (!socket || !socket.connected) {
+    connectSocket(() => {
+      socket.emit("chat:join", { token: TOKEN, prenom, nom });
+    });
+  } else {
+    socket.emit("chat:join", { token: TOKEN, prenom, nom });
+  }
+}
+
+// ─── ENVOI MESSAGE ─────────────────────────────────────────
+function sendMessage() {
+  if (!joined || !socket) return;
+  const input = document.getElementById("msgInput");
+  const text  = input.value.trim();
+  if (!text) return;
+  socket.emit("chat:message", { token: TOKEN, text });
+  input.value = "";
+  autoResize(input);
+}
+
+function handleKey(e) {
+  // Envoi sur Entrée (pas Shift+Entrée)
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 110) + "px";
+}
+
+// ─── RENDU MESSAGES ────────────────────────────────────────
+function appendMsg(author, text, timestamp, isMine) {
+  const list = document.getElementById("msgList");
+  const el   = document.createElement("div");
+  el.className = `msg ${isMine ? "mine" : "other"}`;
+
+  const t = timestamp ? new Date(timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+
+  el.innerHTML =
+    `<div class="msg-author">${escHtml(author)}</div>` +
+    `<div class="msg-text">${escHtml(text)}</div>` +
+    `<div class="msg-time">${escHtml(t)}</div>`;
+
+  list.appendChild(el);
+  scrollBottom();
+}
+
+function appendSystemMsg(text) {
+  const list = document.getElementById("msgList");
+  const el   = document.createElement("div");
+  el.className = "msg-system";
+  el.textContent = text;
+  list.appendChild(el);
+  scrollBottom();
+}
+
+function scrollBottom() {
+  const list = document.getElementById("msgList");
+  list.scrollTop = list.scrollHeight;
+}
+
+// ─── EMOJI PICKER ──────────────────────────────────────────
+function buildEmojiGrid() {
+  const grid = document.getElementById("emojiGrid");
+  EMOJIS.forEach(emoji => {
+    const btn = document.createElement("button");
+    btn.className = "emoji-btn";
+    btn.textContent = emoji;
+    btn.setAttribute("type", "button");
+    btn.onclick = (e) => { e.stopPropagation(); insertEmoji(emoji); };
+    grid.appendChild(btn);
+  });
+}
+
+function toggleEmojiPicker() {
+  const picker = document.getElementById("emojiPicker");
+  const toggle = document.getElementById("emojiToggle");
+  const isOpen = picker.classList.contains("open");
+  picker.classList.toggle("open", !isOpen);
+  toggle.classList.toggle("open", !isOpen);
+}
+
+function insertEmoji(emoji) {
+  const input = document.getElementById("msgInput");
+  const start = input.selectionStart;
+  const end   = input.selectionEnd;
+  const val   = input.value;
+  input.value = val.substring(0, start) + emoji + val.substring(end);
+  input.selectionStart = input.selectionEnd = start + emoji.length;
+  input.focus();
+  autoResize(input);
+  // Fermer le picker
+  document.getElementById("emojiPicker").classList.remove("open");
+  document.getElementById("emojiToggle").classList.remove("open");
+}
+
+// Fermer le picker si clic à l'extérieur
+document.addEventListener("click", (e) => {
+  if (!document.getElementById("emojiToggle").contains(e.target)) {
+    document.getElementById("emojiPicker").classList.remove("open");
+    document.getElementById("emojiToggle").classList.remove("open");
+  }
+});
+
+// ─── UTILITAIRES ───────────────────────────────────────────
+function show(id) {
+  ["screen-error", "screen-login", "screen-chat"].forEach(s => {
+    document.getElementById(s).classList.toggle("hidden", s !== id);
+  });
+}
+
+function showError(title, msg) {
+  document.getElementById("errorTitle").textContent = title;
+  document.getElementById("errorMsg").innerHTML = msg;
+  show("screen-error");
+}
+
+function setLoginError(msg) {
+  document.getElementById("loginError").textContent = msg;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Entrée sur Entrée dans les champs login
+document.addEventListener("DOMContentLoaded", () => {
+  ["inputPrenom", "inputNom"].forEach(id => {
+    document.getElementById(id).addEventListener("keydown", e => {
+      if (e.key === "Enter") joinChat();
+    });
+  });
+});
+
+// ─── DÉMARRAGE ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
