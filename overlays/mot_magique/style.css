@@ -4,43 +4,40 @@
    Dans OBS → Propriétés de la source → CSS personnalisé,
    copiez-collez le bloc :root { } et modifiez les valeurs.
 
-   Ce widget affiche un mot en attente, puis l'anime en grand
-   quand suffisamment de participants ont tapé le mot déclencheur.
+   ℹ️  Le mot affiché, le trigger chat et le seuil sont désormais
+   pilotables depuis la télécommande (onglet ✨).
    ================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap');
 
 :root {
 
-  /* ── ACCÈS À LA ROOM (OBLIGATOIRE) ──────────────────────────  */
+  /* ── OBLIGATOIRE ─────────────────────────────────────────────  */
   --room-id:   "";        /* Identifiant de votre room           */
   --room-key:  "";        /* Clé secrète de la room              */
   --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
 
   /* ── FOND DU PANNEAU ─────────────────────────────────────────  */
-  --panel-bg-color:   #0A0F1E; /* Couleur de fond du panneau        */
+  --panel-bg-color:   #0A0F1E; /* Couleur de fond                 */
   --panel-bg-opacity: 0.80;    /* Transparence : 0=invisible, 1=opaque */
-  --panel-radius:     22px;    /* Arrondi des coins                 */
-  --panel-padding-x:  40px;    /* Espace intérieur gauche/droite    */
-  --panel-padding-y:  20px;    /* Espace intérieur haut/bas         */
+  --panel-radius:     22px;    /* Arrondi des coins               */
+  --panel-padding-x:  40px;    /* Espace intérieur gauche/droite  */
+  --panel-padding-y:  20px;    /* Espace intérieur haut/bas       */
 
-  /* ── MOT EN ATTENTE (avant activation) ──────────────────────  */
-  --start-color: #6b6b6b; /* Couleur du mot avant activation       */
-  --start-size:  72px;    /* Taille de base du mot                 */
+  /* ── MOT EN ATTENTE ──────────────────────────────────────────  */
+  --start-color: #6b6b6b; /* Couleur avant activation (gris)     */
+  --start-size:  72px;    /* Taille de base du mot               */
 
-  /* ── MOT ACTIVÉ (seuil atteint à 100%) ──────────────────────  */
-  --end-color: #ffd700; /* Couleur finale — ex: #ffd700 (or)         */
-  --end-size:  140px;   /* Taille finale (plus grand)                */
+  /* ── MOT ACTIVÉ ──────────────────────────────────────────────  */
+  --end-color: #ffd700; /* Couleur après activation (or)          */
+  --end-size:  140px;   /* Taille finale (plus grand)             */
 
-  /* ── LOGIQUE DU MOT MAGIQUE ─────────────────────────────────  */
-  --display-word:        "VICTOIRE"; /* Mot affiché à l'écran                              */
-  --trigger-chat:        "GG";       /* Mot que les participants tapent dans Teams          */
-  --threshold:           0.9;        /* Seuil de déclenchement : 0.2 = 20%, 0.9 = 90%      */
-  --participants-offset: 2;          /* Participants à exclure du total (organisateur + web) */
-  --sticky:              "false";    /* "true" = reste activé même si le ratio redescend    */
+  /* ── MOT ET DÉCLENCHEUR ──────────────────────────────────────  */
+  --participants-offset: 2;       /* Retire organisateur + navigateur web */
+  --sticky: "false";              /* "true" = reste activé si ratio redescend */
 
   /* ── POLICE ──────────────────────────────────────────────────  */
-  --font-family: "Montserrat"; /* Police de caractères              */
+  --font-family: "Montserrat";
 }
 
 body {

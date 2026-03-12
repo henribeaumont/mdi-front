@@ -7,6 +7,9 @@ let participantsActifs = 1;
 let currentProgress = 0;
 let currentRoom = "";
 
+// Config pilotable depuis la télécommande (priorité sur les CSS vars OBS)
+let CONFIG = { word: "MOTIVÉ", trigger: "GO", threshold: 0.8 };
+
 const wordEl = document.getElementById("golden-word");
 const containerEl = document.getElementById("container");
 const securityEl = document.getElementById("security-screen");
@@ -54,7 +57,6 @@ function updateVisuals(progress) {
     const startSize = parseFloat(cssVar("--start-size", "72")) || 72;
     const endSize   = parseFloat(cssVar("--end-size",   "140")) || 140;
     const currentSize = startSize + (endSize - startSize) * progress;
-    // font-size directement : le container inline-flex s'adapte automatiquement
     wordEl.style.fontSize = `${currentSize.toFixed(2)}px`;
 
     const startColor = parseColor(cssVar("--start-color", "#6b6b6b"));
@@ -73,7 +75,6 @@ function updateVisuals(progress) {
         wordEl.style.textShadow = "";
     }
 
-    // Scintillement uniquement au seuil atteint (100%)
     if (progress >= 1) {
         wordEl.classList.add("shimmer");
     } else {
@@ -81,8 +82,16 @@ function updateVisuals(progress) {
     }
 }
 
+function applyServerConfig(data) {
+    // Priorité : données télécommande > CSS vars OBS > valeurs par défaut
+    CONFIG.word      = data?.word      || cssVar("--display-word", "MOTIVÉ");
+    CONFIG.trigger   = (data?.trigger  || cssVar("--trigger-chat",  "GO")).toUpperCase();
+    CONFIG.threshold = data?.threshold != null
+        ? data.threshold
+        : (parseFloat(cssVar("--threshold", "0.8")) || 0.8);
+}
+
 async function init() {
-    // Petit délai pour laisser OBS injecter le CSS
     await new Promise(r => setTimeout(r, 400));
 
     const room = cssVar("--room-id", "");
@@ -116,6 +125,7 @@ async function init() {
         estAutorise = true;
         participantsActifs = payload.room_count || 1;
 
+        applyServerConfig(payload.data);
         syncConfig();
         containerEl.classList.add("ready");
     });
@@ -130,8 +140,7 @@ async function init() {
         const vote = String(data.vote || "").trim().toUpperCase();
         if (vote === "RESET") { resetSession(); return; }
 
-        const trigger = cssVar("--trigger-chat", "GG").toUpperCase();
-        if (vote === trigger) {
+        if (vote === CONFIG.trigger) {
             triggerCount++;
             updateLogic();
         }
@@ -142,23 +151,20 @@ async function init() {
 
 function syncConfig() {
     if (!estAutorise) return;
-    const newDisplay = cssVar("--display-word", "VICTOIRE");
-    if (wordEl.innerText !== newDisplay) {
-        wordEl.innerText = newDisplay;
+    if (wordEl.innerText !== CONFIG.word) {
+        wordEl.innerText = CONFIG.word;
     }
     updateLogic();
 }
 
 function updateLogic() {
-    // --participants-offset : soustrait l'organisateur + le navigateur web (défaut : 2)
     const offset    = Math.max(0, parseInt(cssVar("--participants-offset", "2")) || 0);
     const total     = Math.max(1, participantsActifs - offset);
-    const threshold = Math.max(0.01, parseFloat(cssVar("--threshold", "0.9")) || 0.9);
+    const threshold = CONFIG.threshold;
 
     const ratio    = Math.min(triggerCount, total) / total;
     const progress = Math.min(ratio / threshold, 1.0);
 
-    // sticky : ne jamais redescendre en dessous du maximum atteint
     if (cssVar("--sticky", "false") === "true") {
         currentProgress = Math.max(currentProgress, progress);
     } else {
