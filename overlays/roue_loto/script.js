@@ -368,14 +368,13 @@ function hideCollecting() {
 }
 
 function showStage() {
-  // Invalide tout fondu d'apparition en cours
+  // Invalide tout fondu en cours
   _stageFadeToken = null;
 
-  // Retire la classe standby
-  document.documentElement.classList.remove("mdi-standby");
-
-  // On passe immédiatement l'opacité à 0 avant que le navigateur ne dessine
+  // Verrouiller l'opacité à 0 AVANT de retirer mdi-standby pour éviter
+  // tout flash d'un frame causé par le changement de cascade CSS
   stageEl.style.opacity = "0";
+  document.documentElement.classList.remove("mdi-standby");
 
   const FADE_MS = 750;
   const token = {};
@@ -383,24 +382,22 @@ function showStage() {
   let t0 = null;
 
   function tick(ts) {
-    if (_stageFadeToken !== token) return; // animation annulée par hideStage()
+    if (_stageFadeToken !== token) return;
     if (t0 === null) t0 = ts;
     const t = Math.min((ts - t0) / FADE_MS, 1);
-    // Application d'un easing progressif (ease-in-out simple) pour adoucir encore plus l'apparition
     const easeT = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
     stageEl.style.opacity = String(easeT);
     if (easeT < 1) {
       requestAnimationFrame(tick);
     } else {
-      stageEl.style.removeProperty("opacity"); // remet le CSS en charge
+      // NE PAS removeProperty : le CSS par défaut est opacity:0,
+      // on garde l'inline opacity:1 pour que la roue reste visible.
+      stageEl.style.opacity = "1";
       _stageFadeToken = null;
     }
   }
 
-  // MODIFICATION 2 : On attend 50ms avant de démarrer le fondu pour éviter le flash blanc (bug récurrent sur OBS Browser Source)
-  setTimeout(() => {
-    requestAnimationFrame(tick);
-  }, 50);
+  setTimeout(() => { requestAnimationFrame(tick); }, 50);
 }
 
 // MODIFICATION : On utilise le Javascript pour faire un fondu doux au masquage aussi.
