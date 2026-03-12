@@ -1111,6 +1111,13 @@
                oninput="motSendUpdate()" />
       </div>
 
+      <!-- Nombre de participants -->
+      <div class="match-team-field">
+        <label>Nombre de participants</label>
+        <input type="number" id="motParticipants" value="" min="1" max="999" placeholder="ex : 8"
+               oninput="motSendUpdate()" style="width:100px;" />
+      </div>
+
       <!-- Seuil -->
       <div class="match-team-field">
         <label>Seuil d'activation</label>
@@ -1461,6 +1468,7 @@
             $("motThresholdRange").value   = pct;
             $("motThresholdDisplay").textContent = pct + "%";
           }
+          if (data.totalParticipants != null) $("motParticipants").value = data.totalParticipants;
         }
       }
 
@@ -2247,11 +2255,13 @@
 
     function motSendUpdate() {
       if (!connected) return;
+      const rawPart = parseInt($("motParticipants").value);
       socket.emit("control:mot_magique_update_config", {
-        room:      currentRoom,
-        word:      $("motWord").value.toUpperCase() || "MOTIVÉ",
-        trigger:   $("motTrigger").value || "go",
-        threshold: parseInt($("motThresholdRange").value) / 100
+        room:              currentRoom,
+        word:              $("motWord").value.toUpperCase() || "MOTIVÉ",
+        trigger:           $("motTrigger").value || "go",
+        threshold:         parseInt($("motThresholdRange").value) / 100,
+        totalParticipants: isNaN(rawPart) || rawPart < 1 ? null : rawPart
       });
     }
 
