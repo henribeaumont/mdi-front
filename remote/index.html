@@ -578,6 +578,7 @@
       <button class="tab" onclick="switchTab('roue', this)">🎡</button>
       <button class="tab" onclick="switchTab('timer', this)">🕔</button>
       <button class="tab" onclick="switchTab('match', this)">↔️</button>
+      <button class="tab" onclick="switchTab('tug', this)">⚖️</button>
       <button class="tab" onclick="switchTab('commentaires', this)">💬</button>
     </div>
 
@@ -1011,6 +1012,70 @@
       <div id="messageMatch" class="flash-msg"></div>
     </div>
 
+    <!-- ===================== ONGLET TUG OF WAR ===================== -->
+    <div id="tabTug" class="tab-content">
+      <div class="overlay-status">
+        <div class="overlay-voyant">
+          <div id="statusTugDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Overlay actif</span>
+        </div>
+      </div>
+
+      <!-- Toggle affichage -->
+      <div class="toggle-container">
+        <div class="toggle-label">
+          <span class="icon">⚖️</span>
+          <span>Tug of War</span>
+        </div>
+        <div id="toggleTug" class="toggle-switch" onclick="tugToggle()"></div>
+      </div>
+
+      <div class="separator"></div>
+
+      <!-- Configuration gauche / droite -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+
+        <!-- Côté gauche -->
+        <div>
+          <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Gauche</div>
+          <div class="match-team-field">
+            <label>Label</label>
+            <input type="text" id="tugNameLeft" placeholder="OUI" oninput="tugSendUpdate()" />
+          </div>
+          <div class="match-team-field">
+            <label>Trigger chat</label>
+            <input type="text" id="tugTriggerLeft" placeholder="O" oninput="tugSendUpdate()" style="text-transform:uppercase;" />
+          </div>
+          <div class="match-team-field">
+            <label>Couleur</label>
+            <div class="match-color-swatches" id="tugSwatchesLeft"></div>
+          </div>
+        </div>
+
+        <!-- Côté droit -->
+        <div>
+          <div style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Droite</div>
+          <div class="match-team-field">
+            <label>Label</label>
+            <input type="text" id="tugNameRight" placeholder="NON" oninput="tugSendUpdate()" />
+          </div>
+          <div class="match-team-field">
+            <label>Trigger chat</label>
+            <input type="text" id="tugTriggerRight" placeholder="N" oninput="tugSendUpdate()" style="text-transform:uppercase;" />
+          </div>
+          <div class="match-team-field">
+            <label>Couleur</label>
+            <div class="match-color-swatches" id="tugSwatchesRight"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <button class="btn-danger" onclick="tugReset()">🔄 Réinitialiser les votes</button>
+
+      <div id="messageTug" class="flash-msg"></div>
+    </div>
+
   </div><!-- /container -->
 
   <script>
@@ -1043,6 +1108,10 @@
     let matchScoreB = 0;
     let matchTeamAColor = "#3b82f6";
     let matchTeamBColor = "#ef4444";
+
+    // Tug of War
+    let tugColorLeft  = "#2ecc71";
+    let tugColorRight = "#e74c3c";
 
     const MATCH_COLORS = [
       { hex: "#3b82f6", label: "Bleu" },
@@ -1093,7 +1162,8 @@
       "roue_loto":       { online: "statusRoueOnline",   display: "statusRoueDisplay"   },
       "commentaires":    { online: "statusCommOnline",   display: "statusCommDisplay"   },
       "timer_chrono":    { online: "statusTimerOnline",  display: "statusTimerDisplay"  },
-      "match_equipes":   { display: "statusMatchDisplay"  }
+      "match_equipes":   { display: "statusMatchDisplay"  },
+      "tug_of_war":      { display: "statusTugDisplay"   }
     };
 
     function updateOverlayDots(overlay, { online, displaying } = {}) {
@@ -1296,6 +1366,30 @@
             });
           }
           matchUpdateLabels();
+        }
+      }
+
+      if (overlay === "tug_of_war") {
+        const isOn = state !== "idle";
+        $("toggleTug").className = isOn ? "toggle-switch active" : "toggle-switch";
+        updateOverlayDots(overlay, { displaying: isOn });
+        if (data) {
+          if (data.nameLeft)     $("tugNameLeft").value    = data.nameLeft;
+          if (data.nameRight)    $("tugNameRight").value   = data.nameRight;
+          if (data.triggerLeft)  $("tugTriggerLeft").value = data.triggerLeft;
+          if (data.triggerRight) $("tugTriggerRight").value= data.triggerRight;
+          if (data.colorLeft && data.colorLeft !== tugColorLeft) {
+            tugColorLeft = data.colorLeft;
+            document.querySelectorAll("#tugSwatchesLeft .match-color-swatch").forEach(s => {
+              s.classList.toggle("selected", s.dataset.color === tugColorLeft);
+            });
+          }
+          if (data.colorRight && data.colorRight !== tugColorRight) {
+            tugColorRight = data.colorRight;
+            document.querySelectorAll("#tugSwatchesRight .match-color-swatch").forEach(s => {
+              s.classList.toggle("selected", s.dataset.color === tugColorRight);
+            });
+          }
         }
       }
 
@@ -1979,6 +2073,77 @@
       });
     }
 
+    // ===================== TUG OF WAR =====================
+    function tugToggle() {
+      if (!connected) return;
+      const isOn = $("toggleTug").classList.contains("active");
+      const action = isOn ? "tug_of_war_off" : "tug_of_war_on";
+      socket.emit("control:action", { room: currentRoom, action });
+    }
+
+    function tugReset() {
+      if (!connected) return;
+      // Le reset côté overlay se fait via tug_of_war_off + on (les scores sont locaux à l'overlay)
+      socket.emit("control:action", { room: currentRoom, action: "tug_of_war_off" });
+      setTimeout(() => socket.emit("control:action", { room: currentRoom, action: "tug_of_war_on" }), 300);
+      showFlash("messageTug", "Votes réinitialisés", "success");
+    }
+
+    function tugSetColor(side, color) {
+      if (side === "left") {
+        tugColorLeft = color;
+        document.querySelectorAll("#tugSwatchesLeft .match-color-swatch").forEach(s => {
+          s.classList.toggle("selected", s.dataset.color === color);
+        });
+      } else {
+        tugColorRight = color;
+        document.querySelectorAll("#tugSwatchesRight .match-color-swatch").forEach(s => {
+          s.classList.toggle("selected", s.dataset.color === color);
+        });
+      }
+      tugSendUpdate();
+    }
+
+    function tugSendUpdate() {
+      if (!connected) return;
+      socket.emit("control:tug_update_config", {
+        room:         currentRoom,
+        nameLeft:     $("tugNameLeft").value,
+        nameRight:    $("tugNameRight").value,
+        triggerLeft:  $("tugTriggerLeft").value.toUpperCase(),
+        triggerRight: $("tugTriggerRight").value.toUpperCase(),
+        colorLeft:    tugColorLeft,
+        colorRight:   tugColorRight
+      });
+    }
+
+    function tugInitSwatches() {
+      const TUG_COLORS = [
+        { hex: "#2ecc71", label: "Vert" },
+        { hex: "#e74c3c", label: "Rouge" },
+        { hex: "#3b82f6", label: "Bleu" },
+        { hex: "#ec4899", label: "Rose" },
+        { hex: "#f97316", label: "Orange" },
+        { hex: "#eab308", label: "Jaune" },
+        { hex: "#a855f7", label: "Violet" },
+        { hex: "#06b6d4", label: "Cyan" },
+        { hex: "#ffffff", label: "Blanc" },
+      ];
+      [["left", tugColorLeft], ["right", tugColorRight]].forEach(([side, defaultColor]) => {
+        const container = $("tugSwatches" + side.charAt(0).toUpperCase() + side.slice(1));
+        TUG_COLORS.forEach(({ hex, label }) => {
+          const div = document.createElement("div");
+          div.className = "match-color-swatch";
+          div.dataset.color = hex;
+          div.style.background = hex;
+          div.title = label;
+          div.onclick = () => tugSetColor(side, hex);
+          if (hex === defaultColor) div.classList.add("selected");
+          container.appendChild(div);
+        });
+      });
+    }
+
     // ===================== SÉCURITÉ — ÉCHAPPEMENT HTML/JS =====================
     function escHtml(str) {
       return String(str)
@@ -1995,6 +2160,7 @@
 
     // ===================== INIT =====================
     matchInitSwatches();
+    tugInitSwatches();
     $("btnConnect").onclick = connect;
 
     const urlParams = new URLSearchParams(window.location.search);

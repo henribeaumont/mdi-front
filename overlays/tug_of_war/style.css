@@ -4,8 +4,10 @@
    Dans OBS → Propriétés de la source → CSS personnalisé,
    copiez-collez le bloc :root { } et modifiez les valeurs.
 
-   Ce widget affiche une barre qui se déplace selon les votes
-   du public (ex: OUI vs NON, ÉQUIPE A vs ÉQUIPE B).
+   ℹ️  Les noms, couleurs et triggers sont désormais pilotables
+   depuis la télécommande (onglet ⚖️). Les variables --name-*,
+   --color-* et --trigger-* servent uniquement de valeurs par
+   défaut si aucune config télécommande n'est disponible.
    ================================================================ */
 
 :root {
@@ -14,19 +16,6 @@
   --room-id:   "";        /* Identifiant de votre room           */
   --room-key:  "";        /* Clé secrète de la room              */
   --auth-mode: "strict";  /* "strict" = clé obligatoire (recommandé) */
-
-  /* ── NOMS DES ÉQUIPES / OPTIONS ─────────────────────────────  */
-  --name-left:  "OUI"; /* Texte affiché à gauche               */
-  --name-right: "NON"; /* Texte affiché à droite               */
-
-  /* ── TOUCHES DE VOTE (pour les participants) ─────────────────
-     Les participants votent en tapant ces touches dans le chat. */
-  --trigger-left:  "O"; /* Touche/mot pour voter à gauche       */
-  --trigger-right: "N"; /* Touche/mot pour voter à droite       */
-
-  /* ── COULEURS ────────────────────────────────────────────────  */
-  --color-left:  #2ecc71; /* Couleur équipe gauche — ex: #2ecc71 (vert) */
-  --color-right: #e74c3c; /* Couleur équipe droite — ex: #e74c3c (rouge) */
 
   /* ── FOND DU PANNEAU ─────────────────────────────────────────  */
   --panel-bg-color:   #0A0F1E; /* Couleur de fond                 */
