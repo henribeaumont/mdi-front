@@ -109,8 +109,7 @@ html, body {
   position: relative;
   width: var(--wheel-size);
   height: var(--wheel-size);
-  opacity: 1;
-  transition: opacity 0.6s ease-in-out;
+  opacity: 0;
 }
 
 canvas#wheel {
@@ -239,7 +238,6 @@ canvas.confetti {
 
 /* ── MESSAGE D'ATTENTE (collecte ouverte en mode chat) ─────────── */
 .roue-waiting-message {
-  display: none;
   position: fixed;
   bottom: 8%;
   left: 50%;
@@ -247,6 +245,9 @@ canvas.confetti {
   z-index: 180;
   max-width: 90vw;
   text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.75s ease-in-out;
 }
 
 .roue-waiting-message::after {
@@ -273,5 +274,6 @@ canvas.confetti {
 }
 
 .mdi-collecting .roue-waiting-message {
-  display: block;
+  opacity: 1;
+  pointer-events: auto;
 }
