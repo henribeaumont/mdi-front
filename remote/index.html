@@ -581,6 +581,7 @@
       <button class="tab" onclick="switchTab('tug', this)">↔️</button>
       <button class="tab" onclick="switchTab('mot', this)">✨</button>
       <button class="tab" onclick="switchTab('commentaires', this)">💬</button>
+      <button class="tab" id="tabBtnChatMDI" onclick="switchTab('chatMDI', this)">🗨️</button>
     </div>
 
     <!-- ===================== ONGLET QUIZ ===================== -->
@@ -689,8 +690,17 @@
 
       <div id="roueControls" class="roue-controls">
 
-        <!-- Sélection du mode de collecte -->
-        <div class="roue-feed-mode">
+        <!-- Bannière Chat MDI actif (masque les contrôles non pertinents) -->
+        <div id="roueChatMDIBanner" style="display:none; background:rgba(124,92,252,0.12);
+             border:1px solid rgba(124,92,252,0.4); border-radius:8px; padding:10px 12px;
+             font-size:12px; color:#c8b8ff; margin-bottom:8px; line-height:1.5;">
+          🗨️ <strong>Chat MDI actif</strong> — La roue est alimentée automatiquement par
+          les participants du chat. Seuls <strong>Lancer la roue</strong> et
+          <strong>Mode consécutif</strong> sont disponibles.
+        </div>
+
+        <!-- Sélection du mode de collecte (masqué quand Chat MDI actif) -->
+        <div id="roueFeedModeSection" class="roue-feed-mode">
           <div class="roue-feed-label">Mode de collecte</div>
           <div class="roue-feed-btns">
             <button id="btnFeedChat" class="feed-mode-btn active" onclick="setFeedMode('chat')">💬 Chat</button>
@@ -698,7 +708,8 @@
           </div>
         </div>
 
-        <!-- Liste organisateur (persistante, gérée indépendamment) -->
+        <!-- Liste organisateur (masquée quand Chat MDI actif) -->
+        <div id="roueRemoteSection">
         <div class="moderation-section">
           <div class="moderation-header" onclick="toggleRemoteSection()">
             <div class="moderation-header-left">
@@ -722,6 +733,7 @@
             </button>
           </div>
         </div>
+        </div><!-- /roueRemoteSection -->
 
         <!-- Actions en standby (roue cachée, prête à être affichée) -->
         <div id="roueStandbyActions">
@@ -1134,6 +1146,68 @@
       <div id="messageMot" class="flash-msg"></div>
     </div>
 
+    <!-- ===================== ONGLET CHAT MDI ===================== -->
+    <div id="tabChatMDI" class="tab-content">
+
+      <!-- Activation du Chat MDI -->
+      <div class="toggle-container">
+        <div class="toggle-label">
+          <span class="icon">🗨️</span>
+          <span>Chat MDI</span>
+        </div>
+        <div id="toggleChatMDI" class="toggle-switch" onclick="toggleChatMDI()"></div>
+      </div>
+
+      <div id="chatMDIControls" style="display:none;">
+
+        <!-- Lien + QR Code -->
+        <div class="moderation-section">
+          <div class="section-title" style="padding:10px 0 6px;">🔗 Lien participants</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="chatMDILink" readonly
+                   style="flex:1; font-size:12px; padding:8px 10px; border-radius:8px;
+                          border:1.5px solid var(--border); background:var(--bg-input);
+                          color:var(--text-muted); cursor:pointer; outline:none;"
+                   onclick="copyChatLink()" title="Cliquer pour copier">
+            <button class="btn-secondary" style="flex-shrink:0; font-size:12px; padding:8px 12px;"
+                    onclick="copyChatLink()">📋 Copier</button>
+          </div>
+          <div id="chatMDIQR" style="display:flex; justify-content:center; margin-top:14px;"></div>
+          <div id="chatMDICopyFeedback" style="font-size:12px; color:var(--success); text-align:center; min-height:18px; margin-top:4px;"></div>
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Participants connectés -->
+        <div class="moderation-section">
+          <div class="moderation-header" onclick="toggleChatParticipantsSection()">
+            <div class="moderation-header-left">
+              👥 Participants connectés
+              <span id="chatMDICount" class="moderation-count">0</span>
+            </div>
+            <span id="chatMDIChevron" class="moderation-chevron">▼</span>
+          </div>
+          <div id="chatMDIParticipantsBody" class="moderation-body">
+            <div id="chatMDIParticipantsList" class="participants-list">
+              <div class="empty-participants">Aucun participant connecté</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Note info Roue -->
+        <div style="background:rgba(124,92,252,0.10); border:1px solid rgba(124,92,252,0.3);
+                    border-radius:8px; padding:10px 12px; font-size:12px;
+                    color:var(--text-muted); margin-top:4px; line-height:1.5;">
+          🎡 Quand la roue est active, elle est <strong>automatiquement alimentée</strong>
+          par les participants du Chat MDI.<br>
+          Seuls <strong>Lancer la roue</strong> et <strong>Mode consécutif</strong> sont disponibles.
+        </div>
+
+      </div>
+
+      <div id="messageChatMDI" class="flash-msg"></div>
+    </div>
+
   </div><!-- /container -->
 
   <script>
@@ -1194,6 +1268,11 @@
     let consecutifMode = false;
     let feedMode = "chat"; // "chat" | "remote"
     let roueCurrentState = "idle"; // "idle" | "standby" | "collecting" | "ready" | "spinning" | "winner"
+
+    // Chat MDI
+    let chatMDIActive = false;
+    let chatMDIToken  = null;
+    let chatMDIParticipantsSectionOpen = true;
 
     // Commentaires
     let fluxMessages = [];
@@ -1295,6 +1374,8 @@
         // Activer timer et match en arrière-plan
         setTimeout(() => socket.emit("control:activate_overlay", { room: currentRoom, overlay: "timer_chrono" }), 500);
         setTimeout(() => socket.emit("control:activate_overlay", { room: currentRoom, overlay: "match_equipes" }), 700);
+        // Récupérer l'état Chat MDI au cas où il était actif avant la connexion
+        setTimeout(() => requestChatMDIState(), 900);
       });
 
       socket.on("connect_error", () => {
@@ -1325,6 +1406,19 @@
         connected = false;
         $("statusDot").className = "status-dot";
       });
+
+      // ── Chat MDI ──────────────────────────────────────────────
+      socket.on("chat:state", (payload) => {
+        console.log("💬 [CHAT MDI] État reçu:", payload.active, "participants:", payload.participants?.length);
+        chatMDIActive = Boolean(payload.active);
+        chatMDIToken  = payload.token || null;
+        updateChatMDIUI(payload.participants || [], payload.messages || []);
+      });
+
+      // Demander l'état actuel après reconnexion
+      setTimeout(() => {
+        if (connected && currentRoom) socket.emit("chat:get_state", { room: currentRoom });
+      }, 800);
     }
 
     // ===================== ÉTATS OVERLAY =====================
@@ -2277,6 +2371,123 @@
 
     function escJs(str) {
       return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    }
+
+    // ===================== CHAT MDI =====================
+
+    function toggleChatMDI() {
+      if (!connected) return flash("chatMDI", "⚠️ Non connecté", "error");
+      socket.emit("chat:toggle", { room: currentRoom });
+    }
+
+    function updateChatMDIUI(participants, messages) {
+      // Toggle Chat MDI
+      $("toggleChatMDI").className = chatMDIActive ? "toggle-switch active" : "toggle-switch";
+      $("chatMDIControls").style.display = chatMDIActive ? "block" : "none";
+
+      // Adaptation onglet Roue : bannière + masquage des contrôles non pertinents
+      const roueBanner       = $("roueChatMDIBanner");
+      const roueFeedSection  = $("roueFeedModeSection");
+      const roueRemoteSection = $("roueRemoteSection");
+      if (roueBanner)        roueBanner.style.display        = chatMDIActive ? "block" : "none";
+      if (roueFeedSection)   roueFeedSection.style.display   = chatMDIActive ? "none"  : "block";
+      if (roueRemoteSection) roueRemoteSection.style.display = chatMDIActive ? "none"  : "block";
+
+      if (!chatMDIActive) {
+        $("chatMDILink").value = "";
+        $("chatMDIQR").innerHTML = "";
+        $("chatMDICount").textContent = "0";
+        $("chatMDIParticipantsList").innerHTML = '<div class="empty-participants">Aucun participant connecté</div>';
+        return;
+      }
+
+      // URL du chat (même origine que la télécommande, sans room_id ni room_key)
+      const chatUrl = chatMDIToken
+        ? `${window.location.origin}/chat/?t=${chatMDIToken}`
+        : "";
+      $("chatMDILink").value = chatUrl;
+
+      // QR code
+      if (chatUrl) renderChatQR(chatUrl);
+
+      // Participants
+      $("chatMDICount").textContent = participants.length;
+      if (participants.length === 0) {
+        $("chatMDIParticipantsList").innerHTML = '<div class="empty-participants">Aucun participant connecté</div>';
+      } else {
+        $("chatMDIParticipantsList").innerHTML = participants
+          .map(p => `<div class="participant-item" style="justify-content:flex-start; gap:8px; cursor:default;">
+            <span style="color:var(--success); font-size:10px;">●</span>
+            <span>${escHtml(p.prenom)} ${escHtml(p.nom)}</span>
+          </div>`)
+          .join("");
+      }
+    }
+
+    function copyChatLink() {
+      const link = $("chatMDILink").value;
+      if (!link) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(() => showCopyFeedback());
+      } else {
+        $("chatMDILink").select();
+        document.execCommand("copy");
+        showCopyFeedback();
+      }
+    }
+
+    function showCopyFeedback() {
+      $("chatMDICopyFeedback").textContent = "✅ Lien copié !";
+      setTimeout(() => { $("chatMDICopyFeedback").textContent = ""; }, 2000);
+    }
+
+    // QR Code — génération inline (pas de dépendance externe)
+    function renderChatQR(url) {
+      const container = $("chatMDIQR");
+      container.innerHTML = "";
+      // Chargement dynamique de qrcodejs si pas encore disponible
+      if (typeof QRCode !== "undefined") {
+        buildQR(container, url);
+      } else {
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js";
+        script.onload = () => buildQR(container, url);
+        script.onerror = () => {
+          container.innerHTML = `<div style="font-size:11px;color:var(--text-muted);text-align:center;">
+            QR code indisponible<br><small>Copiez le lien ci-dessus</small></div>`;
+        };
+        document.head.appendChild(script);
+      }
+    }
+
+    function buildQR(container, url) {
+      container.innerHTML = "";
+      try {
+        new QRCode(container, {
+          text: url,
+          width: 160,
+          height: 160,
+          colorDark: "#e8eaf0",
+          colorLight: "#1a1d27",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch(e) {
+        container.innerHTML = `<div style="font-size:11px;color:var(--text-muted);">QR indisponible</div>`;
+      }
+    }
+
+    function toggleChatParticipantsSection() {
+      chatMDIParticipantsSectionOpen = !chatMDIParticipantsSectionOpen;
+      $("chatMDIParticipantsBody").style.display = chatMDIParticipantsSectionOpen ? "block" : "none";
+      $("chatMDIChevron").textContent = chatMDIParticipantsSectionOpen ? "▼" : "▶";
+    }
+
+    // Adaptation onglet chatMDI (largeur narrow, comme les autres onglets sauf commentaires)
+    // La fonction switchTab existante gère déjà ça (seul 'commentaires' passe en wide).
+
+    // Récupère l'état Chat MDI quand la télécommande se connecte
+    function requestChatMDIState() {
+      if (connected && currentRoom) socket.emit("chat:get_state", { room: currentRoom });
     }
 
     // ===================== INIT =====================
