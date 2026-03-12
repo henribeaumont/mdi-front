@@ -577,8 +577,8 @@
       <button class="tab" onclick="switchTab('nuage', this)">☁️</button>
       <button class="tab" onclick="switchTab('roue', this)">🎡</button>
       <button class="tab" onclick="switchTab('timer', this)">🕔</button>
-      <button class="tab" onclick="switchTab('match', this)">↔️</button>
-      <button class="tab" onclick="switchTab('tug', this)">⚖️</button>
+      <button class="tab" onclick="switchTab('match', this)">🆚</button>
+      <button class="tab" onclick="switchTab('tug', this)">↔️</button>
       <button class="tab" onclick="switchTab('commentaires', this)">💬</button>
     </div>
 
@@ -1024,8 +1024,8 @@
       <!-- Toggle affichage -->
       <div class="toggle-container">
         <div class="toggle-label">
-          <span class="icon">⚖️</span>
-          <span>Tug of War</span>
+          <span class="icon">↔️</span>
+          <span>Tir à la corde</span>
         </div>
         <div id="toggleTug" class="toggle-switch" onclick="tugToggle()"></div>
       </div>
@@ -1095,7 +1095,8 @@
       roue_collecte: false,
       quiz_ou_sondage: false,
       timer_chrono: false,
-      commentaires: false
+      commentaires: false,
+      tug_of_war: false
     };
 
     // Timer
@@ -1371,6 +1372,7 @@
 
       if (overlay === "tug_of_war") {
         const isOn = state !== "idle";
+        overlayStates.tug_of_war = isOn;
         $("toggleTug").className = isOn ? "toggle-switch active" : "toggle-switch";
         updateOverlayDots(overlay, { displaying: isOn });
         if (data) {
@@ -2076,16 +2078,18 @@
     // ===================== TUG OF WAR =====================
     function tugToggle() {
       if (!connected) return;
-      const isOn = $("toggleTug").classList.contains("active");
-      const action = isOn ? "tug_of_war_off" : "tug_of_war_on";
-      socket.emit("control:action", { room: currentRoom, action });
+      if (overlayStates.tug_of_war) {
+        socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "tug_of_war" });
+      } else {
+        socket.emit("control:activate_overlay", { room: currentRoom, overlay: "tug_of_war" });
+      }
     }
 
     function tugReset() {
       if (!connected) return;
-      // Le reset côté overlay se fait via tug_of_war_off + on (les scores sont locaux à l'overlay)
-      socket.emit("control:action", { room: currentRoom, action: "tug_of_war_off" });
-      setTimeout(() => socket.emit("control:action", { room: currentRoom, action: "tug_of_war_on" }), 300);
+      // Réinitialise les scores en désactivant puis réactivant (scores locaux à l'overlay)
+      socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "tug_of_war" });
+      setTimeout(() => socket.emit("control:activate_overlay", { room: currentRoom, overlay: "tug_of_war" }), 300);
       showFlash("messageTug", "Votes réinitialisés", "success");
     }
 
