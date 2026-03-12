@@ -8,7 +8,7 @@ let currentProgress = 0;
 let currentRoom = "";
 
 // Config pilotable depuis la télécommande (priorité sur les CSS vars OBS)
-let CONFIG = { word: "MOTIVÉ", trigger: "GO", threshold: 0.8 };
+let CONFIG = { word: "MOTIVÉ", trigger: "GO", threshold: 0.8, totalParticipants: null };
 
 const wordEl = document.getElementById("golden-word");
 const containerEl = document.getElementById("container");
@@ -89,6 +89,7 @@ function applyServerConfig(data) {
     CONFIG.threshold = data?.threshold != null
         ? data.threshold
         : (parseFloat(cssVar("--threshold", "0.8")) || 0.8);
+    CONFIG.totalParticipants = data?.totalParticipants ?? null;
 }
 
 async function init() {
@@ -159,7 +160,8 @@ function syncConfig() {
 
 function updateLogic() {
     const offset    = Math.max(0, parseInt(cssVar("--participants-offset", "2")) || 0);
-    const total     = Math.max(1, participantsActifs - offset);
+    const base      = CONFIG.totalParticipants != null ? CONFIG.totalParticipants : participantsActifs;
+    const total     = Math.max(1, base - offset);
     const threshold = CONFIG.threshold;
 
     const ratio    = Math.min(triggerCount, total) / total;
