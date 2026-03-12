@@ -579,6 +579,7 @@
       <button class="tab" onclick="switchTab('timer', this)">🕔</button>
       <button class="tab" onclick="switchTab('match', this)">🆚</button>
       <button class="tab" onclick="switchTab('tug', this)">↔️</button>
+      <button class="tab" onclick="switchTab('mot', this)">✨</button>
       <button class="tab" onclick="switchTab('commentaires', this)">💬</button>
     </div>
 
@@ -1076,6 +1077,56 @@
       <div id="messageTug" class="flash-msg"></div>
     </div>
 
+    <!-- ===================== ONGLET MOT MAGIQUE ===================== -->
+    <div id="tabMot" class="tab-content">
+      <div class="overlay-status">
+        <div class="overlay-voyant">
+          <div id="statusMotDisplay" class="overlay-status-dot"></div>
+          <span class="overlay-status-label">Overlay actif</span>
+        </div>
+      </div>
+
+      <!-- Toggle affichage -->
+      <div class="toggle-container">
+        <div class="toggle-label">
+          <span class="icon">✨</span>
+          <span>Mot Magique</span>
+        </div>
+        <div id="toggleMot" class="toggle-switch" onclick="motToggle()"></div>
+      </div>
+
+      <div class="separator"></div>
+
+      <!-- Mot affiché -->
+      <div class="match-team-field">
+        <label>Mot affiché</label>
+        <input type="text" id="motWord" value="MOTIVÉ" placeholder="MOTIVÉ"
+               oninput="this.value=this.value.toUpperCase(); motSendUpdate()" />
+      </div>
+
+      <!-- Trigger chat -->
+      <div class="match-team-field">
+        <label>Trigger chat</label>
+        <input type="text" id="motTrigger" value="go" placeholder="go"
+               oninput="motSendUpdate()" />
+      </div>
+
+      <!-- Seuil -->
+      <div class="match-team-field">
+        <label>Seuil d'activation</label>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+          <input type="range" id="motThresholdRange" min="10" max="100" step="5" value="80"
+                 oninput="motThresholdSync()"
+                 style="flex:1; accent-color:var(--accent);" />
+          <span id="motThresholdDisplay" style="font-weight:700; font-size:14px; min-width:38px; text-align:right; color:var(--accent);">80%</span>
+        </div>
+      </div>
+
+      <button class="btn-danger" style="margin-top:4px;" onclick="motReset()">🔄 Réinitialiser les votes</button>
+
+      <div id="messageMot" class="flash-msg"></div>
+    </div>
+
   </div><!-- /container -->
 
   <script>
@@ -1096,7 +1147,8 @@
       quiz_ou_sondage: false,
       timer_chrono: false,
       commentaires: false,
-      tug_of_war: false
+      tug_of_war: false,
+      mot_magique: false
     };
 
     // Timer
@@ -1164,7 +1216,8 @@
       "commentaires":    { online: "statusCommOnline",   display: "statusCommDisplay"   },
       "timer_chrono":    { online: "statusTimerOnline",  display: "statusTimerDisplay"  },
       "match_equipes":   { display: "statusMatchDisplay"  },
-      "tug_of_war":      { display: "statusTugDisplay"   }
+      "tug_of_war":      { display: "statusTugDisplay"   },
+      "mot_magique":     { display: "statusMotDisplay"   }
     };
 
     function updateOverlayDots(overlay, { online, displaying } = {}) {
@@ -1391,6 +1444,22 @@
             document.querySelectorAll("#tugSwatchesRight .match-color-swatch").forEach(s => {
               s.classList.toggle("selected", s.dataset.color === tugColorRight);
             });
+          }
+        }
+      }
+
+      if (overlay === "mot_magique") {
+        const isOn = state !== "idle";
+        overlayStates.mot_magique = isOn;
+        $("toggleMot").className = isOn ? "toggle-switch active" : "toggle-switch";
+        updateOverlayDots(overlay, { displaying: isOn });
+        if (data) {
+          if (data.word)    $("motWord").value    = data.word;
+          if (data.trigger) $("motTrigger").value = data.trigger;
+          if (data.threshold != null) {
+            const pct = Math.round(data.threshold * 100);
+            $("motThresholdRange").value   = pct;
+            $("motThresholdDisplay").textContent = pct + "%";
           }
         }
       }
@@ -2145,6 +2214,44 @@
           if (hex === defaultColor) div.classList.add("selected");
           container.appendChild(div);
         });
+      });
+    }
+
+    // ===================== MOT MAGIQUE =====================
+    function motToggle() {
+      if (!connected) return;
+      if (overlayStates.mot_magique) {
+        socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "mot_magique" });
+      } else {
+        socket.emit("control:activate_overlay", { room: currentRoom, overlay: "mot_magique" });
+        // Envoyer la config courante juste après l'activation
+        setTimeout(motSendUpdate, 200);
+      }
+    }
+
+    function motReset() {
+      if (!connected) return;
+      socket.emit("control:deactivate_overlay", { room: currentRoom, overlay: "mot_magique" });
+      setTimeout(() => {
+        socket.emit("control:activate_overlay", { room: currentRoom, overlay: "mot_magique" });
+        setTimeout(motSendUpdate, 200);
+      }, 300);
+      showFlash("messageMot", "Votes réinitialisés", "success");
+    }
+
+    function motThresholdSync() {
+      const pct = parseInt($("motThresholdRange").value);
+      $("motThresholdDisplay").textContent = pct + "%";
+      motSendUpdate();
+    }
+
+    function motSendUpdate() {
+      if (!connected) return;
+      socket.emit("control:mot_magique_update_config", {
+        room:      currentRoom,
+        word:      $("motWord").value.toUpperCase() || "MOTIVÉ",
+        trigger:   $("motTrigger").value || "go",
+        threshold: parseInt($("motThresholdRange").value) / 100
       });
     }
 
