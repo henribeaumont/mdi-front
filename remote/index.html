@@ -618,6 +618,19 @@
         <button id="btnRevealAnswer" class="btn-secondary" onclick="revealAnswer()" disabled>4. ✅ Réponse</button>
       </div>
       <button id="btnResetQuiz" class="btn-danger" onclick="resetQuiz()" disabled>5. 🔄 Réinitialiser</button>
+
+      <!-- Plus rapide (visible seulement quand Chat MDI actif) -->
+      <div id="fastestSection" style="display:none; margin-top:14px; padding:10px 12px;
+           background:rgba(251,191,36,0.10); border:1px solid rgba(251,191,36,0.35);
+           border-radius:8px; font-size:12px;">
+        <div style="font-weight:600; color:#fbbf24; margin-bottom:6px;">⚡ Plus rapide à répondre</div>
+        <div id="fastestName" style="color:#e5e7eb; margin-bottom:8px; min-height:18px;">—</div>
+        <button class="btn-secondary" style="width:100%; font-size:12px;"
+                onclick="showFastest()" id="btnShowFastest" disabled>
+          ⚡ Afficher le plus rapide
+        </button>
+      </div>
+
       <div id="messageQuiz" class="flash-msg"></div>
     </div>
 
@@ -1413,6 +1426,11 @@
         chatMDIActive = Boolean(payload.active);
         chatMDIToken  = payload.token || null;
         updateChatMDIUI(payload.participants || [], payload.messages || []);
+        updateFastestUI(payload.fastest || null);
+      });
+
+      socket.on("chat:fastest", (fastest) => {
+        updateFastestUI(fastest);
       });
 
       // Demander l'état actuel après reconnexion
@@ -1650,6 +1668,23 @@
     function showResults() { if (!connected) return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "results" }); }
     function revealAnswer() { if (!connected || currentQuestionType === "poll") return; socket.emit("control:set_state", { room: currentRoom, overlay: "quiz_ou_sondage", state: "reveal" }); }
     function resetQuiz() { if (!connected) return; socket.emit("control:idle", { room: currentRoom, overlay: "quiz_ou_sondage" }); }
+    function showFastest() { if (!connected) return; socket.emit("control:show_fastest", { room: currentRoom }); }
+
+    function updateFastestUI(fastest) {
+      window._fastestCache = fastest || null;
+      const section = $("fastestSection");
+      const nameEl  = $("fastestName");
+      const btn     = $("btnShowFastest");
+      if (!chatMDIActive) { section.style.display = "none"; return; }
+      section.style.display = "block";
+      if (fastest) {
+        nameEl.textContent = `${fastest.author} (${fastest.choice})`;
+        btn.disabled = false;
+      } else {
+        nameEl.textContent = "—";
+        btn.disabled = true;
+      }
+    }
 
 
     // ===================== TOGGLE OVERLAY GÉNÉRIQUE =====================
@@ -2393,7 +2428,11 @@
       if (roueFeedSection)   roueFeedSection.style.display   = chatMDIActive ? "none"  : "block";
       if (roueRemoteSection) roueRemoteSection.style.display = chatMDIActive ? "none"  : "block";
 
+      // Section Plus rapide (onglet Quiz)
+      updateFastestUI(chatMDIActive ? (window._fastestCache || null) : null);
+
       if (!chatMDIActive) {
+        window._fastestCache = null;
         $("chatMDILink").value = "";
         $("chatMDIQR").innerHTML = "";
         $("chatMDICount").textContent = "0";
