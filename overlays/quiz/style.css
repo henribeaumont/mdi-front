@@ -162,3 +162,34 @@ html.mdi-dim-answers .answer {
 
 /* (Optionnel) Si tu veux quand même voir la bonne réponse en fond, décommente ça : */
 /* html.mdi-dim-answers .answer.force-visible { opacity: 0.3 !important; filter: blur(2px); } */
+
+/* --- ÉTAT FASTEST (Chat MDI) --- */
+
+/* Estomper les réponses à 50% quand le plus rapide est affiché */
+html.mdi-fastest .answer {
+  opacity: 0.5 !important;
+  transition: opacity 0.4s ease;
+}
+
+/* Overlay fastest : superimpression sur le panel réponses */
+.fastest-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px;
+  opacity: 0; pointer-events: none; z-index: 55;
+  transition: opacity 0.4s ease;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 48px;
+}
+html.mdi-fastest .fastest-overlay { opacity: 1; }
+
+.fastest-label {
+  font-size: 38px; font-weight: 800; color: #fbbf24;
+  text-shadow: 0 0 24px rgba(251, 191, 36, 0.9), 0 2px 8px rgba(0,0,0,0.8);
+  letter-spacing: 2px;
+}
+.fastest-name {
+  font-size: 90px; font-weight: 900; color: #fff;
+  text-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 20px rgba(251,191,36,0.4);
+  text-align: center; max-width: 90%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

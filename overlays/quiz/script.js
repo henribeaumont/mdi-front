@@ -82,7 +82,8 @@ function resetVisuals() {
     "mdi-show-winner",
     "mdi-dim-others",
     "mdi-dim-answers",
-    "mdi-options-hidden"
+    "mdi-options-hidden",
+    "mdi-fastest"
   );
 }
 
@@ -199,6 +200,16 @@ function initSocket() {
     if (payload?.overlay !== OVERLAY_NAME) return;
     showAuthorized();
     applyState(payload.state, payload.data);
+  });
+
+  socket.on("chat:fastest", (fastest) => {
+    const nameEl = document.getElementById("fastestNameQuiz");
+    if (fastest) {
+      if (nameEl) nameEl.textContent = fastest.author + (fastest.choice ? ` — ${fastest.choice}` : "");
+      document.documentElement.classList.add("mdi-fastest");
+    } else {
+      document.documentElement.classList.remove("mdi-fastest");
+    }
   });
 }
 
